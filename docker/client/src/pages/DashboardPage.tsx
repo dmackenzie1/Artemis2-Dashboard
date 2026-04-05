@@ -1,7 +1,8 @@
 import type { FC, FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { chat, fetchDashboard, fetchHealth, fetchPipelineDashboard } from "../api";
-import type { DashboardData, HealthData, PipelineDashboardData } from "../api";
+import type { ChatMode, DashboardData, HealthData, PipelineDashboardData } from "../api";
+import { clientLogger } from "../utils/logging/clientLogger";
 
 const starterQueries = [
   "summarize MER manager activity",
@@ -9,6 +10,17 @@ const starterQueries = [
   "which channels discussed timeline risk?",
   "show mentions of comm dropouts"
 ];
+
+type ChatMessage = {
+  role: "user" | "assistant";
+  text: string;
+  strategy?: {
+    mode: ChatMode;
+    totalUtterances: number;
+    contextUtterances: number;
+    wasTruncated: boolean;
+  };
+};
 
 const getPromptDisplay = (
   prompt: PipelineDashboardData["prompts"][number] | undefined,
