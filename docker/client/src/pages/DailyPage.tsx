@@ -1,18 +1,20 @@
 import type { FC } from "react";
 import { useEffect, useState } from "react";
+import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import { fetchDashboard, type DashboardData } from "../api";
 
 export const DailyPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
+  const { componentId, componentUid } = useComponentIdentity("daily-page");
 
   useEffect(() => {
     void fetchDashboard().then((payload) => setData(payload));
   }, []);
 
   return (
-    <div className="stack">
+    <div className="stack" data-component-id={componentId} data-component-uid={componentUid}>
       {data?.days.map((day) => (
-        <article className="panel" key={day.day}>
+        <article className="panel" key={day.day} data-component-id="daily-day-panel" data-component-uid={`${componentUid}-${day.day}`}>
           <h2>{day.day}</h2>
           <p>{day.summary}</p>
           <p>

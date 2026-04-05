@@ -26,6 +26,7 @@ export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
 
   return (
     <DashboardPanel
+      componentId="daily-summary-panel"
       className="daily-summary-panel"
       kicker="Operational Readout"
       title="Last 24 Hours"

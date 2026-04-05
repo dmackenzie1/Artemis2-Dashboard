@@ -32,6 +32,7 @@ export const MissionOverviewPanel: FunctionComponent<MissionOverviewPanelProps> 
 
   return (
     <DashboardPanel
+      componentId="mission-overview-panel"
       className="mission-summary-panel"
       kicker="Mission Intelligence"
       title="Mission Summary"

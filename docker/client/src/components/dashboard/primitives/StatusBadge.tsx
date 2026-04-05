@@ -1,4 +1,5 @@
 import type { FunctionComponent } from "react";
+import { useComponentIdentity } from "./useComponentIdentity";
 
 type StatusTone =
   | "ready"
@@ -50,9 +51,10 @@ const normalizeTone = (label: string): StatusTone => {
 
 export const StatusBadge: FunctionComponent<StatusBadgeProps> = ({ label }) => {
   const tone = normalizeTone(label);
+  const { componentId, componentUid } = useComponentIdentity("status-badge");
 
   return (
-    <span className={`status-badge status-${tone}`}>
+    <span className={`status-badge status-${tone}`} data-component-id={componentId} data-component-uid={componentUid}>
       <span className="status-dot" aria-hidden="true" />
       <span>{label}</span>
     </span>
