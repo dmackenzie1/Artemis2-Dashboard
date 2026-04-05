@@ -75,6 +75,11 @@ type DailyDocumentGroup = {
   documents: SourceContextDocument[];
 };
 
+type DailyDocumentVariant = {
+  canonicalPath: string;
+  isPartial: boolean;
+};
+
 export class PipelineService {
   private runInProgress = false;
   private missionStatsCache: { computedAtMs: number; payload: MissionStatsView } | null = null;
@@ -125,6 +130,37 @@ export class PipelineService {
     return "unspecified-day";
   }
 
+  private deriveDailyDocumentVariant(relativePath: string): DailyDocumentVariant {
+    const parsedPath = path.parse(relativePath);
+    const isPartial = /_partial$/iu.test(parsedPath.name);
+    const canonicalName = isPartial ? parsedPath.name.replace(/_partial$/iu, "") : parsedPath.name;
+    return {
+      canonicalPath: path.join(parsedPath.dir, `${canonicalName}${parsedPath.ext}`),
+      isPartial
+    };
+  }
+
+  private resolveDailyGroupDocuments(documents: SourceContextDocument[]): SourceContextDocument[] {
+    const preferredByCanonicalPath = documents.reduce<Map<string, SourceContextDocument>>((selected, document) => {
+      const variant = this.deriveDailyDocumentVariant(document.path);
+      const existing = selected.get(variant.canonicalPath);
+
+      if (!existing) {
+        selected.set(variant.canonicalPath, document);
+        return selected;
+      }
+
+      const existingVariant = this.deriveDailyDocumentVariant(existing.path);
+      if (existingVariant.isPartial && !variant.isPartial) {
+        selected.set(variant.canonicalPath, document);
+      }
+
+      return selected;
+    }, new Map<string, SourceContextDocument>());
+
+    return [...preferredByCanonicalPath.values()].sort((left, right) => left.path.localeCompare(right.path));
+  }
+
   private buildDailyGroups(sourceContext: SourceContextDocument[]): DailyDocumentGroup[] {
     const groupedByDay = sourceContext.reduce<Map<string, SourceContextDocument[]>>((grouped, document) => {
       const dayKey = this.deriveDayKey(document.path);
@@ -136,11 +172,21 @@ export class PipelineService {
 
     return [...groupedByDay.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([day, documents]) => ({ day, documents }));
+      .map(([day, documents]) => ({ day, documents: this.resolveDailyGroupDocuments(documents) }));
   }
 
   private createDailySummaryCacheSubmission(sourceContext: SourceContextDocument[]): string {
-    const dayGroups = this.buildDailyGroups(sourceContext).map((group) => ({
+    const groupedDays = this.buildDailyGroups(sourceContext);
+    serverLogger.info("Prepared grouped daily-summary source document manifest", {
+      groupedDayCount: groupedDays.length,
+      groupedDays: groupedDays.map((group) => ({
+        day: group.day,
+        documentCount: group.documents.length,
+        documents: group.documents.map((document) => document.path)
+      }))
+    });
+
+    const dayGroups = groupedDays.map((group) => ({
       day: group.day,
       sourceDocuments: group.documents.map((document) => ({
         path: document.path,
@@ -229,10 +275,18 @@ export class PipelineService {
   private async generateDailySummaryOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
     const dayGroups = this.buildDailyGroups(sourceContext);
     const dayOutputs: string[] = [];
+    serverLogger.info("Starting daily summary layered generation", {
+      groupedDayCount: dayGroups.length
+    });
 
     for (const group of dayGroups) {
       const documentChunks = this.splitDayDocumentsIntoChunks(group.documents);
       const chunkOutputs: string[] = [];
+      serverLogger.info("Processing daily summary group", {
+        day: group.day,
+        sourceDocumentCount: group.documents.length,
+        chunkCount: documentChunks.length
+      });
 
       for (const [chunkIndex, chunkDocuments] of documentChunks.entries()) {
         const chunkOutput = await this.config.llmClient.generateText({

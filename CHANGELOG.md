@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: prefer canonical full-day transcript summary files over matching `_partial` variants when composing `daily_summary` day groups, and add detailed grouping/chunk logs for traceability. Intent: Keep day-level prompt manifests accurate and easier to debug when operators validate daily-summary source selection.
 - fix: reduce dashboard hourly-channel stats polling from 10 seconds to 5 minutes while keeping initial page-load fetch behavior. Intent: Cut unnecessary repeated backend hourly stats queries for mostly static mission activity views and reduce avoidable API/database load.
 - feat: make the mission activity signature panel full width, remove the standalone pipeline widget, and compress dashboard spacing/typography while restoring visible query controls and stronger background imagery. Intent: Match the latest reference layout so all operator panes fit on screen without overlap and the mission query search action remains discoverable.
 - feat: chunk day-level source documents into bounded prompt payloads, cache daily-summary submissions as checksum manifests, and run mission-summary synthesis from daily outputs with configurable LLM max token budget. Intent: Prevent context-window overflow on multi-million-token transcript sets while preserving reusable day abstractions for mission-level synthesis.
