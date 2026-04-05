@@ -17,6 +17,7 @@ const EnvSchema = z.object({
   DB_NAME: z.string().default("artemis_transcripts"),
   SOURCE_FILES_DIR: z.string().default("/app/source_files"),
   PROMPT_SUBMISSIONS_DIR: z.string().default("/app/data/prompt-submissions"),
+  LLM_DEBUG_PROMPTS_DIR: z.string().default("/tmp/llm-prompts"),
   PIPELINE_INTERVAL_HOURS: z.coerce.number().positive().default(6),
   PIPELINE_AUTO_RUN: z.coerce.boolean().default(true)
 });
