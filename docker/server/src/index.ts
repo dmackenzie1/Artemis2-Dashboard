@@ -114,7 +114,7 @@ app.use(
   createApiRouter(analysisService, () => llmConnectivityStatus, async () => {
     const em = ingestionEntityManager;
     if (em) {
-      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.TRANSCRIPT_CSV_DIR, em);
+      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
       serverLogger.info("Manual transcript ingestion completed", transcriptIngestion);
     }
 
@@ -175,7 +175,7 @@ const runStartupIngestion = async (): Promise<void> => {
   try {
     const em = ingestionEntityManager;
     if (em) {
-      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.TRANSCRIPT_CSV_DIR, em);
+      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
       serverLogger.info("Startup transcript ingestion completed", transcriptIngestion);
     }
 
