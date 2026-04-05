@@ -59,4 +59,34 @@ describe("LlmClient.generateText", () => {
       global.fetch = originalFetch;
     }
   });
+
+  it("extracts text when provider returns array content blocks without a type field", async () => {
+    const originalFetch = global.fetch;
+
+    try {
+      global.fetch = async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: [{ text: "pane-ready" }]
+                }
+              }
+            ]
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+
+      const client = new LlmClient("https://itar-llm-api-access-dev.caio.mcp.nasa.gov/v1/chat/completions", "test-key", "gemini-test");
+      const output = await client.generateText({
+        systemPrompt: "Respond with pane-ready.",
+        userPrompt: "test"
+      });
+
+      expect(output).toBe("pane-ready");
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });

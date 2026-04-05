@@ -4,6 +4,9 @@ import { PromptDefinition } from "./PromptDefinition.js";
 export class PromptExecution {
   id!: number;
   prompt!: PromptDefinition;
+  componentId!: string;
+  cacheKey!: string;
+  cacheHit!: boolean;
   startedAt!: Date;
   finishedAt!: Date | null;
   status!: "running" | "success" | "failed";
@@ -18,6 +21,9 @@ export const PromptExecutionSchema = new EntitySchema<PromptExecution>({
   properties: {
     id: { type: "number", primary: true, autoincrement: true },
     prompt: { kind: "m:1", entity: () => PromptDefinition, index: true },
+    componentId: { type: "string", length: 128, index: true },
+    cacheKey: { type: "string", length: 64, index: true },
+    cacheHit: { type: "boolean", default: false, index: true },
     startedAt: { type: "datetime", index: true },
     finishedAt: { type: "datetime", nullable: true, index: true },
     status: { type: "string", length: 16, index: true },

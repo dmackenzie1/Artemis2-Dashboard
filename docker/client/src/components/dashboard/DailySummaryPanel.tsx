@@ -1,9 +1,10 @@
-import type { FC } from "react";
-import type { PipelineDashboardData } from "../../api";
-import { getPromptDisplay } from "./promptDisplay";
+import type { FunctionComponent } from "react";
+import { DashboardPanel } from "./primitives/DashboardPanel";
+import { PaneStateMessage } from "./primitives/PaneStateMessage";
 
 type DailySummaryPanelProps = {
-  prompt: PipelineDashboardData["prompts"][number] | undefined;
+  statusLabel: string;
+  summaryText: string;
   latestDay: string | undefined;
 };
 
@@ -15,25 +16,36 @@ const summarizeLines = (text: string): string[] => {
     .slice(0, 5);
 };
 
-export const DailySummaryPanel: FC<DailySummaryPanelProps> = ({ prompt, latestDay }) => {
-  const display = getPromptDisplay(prompt, "Not ready yet.");
-  const rows = summarizeLines(display.text);
+export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
+  statusLabel,
+  summaryText,
+  latestDay
+}) => {
+  const rows = summarizeLines(summaryText);
 
   return (
-    <section className="panel space-panel daily-summary-panel">
-      <p className="panel-kicker">Operational Readout</p>
-      <h2>Last 24 Hours</h2>
-      <div className="summary-feed" role="list">
-        {rows.map((row, index) => (
-          <p key={`${row}-${index}`} role="listitem" className="summary-row">
-            {row}
-          </p>
-        ))}
-      </div>
-      <div className="panel-footer-row">
-        <small className="status-label">Status: {display.statusLabel}</small>
-        <small className="subtle">{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>
-      </div>
-    </section>
+    <DashboardPanel
+      className="daily-summary-panel"
+      kicker="Operational Readout"
+      title="Last 24 Hours"
+      footer={
+        <>
+          <small className="status-label">Status: {statusLabel}</small>
+          <small className="subtle">{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>
+        </>
+      }
+    >
+      {rows.length === 0 ? (
+        <PaneStateMessage message="Not ready yet." />
+      ) : (
+        <div className="summary-feed" role="list">
+          {rows.map((row, index) => (
+            <p key={`${row}-${index}`} role="listitem" className="summary-row">
+              {row}
+            </p>
+          ))}
+        </div>
+      )}
+    </DashboardPanel>
   );
 };

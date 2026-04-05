@@ -22,10 +22,14 @@ type PipelineConfig = {
 type PromptDashboardEntry = {
   id: number;
   key: string;
+  componentId: string;
   fileName: string;
   promptUpdatedAt: string;
   lastRunAt: string | null;
   status: "running" | "success" | "failed" | "never";
+  cacheHit: boolean;
+  submittedPreview: string | null;
+  outputPreview: string | null;
   submittedText: string | null;
   output: string | null;
   errorMessage: string | null;
@@ -73,6 +77,21 @@ export class PipelineService {
     await fs.writeFile(outputPath, submittedText, "utf8");
 
     return outputPath;
+  }
+
+  private createCacheKey(promptContent: string, submittedText: string): string {
+    return crypto.createHash("sha256").update(`${promptContent}\n---\n${submittedText}`).digest("hex");
+  }
+
+  private createPreview(text: string, maxChars: number, maxLines: number): string {
+    const allLines = text.split(/\r?\n/u);
+    const lines = allLines.slice(0, maxLines);
+    const joined = lines.join("\n");
+    if (joined.length <= maxChars && lines.length === allLines.length) {
+      return joined;
+    }
+
+    return `${joined.slice(0, maxChars)}…`;
   }
 
   private buildPromptQueue(prompts: PromptDefinition[]): PromptDefinition[] {
@@ -214,6 +233,9 @@ export class PipelineService {
       );
       const execution = this.em.create(PromptExecution, {
         prompt,
+        componentId: prompt.key,
+        cacheKey: this.createCacheKey(prompt.content, submittedText),
+        cacheHit: false,
         startedAt,
         finishedAt: null,
         status: "running",
@@ -231,18 +253,51 @@ export class PipelineService {
       });
 
       try {
+        const cachedExecution = await this.em.findOne(
+          PromptExecution,
+          {
+            componentId: prompt.key,
+            cacheKey: execution.cacheKey,
+            status: "success"
+          },
+          { orderBy: { startedAt: "desc" } }
+        );
+
+        if (cachedExecution) {
+          execution.status = "success";
+          execution.cacheHit = true;
+          execution.output = cachedExecution.output;
+          execution.finishedAt = dayjs().utc().toDate();
+          serverLogger.info("Prompt response served from cache", {
+            promptKey: prompt.key,
+            componentId: execution.componentId,
+            cacheKey: execution.cacheKey,
+            outputLength: execution.output.length,
+            outputPreview: this.createPreview(execution.output, 220, 2)
+          });
+          await this.em.flush();
+          continue;
+        }
+
         const output = await this.config.llmClient.generateText({
           systemPrompt: prompt.content,
-          userPrompt: submittedText
+          userPrompt: submittedText,
+          componentId: execution.componentId,
+          requestId: `${execution.componentId}-${execution.id}`
         });
 
         execution.status = "success";
+        execution.cacheHit = false;
         execution.output = output;
         execution.finishedAt = dayjs().utc().toDate();
         serverLogger.info("Prompt response received", {
           promptKey: prompt.key,
+          componentId: execution.componentId,
+          cacheKey: execution.cacheKey,
+          cacheHit: execution.cacheHit,
           status: execution.status,
-          outputLength: output.length
+          outputLength: output.length,
+          outputPreview: this.createPreview(output, 220, 2)
         });
       } catch (error) {
         execution.status = "failed";
@@ -251,6 +306,8 @@ export class PipelineService {
         execution.finishedAt = dayjs().utc().toDate();
         serverLogger.error("Prompt response failed", {
           promptKey: prompt.key,
+          componentId: execution.componentId,
+          cacheKey: execution.cacheKey,
           errorMessage: execution.errorMessage
         });
       }
@@ -273,10 +330,14 @@ export class PipelineService {
       rows.push({
         id: prompt.id,
         key: prompt.key,
+        componentId: prompt.key,
         fileName: prompt.fileName,
         promptUpdatedAt: dayjs(prompt.updatedAt).utc().toISOString(),
         lastRunAt: latestExecution ? dayjs(latestExecution.startedAt).utc().toISOString() : null,
         status: latestExecution?.status ?? "never",
+        cacheHit: latestExecution?.cacheHit ?? false,
+        submittedPreview: latestExecution?.submittedText ? this.createPreview(latestExecution.submittedText, 180, 2) : null,
+        outputPreview: latestExecution?.output ? this.createPreview(latestExecution.output, 180, 2) : null,
         submittedText: latestExecution?.submittedText ?? null,
         output: latestExecution?.status === "success" ? latestExecution.output : null,
         errorMessage: latestExecution?.status === "failed" ? latestExecution.errorMessage : null

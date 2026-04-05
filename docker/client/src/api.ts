@@ -18,10 +18,14 @@ export type PipelineDashboardData = {
   prompts: Array<{
     id: number;
     key: string;
+    componentId: string;
     fileName: string;
     promptUpdatedAt: string;
     lastRunAt: string | null;
     status: "running" | "success" | "failed" | "never";
+    cacheHit: boolean;
+    submittedPreview: string | null;
+    outputPreview: string | null;
     submittedText: string | null;
     output: string | null;
     errorMessage: string | null;

@@ -14,6 +14,7 @@ import type {
   MissionStatsSummaryData,
   PipelineDashboardData
 } from "../api";
+import type { FunctionComponent } from "react";
 import { DailySummaryPanel } from "../components/dashboard/DailySummaryPanel";
 import { MissionChatPanel } from "../components/dashboard/MissionChatPanel";
 import { MissionOverviewPanel } from "../components/dashboard/MissionOverviewPanel";
@@ -114,6 +115,20 @@ export const DashboardPage: FC = () => {
     ],
     [statsSummary]
   );
+import { useDashboardController } from "./dashboard/useDashboardController";
+
+export const DashboardPage: FunctionComponent = () => {
+  const {
+    health,
+    viewModel,
+    chatInput,
+    chatMode,
+    isThinking,
+    chatMessages,
+    onChatInputChange,
+    onChatModeChange,
+    onChatSubmit
+  } = useDashboardController();
 
   const hourlyHistogram = useMemo(() => {
     if (hourlyByChannel.length === 0) {
@@ -139,6 +154,25 @@ export const DashboardPage: FC = () => {
       </div>
       <div className="dashboard-mid-row">
         <DailySummaryPanel prompt={dailyPrompt} latestDay={latestDay?.day} />
+      <section className="dashboard-main-grid">
+        <MissionOverviewPanel
+          statusLabel={viewModel.missionSummary.statusLabel}
+          summaryText={viewModel.missionSummary.text}
+          lastRunAt={viewModel.missionSummary.lastRunAt}
+        />
+        <DailySummaryPanel
+          statusLabel={viewModel.dailySummary.statusLabel}
+          summaryText={viewModel.dailySummary.text}
+          latestDay={viewModel.latestDay}
+        />
+      </section>
+
+      <aside className="dashboard-right-rail">
+        <DashboardToolbar health={health} />
+        <StatsPanel stats={viewModel.stats} />
+      </aside>
+
+      <section className="timeline-strip-panel">
         <MissionChatPanel
           chatInput={chatInput}
           chatMode={chatMode}
@@ -150,6 +184,11 @@ export const DashboardPage: FC = () => {
         />
       </div>
       <UtterancesTimelinePanel histogram={hourlyHistogram} />
+          onChatInputChange={onChatInputChange}
+          onChatModeChange={onChatModeChange}
+          onChatSubmit={onChatSubmit}
+        />
+      </section>
     </div>
   );
 };
