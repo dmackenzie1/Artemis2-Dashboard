@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: layer prompt pipeline context as per-day summary groups (5k-10k target words), then feed mission-summary generation from cached daily-summary output with configurable LLM max token budget. Intent: Keep large transcript corpora within context limits by persisting reusable daily abstractions before mission-level synthesis.
 - feat: persist per-request outgoing/incoming LLM payload artifacts to a temporary debug directory with a TODO cleanup marker file for operator troubleshooting. Intent: Let mission operators inspect exact prompt/response traffic during live debugging without relying on truncated log previews.
 - fix: remove redundant `TRANSCRIPT_CSV_DIR` wiring and use `DATA_DIR` as the single transcript CSV ingestion path across startup/manual ingestion and CLI script flows. Intent: Eliminate duplicate env configuration so operators only manage one directory variable for transcript inputs.
 - fix: standardize transcript ingestion to `source_files` by default and align Docker/env defaults so startup/manual ingestion no longer reads from `sample_data` or `TB-Artemis-Summaries` unless explicitly overridden. Intent: Ensure operators can manage a single host-mounted ingestion directory that is consistent between local runs and deployment prep.
