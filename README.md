@@ -5,6 +5,7 @@ A full-stack internal demo that ingests Artemis communication transcript CSVs an
 ## What it does
 
 - Ingests all CSV files from `sample_data/` (or configured data directory)
+- Ingests source text files from `source_files/` into Postgres for scheduled prompt runs
 - Handles quoted text, commas, multiline transcript text, and trailing CSV columns
 - Generates:
   - hourly summaries
@@ -79,6 +80,14 @@ npm run dev:client
 - Re-run ingestion from the UI or call `POST /api/ingest`
 - Ingestion is safe to rerun and always rebuilds normalized records + derived intelligence
 
+## Source-file workflow (new)
+
+- Drop 4-6 text/code files into `source_files/`
+- Backend ingests them into Postgres (`source_documents`)
+- Prompt definitions are sourced from `/prompts/*.txt` and stored with IDs + update timestamps
+- Prompt executions run sequentially (never in parallel) and store results in `prompt_executions`
+- Scheduled pipeline reruns every `PIPELINE_INTERVAL_HOURS` (default 6 hours)
+
 ## Prompt management
 
 Prompts are editable text files in `/prompts`:
@@ -100,6 +109,9 @@ Prompts are editable text files in `/prompts`:
 - `GET /api/stats`
 - `GET /api/topics/:topicTitle`
 - `POST /api/chat` with `{ "query": "..." }`
+- `GET /api/pipeline/dashboard`
+- `POST /api/pipeline/ingest`
+- `POST /api/pipeline/run`
 
 ## Internal LLM API configuration
 
