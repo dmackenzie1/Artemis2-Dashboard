@@ -84,8 +84,8 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
     port: env.DB_PORT,
     database: env.DB_NAME
   });
-  await ensurePromptExecutionSubmittedTextColumn(orm);
   await orm.getSchemaGenerator().updateSchema();
+  await ensurePromptExecutionSubmittedTextColumn(orm);
   app.use("/api/transcripts", createTranscriptRouter(orm.em.fork()));
   statsService = new StatsService(orm.em.fork());
 
