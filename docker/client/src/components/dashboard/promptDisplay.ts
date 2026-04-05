@@ -17,7 +17,7 @@ export const getPromptDisplay = (
   }
 
   if (prompt.status === "failed") {
-    return { text: "Not ready.", statusLabel: "not ready" };
+    return { text: `Not ready. ${prompt.errorMessage ?? "The query failed before returning text."}`.trim(), statusLabel: "failed" };
   }
 
   return { text: "Building...", statusLabel: "building" };

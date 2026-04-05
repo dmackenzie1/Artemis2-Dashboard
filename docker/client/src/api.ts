@@ -24,6 +24,7 @@ export type PipelineDashboardData = {
     status: "running" | "success" | "failed" | "never";
     submittedText: string | null;
     output: string | null;
+    errorMessage: string | null;
   }>;
 };
 
@@ -56,13 +57,6 @@ export type MissionStatsSummaryData = {
     words: number;
     channels: number;
   };
-};
-
-export type MissionStatsByDayEntry = {
-  day: string;
-  utterances: number;
-  words: number;
-  channels: number;
 };
 
 export type MissionHourlyChannelEntry = {
@@ -148,16 +142,6 @@ export const fetchStatsSummary = async (): Promise<MissionStatsSummaryData | nul
   }
 
   return (await response.json()) as MissionStatsSummaryData;
-};
-
-export const fetchStatsByDay = async (): Promise<MissionStatsByDayEntry[]> => {
-  const response = await fetch(`${base}/stats/days`);
-  if (!response.ok) {
-    clientLogger.warn("Stats by day unavailable", { status: response.status });
-    return [];
-  }
-
-  return (await response.json()) as MissionStatsByDayEntry[];
 };
 
 export const fetchStatsHourlyByChannel = async (days = 7): Promise<MissionHourlyChannelEntry[]> => {
