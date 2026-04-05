@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: support CAIO dev `/v1/chat/completions` payload/header compatibility and parse OpenAI-style `choices` responses in the LLM client. Intent: Prevent false connectivity failures and empty chat answers when routing Artemis dashboard requests through CAIO dev gateway endpoints.
 - fix: repair dashboard page JSX/import regressions and expand client/server unit coverage for API and topic parsing paths. Intent: Restore reliable frontend build health and reduce regression risk in mission-ops dashboard workflows.
 - chore: perform a full repository code review and document prioritized build/test stability findings. Intent: Give maintainers a current, actionable quality baseline before additional Artemis 2 dashboard feature work.
 - chore: switch Docker Compose storage to internal named volumes and limit host bind mounts to transcript/prompt/source input directories. Intent: Avoid scratch-drive persistence during active development while keeping only operator-managed ingestion inputs mapped from host.
