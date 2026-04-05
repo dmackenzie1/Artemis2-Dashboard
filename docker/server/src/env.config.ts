@@ -15,7 +15,10 @@ const EnvSchema = z.object({
   DB_USER: z.string().default("artemis"),
   DB_PASS: z.string().default("artemis"),
   DB_NAME: z.string().default("artemis_transcripts"),
-  TRANSCRIPT_CSV_DIR: z.string().default("/app/TB-Artemis-Summaries")
+  TRANSCRIPT_CSV_DIR: z.string().default("/app/TB-Artemis-Summaries"),
+  SOURCE_FILES_DIR: z.string().default("/app/source_files"),
+  PIPELINE_INTERVAL_HOURS: z.coerce.number().positive().default(6),
+  PIPELINE_AUTO_RUN: z.coerce.boolean().default(true)
 });
 
 export const env = EnvSchema.parse(process.env);

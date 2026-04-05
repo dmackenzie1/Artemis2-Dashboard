@@ -24,6 +24,7 @@ services:
       - ./prompts:/app/prompts:ro
       - ./docker/server/data:/app/data
       - ./TB-Artemis-Summaries:/app/TB-Artemis-Summaries:ro
+      - ./source_files:/app/source_files:ro
     depends_on:
       - db
 
