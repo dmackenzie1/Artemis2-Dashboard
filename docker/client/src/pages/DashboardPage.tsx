@@ -92,7 +92,10 @@ export const DashboardPage: FunctionComponent = () => {
         />
       </section>
 
-      <UtterancesTimelinePanel histogram={hourlyHistogram} />
+      <section className="dashboard-bottom-row">
+        <UtterancesTimelinePanel histogram={hourlyHistogram} />
+        <div className="right-rail-spacer" aria-hidden="true" />
+      </section>
     </div>
   );
 };

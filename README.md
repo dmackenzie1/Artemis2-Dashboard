@@ -75,6 +75,12 @@ npm run dev:client
 - For full local functionality without Docker, run a local Postgres instance and set `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, and `DB_NAME` in `.env`.
 
 
+## UI design guidance (single source of truth)
+
+For shared UI visual direction, implementation guardrails, and loading/alert-state behavior, use:
+
+- `docs/ui-design-guidance.md`
+
 ## Capture client screenshots (Codex-friendly)
 
 When the stack is running at `http://localhost:8080`, run:
