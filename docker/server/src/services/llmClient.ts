@@ -25,24 +25,43 @@ export class LlmClient {
       return `Prototype fallback response:\n${options.userPrompt.slice(0, 500)}...`;
     }
 
+    const isOpenAiCompatible = this.apiUrl.includes("/v1/chat/completions");
+
     const response = await fetch(this.apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}`, "x-api-key": this.apiKey } : {}),
-        "anthropic-version": "2023-06-01"
+        ...(isOpenAiCompatible ? {} : { "anthropic-version": "2023-06-01" })
       },
-      body: JSON.stringify({
-        model: this.model,
-        system: options.systemPrompt,
-        max_tokens: 300,
-        messages: [
-          {
-            role: "user",
-            content: options.userPrompt
-          }
-        ]
-      })
+      body: JSON.stringify(
+        isOpenAiCompatible
+          ? {
+              model: this.model,
+              max_tokens: 300,
+              messages: [
+                {
+                  role: "system",
+                  content: options.systemPrompt
+                },
+                {
+                  role: "user",
+                  content: options.userPrompt
+                }
+              ]
+            }
+          : {
+              model: this.model,
+              system: options.systemPrompt,
+              max_tokens: 300,
+              messages: [
+                {
+                  role: "user",
+                  content: options.userPrompt
+                }
+              ]
+            }
+      )
     });
 
     if (!response.ok) {
@@ -56,15 +75,21 @@ export class LlmClient {
       completion?: string;
       content_blocks?: Array<{ text?: string }>;
       messages?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+      choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>;
       error?: { message?: string };
     };
+
+    const choiceContent = payload.choices?.[0]?.message?.content;
+    const choiceText = Array.isArray(choiceContent)
+      ? choiceContent.filter((item) => item.type === "text").map((item) => item.text ?? "").join("\n")
+      : choiceContent;
 
     const messageContent = payload.messages?.[0]?.content
       ?.filter((block) => block.type === "text")
       .map((block) => block.text ?? "")
       .join("\n");
     const contentBlocks = payload.content_blocks?.map((item) => item.text ?? "").join("\n");
-    return payload.text ?? payload.content ?? payload.completion ?? contentBlocks ?? messageContent ?? "";
+    return payload.text ?? payload.content ?? payload.completion ?? contentBlocks ?? messageContent ?? choiceText ?? "";
   }
 
   async checkConnectivity(): Promise<LlmConnectivityStatus> {
