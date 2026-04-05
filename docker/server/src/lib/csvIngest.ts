@@ -8,6 +8,12 @@ import type { TranscriptUtterance } from "../types.js";
 
 dayjs.extend(utc);
 
+type IngestCsvDirectoryOptions = {
+  onDirectoryRead?: (context: { directoryPath: string; totalFiles: number }) => void;
+  onFileIngested?: (context: { file: string; rowsParsed: number; rowsAccepted: number; rowsSkipped: number }) => void;
+  onIngestComplete?: (context: { totalFiles: number; totalRowsAccepted: number; totalRowsSkipped: number }) => void;
+};
+
 const parseDuration = (value: string): number => {
   const [mm, ss] = value.trim().split(":").map(Number);
   if (Number.isNaN(mm) || Number.isNaN(ss)) {
@@ -17,9 +23,12 @@ const parseDuration = (value: string): number => {
   return mm * 60 + ss;
 };
 
-export const ingestCsvDirectory = async (directoryPath: string): Promise<TranscriptUtterance[]> => {
+export const ingestCsvDirectory = async (directoryPath: string, options: IngestCsvDirectoryOptions = {}): Promise<TranscriptUtterance[]> => {
   const files = (await fs.readdir(directoryPath)).filter((file) => file.toLowerCase().endsWith(".csv"));
   const rows: TranscriptUtterance[] = [];
+  let totalRowsSkipped = 0;
+
+  options.onDirectoryRead?.({ directoryPath, totalFiles: files.length });
 
   for (const file of files) {
     const csvPath = path.join(directoryPath, file);
@@ -32,15 +41,19 @@ export const ingestCsvDirectory = async (directoryPath: string): Promise<Transcr
     });
 
     const dataRows = records.slice(1);
+    let fileRowsAccepted = 0;
+    let fileRowsSkipped = 0;
 
     for (const record of dataRows) {
       const [dateRaw = "", channel = "", duration = "", language = "", translated = "", text = "", filename = ""] = record;
       const parsedDate = dayjs(dateRaw).utc();
 
       if (!parsedDate.isValid()) {
+        fileRowsSkipped += 1;
         continue;
       }
 
+      fileRowsAccepted += 1;
       rows.push({
         id: randomUUID(),
         timestamp: parsedDate.toISOString(),
@@ -55,8 +68,23 @@ export const ingestCsvDirectory = async (directoryPath: string): Promise<Transcr
         sourceFile: file
       });
     }
+
+    totalRowsSkipped += fileRowsSkipped;
+    options.onFileIngested?.({
+      file,
+      rowsParsed: dataRows.length,
+      rowsAccepted: fileRowsAccepted,
+      rowsSkipped: fileRowsSkipped
+    });
   }
 
   rows.sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1));
+
+  options.onIngestComplete?.({
+    totalFiles: files.length,
+    totalRowsAccepted: rows.length,
+    totalRowsSkipped
+  });
+
   return rows;
 };

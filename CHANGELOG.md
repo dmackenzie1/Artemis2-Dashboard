@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: add structured client/server ingestion lifecycle logging with per-file CSV counters. Intent: Give operators clear, auditable visibility that transcript ingestion is running and succeeding for each input file.
 - feat: surface startup LLM connectivity status and add starter chat query presets in the dashboard, while updating request formatting for Anthropic-compatible gateway models. Intent: Give operators immediate confidence that configured model access is live and speed up analysis workflows with pre-populated mission query prompts.
 - feat: redesign the dashboard UI with a denser two-column mission layout, top-right rebuild controls, and a full-width communications histogram footer. Intent: Improve mission operator scanning speed with a space-themed visual hierarchy aligned to Artemis 2 comms workflows.
 - fix: switch backend analysis service lodash usage to default CommonJS interop import for Node ESM runtime compatibility. Intent: Prevent containerized API startup crashes caused by invalid named imports from `lodash` and restore dashboard API availability.

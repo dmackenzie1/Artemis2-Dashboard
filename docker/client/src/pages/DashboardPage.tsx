@@ -28,6 +28,7 @@ export const DashboardPage: FC = () => {
   }, []);
 
   const onIngest = async (): Promise<void> => {
+    clientLogger.info("Dashboard ingest button clicked");
     const payload = await triggerIngest();
     setData(payload);
   };

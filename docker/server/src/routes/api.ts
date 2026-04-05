@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { AnalysisService } from "../services/analysisService.js";
+import { serverLogger } from "../utils/logging/serverLogger.js";
 import type { LlmConnectivityStatus } from "../services/llmClient.js";
 
 export const createApiRouter = (
@@ -15,9 +16,12 @@ export const createApiRouter = (
 
   router.post("/ingest", async (_req, res, next) => {
     try {
+      serverLogger.info("Ingest endpoint invoked");
       const dashboard = await analysisService.ingestAndAnalyze();
+      serverLogger.info("Ingest endpoint completed", { generatedAt: dashboard.generatedAt, totalDays: dashboard.days.length });
       res.json(dashboard);
     } catch (error) {
+      serverLogger.error("Ingest endpoint failed", { error });
       next(error);
     }
   });
