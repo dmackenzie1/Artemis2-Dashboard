@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: relax CSV quote parsing during transcript startup ingestion so filenames containing unescaped quote characters do not abort batch imports. Intent: Keep backend startup resilient to real-world transcript exports that include malformed-but-recoverable quote usage in the `Filename` column.
 - feat: ingest transcript CSVs into Postgres during startup/manual ingestion, log inserted/skipped totals plus database utterance count before declaring backend readiness, and store per-utterance word counts; also switch Compose Postgres to ephemeral storage (no named volume). Intent: Give operators explicit verification that ingestion populated the database and provide native utterance-level word metrics while keeping short-lived local DB state for current development runs.
 - fix: inline the safe `days` window in hourly channel stats SQL and add structured error serialization for startup/API failures. Intent: Eliminate the PostgreSQL `$1` binding error while making production logs actionable with concrete error message/stack details.
 - fix: run schema synchronization before the prompt execution `submitted_text` backfill/constraint SQL during startup. Intent: Prevent fresh database boots from crashing when `prompt_executions` has not been created yet.
