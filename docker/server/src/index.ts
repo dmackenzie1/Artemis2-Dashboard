@@ -78,7 +78,12 @@ const app = express();
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json({ limit: "4mb" }));
 
-const llmClient = new LlmClient(env.ANTHROPIC_BASE_URL, env.ANTHROPIC_API_KEY, env.ANTHROPIC_MODEL);
+const llmClient = new LlmClient(
+  env.ANTHROPIC_BASE_URL,
+  env.ANTHROPIC_API_KEY,
+  env.ANTHROPIC_MODEL,
+  env.LLM_DEBUG_PROMPTS_DIR
+);
 let llmConnectivityStatus = await llmClient.checkConnectivity();
 
 const analysisService = new AnalysisService({

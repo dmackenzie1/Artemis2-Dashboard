@@ -1,4 +1,6 @@
 import type { Topic } from "../types.js";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 
 type GenerateOptions = {
@@ -19,11 +21,13 @@ export type LlmConnectivityStatus = {
 export class LlmClient {
   private queue = Promise.resolve();
   private requestCounter = 0;
+  private debugDirectoryInitialized = false;
 
   constructor(
     private readonly apiUrl?: string,
     private readonly apiKey?: string,
-    private readonly model?: string
+    private readonly model?: string,
+    private readonly debugPromptsDir?: string
   ) {}
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
@@ -84,6 +88,53 @@ export class LlmClient {
     return "";
   }
 
+  private sanitizeSegment(segment: string): string {
+    return segment.replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
+
+  private async persistDebugPrompt(
+    direction: "outgoing" | "incoming",
+    requestId: string,
+    componentId: string,
+    payload: Record<string, unknown>
+  ): Promise<void> {
+    if (!this.debugPromptsDir) {
+      return;
+    }
+
+    try {
+      await mkdir(this.debugPromptsDir, { recursive: true });
+
+      if (!this.debugDirectoryInitialized) {
+        const todoFilePath = path.join(this.debugPromptsDir, "README-TODO-DELETE-ME.txt");
+        await writeFile(
+          todoFilePath,
+          [
+            "Temporary debug artifacts for LLM prompts/responses.",
+            "TODO: Delete this directory and disable LLM_DEBUG_PROMPTS_DIR after debugging is complete."
+          ].join("\n"),
+          "utf8"
+        );
+        this.debugDirectoryInitialized = true;
+      }
+
+      const timestamp = new Date().toISOString().replaceAll(":", "-");
+      const safeRequestId = this.sanitizeSegment(requestId);
+      const safeComponentId = this.sanitizeSegment(componentId);
+      const fileName = `${timestamp}_${direction}_${safeComponentId}_${safeRequestId}.json`;
+      const filePath = path.join(this.debugPromptsDir, fileName);
+
+      await writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+    } catch (error) {
+      serverLogger.warn("Unable to write LLM debug prompt artifact", {
+        requestId,
+        componentId,
+        debugPromptsDir: this.debugPromptsDir,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
   async generateText(options: GenerateOptions): Promise<string> {
     const requestId = options.requestId ?? `llm-${Date.now()}-${++this.requestCounter}`;
     const componentId = options.componentId ?? "unknown-component";
@@ -99,6 +150,15 @@ export class LlmClient {
         requestSystemLength: options.systemPrompt.length,
         requestUserLength: options.userPrompt.length
       });
+      await this.persistDebugPrompt("outgoing", requestId, componentId, {
+        requestId,
+        componentId,
+        sentAt: new Date().toISOString(),
+        model: this.model ?? null,
+        apiUrl: this.apiUrl ?? null,
+        systemPrompt: options.systemPrompt,
+        userPrompt: options.userPrompt
+      });
 
       if (!this.apiUrl) {
         const fallback = `Prototype fallback response:\n${options.userPrompt.slice(0, 500)}...`;
@@ -107,6 +167,14 @@ export class LlmClient {
           componentId,
           responsePreview: this.createPreview(fallback, 450, 3),
           responseLength: fallback.length
+        });
+        await this.persistDebugPrompt("incoming", requestId, componentId, {
+          requestId,
+          componentId,
+          receivedAt: new Date().toISOString(),
+          response: fallback,
+          responseLength: fallback.length,
+          mode: "fallback"
         });
         return fallback;
       }
@@ -156,6 +224,13 @@ export class LlmClient {
           status: response.status,
           errorPreview: this.createPreview(text, 450, 3)
         });
+        await this.persistDebugPrompt("incoming", requestId, componentId, {
+          requestId,
+          componentId,
+          receivedAt: new Date().toISOString(),
+          status: response.status,
+          error: text
+        });
         throw new Error(`LLM request failed: ${response.status} ${text}`);
       }
 
@@ -183,6 +258,14 @@ export class LlmClient {
         componentId,
         responsePreview: this.createPreview(output, 450, 3),
         responseLength: output.length
+      });
+      await this.persistDebugPrompt("incoming", requestId, componentId, {
+        requestId,
+        componentId,
+        receivedAt: new Date().toISOString(),
+        response: output,
+        responseLength: output.length,
+        rawPayload: payload
       });
 
       return output;
