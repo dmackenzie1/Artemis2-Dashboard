@@ -1,9 +1,12 @@
 import express from "express";
 import cors from "cors";
+import { MikroORM } from "@mikro-orm/postgresql";
 import { env } from "./env.config.js";
 import { LlmClient } from "./services/llmClient.js";
 import { AnalysisService } from "./services/analysisService.js";
 import { createApiRouter } from "./routes/api.js";
+import { createTranscriptRouter } from "./routes/transcripts.js";
+import ormConfig from "./mikro-orm.config.js";
 
 const app = express();
 app.use(cors({ origin: env.CORS_ORIGIN }));
@@ -18,6 +21,18 @@ const analysisService = new AnalysisService({
 
 await analysisService.loadFromDisk();
 app.use("/api", createApiRouter(analysisService));
+
+if (env.TRANSCRIPTS_DB_ENABLED) {
+  const orm = await MikroORM.init(ormConfig);
+  await orm.getSchemaGenerator().updateSchema();
+  app.use("/api/transcripts", createTranscriptRouter(orm.em.fork()));
+} else {
+  app.get("/api/transcripts/context", (_req, res) => {
+    res.status(503).json({
+      message: "Transcript DB is disabled. Set TRANSCRIPTS_DB_ENABLED=true to enable /api/transcripts/context."
+    });
+  });
+}
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const message = error instanceof Error ? error.message : "Unexpected error";
