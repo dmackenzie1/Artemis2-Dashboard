@@ -7,16 +7,20 @@ import { AnalysisService } from "./services/analysisService.js";
 import { createApiRouter } from "./routes/api.js";
 import { createTranscriptRouter } from "./routes/transcripts.js";
 import ormConfig from "./mikro-orm.config.js";
+import { PipelineService } from "./services/pipelineService.js";
+import { createPipelineRouter } from "./routes/pipeline.js";
 
 const app = express();
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json({ limit: "4mb" }));
 
+const llmClient = new LlmClient(env.ANTHROPIC_BASE_URL, env.ANTHROPIC_API_KEY, env.ANTHROPIC_MODEL);
+
 const analysisService = new AnalysisService({
   dataDir: env.DATA_DIR,
   promptsDir: env.PROMPTS_DIR,
   cacheFile: env.CACHE_FILE,
-  llmClient: new LlmClient(env.ANTHROPIC_BASE_URL, env.ANTHROPIC_API_KEY, env.ANTHROPIC_MODEL)
+  llmClient
 });
 
 await analysisService.loadFromDisk();
@@ -26,10 +30,35 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
   const orm = await MikroORM.init(ormConfig);
   await orm.getSchemaGenerator().updateSchema();
   app.use("/api/transcripts", createTranscriptRouter(orm.em.fork()));
+
+  const pipelineService = new PipelineService(orm.em.fork(), {
+    sourceFilesDir: env.SOURCE_FILES_DIR,
+    promptsDir: env.PROMPTS_DIR,
+    llmClient
+  });
+
+  app.use("/api/pipeline", createPipelineRouter(pipelineService));
+
+  if (env.PIPELINE_AUTO_RUN) {
+    await pipelineService.runPipelineCycle();
+
+    const intervalMs = env.PIPELINE_INTERVAL_HOURS * 60 * 60 * 1000;
+    setInterval(() => {
+      pipelineService.runPipelineCycle().catch(() => {
+        // no-op: failure is persisted in prompt_executions table
+      });
+    }, intervalMs);
+  }
 } else {
   app.get("/api/transcripts/context", (_req, res) => {
     res.status(503).json({
       message: "Transcript DB is disabled. Set TRANSCRIPTS_DB_ENABLED=true to enable /api/transcripts/context."
+    });
+  });
+
+  app.get("/api/pipeline/dashboard", (_req, res) => {
+    res.status(503).json({
+      message: "Pipeline DB is disabled. Set TRANSCRIPTS_DB_ENABLED=true to enable /api/pipeline endpoints."
     });
   });
 }

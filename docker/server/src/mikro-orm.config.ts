@@ -1,5 +1,8 @@
 import { defineConfig } from "@mikro-orm/postgresql";
 import { env } from "./env.config.js";
+import { PromptDefinitionSchema } from "./entities/PromptDefinition.js";
+import { PromptExecutionSchema } from "./entities/PromptExecution.js";
+import { SourceDocumentSchema } from "./entities/SourceDocument.js";
 import { TranscriptUtteranceSchema } from "./entities/TranscriptUtterance.js";
 
 export default defineConfig({
@@ -8,6 +11,6 @@ export default defineConfig({
   user: env.DB_USER,
   password: env.DB_PASS,
   dbName: env.DB_NAME,
-  entities: [TranscriptUtteranceSchema],
+  entities: [TranscriptUtteranceSchema, SourceDocumentSchema, PromptDefinitionSchema, PromptExecutionSchema],
   debug: false
 });
