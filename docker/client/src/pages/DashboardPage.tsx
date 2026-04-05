@@ -10,39 +10,10 @@ const starterQueries = [
   "show mentions of comm dropouts"
 ];
 
-type PromptCardConfig = {
-  key: string;
-  title: string;
-  defaultMessage: string;
-};
-
-const promptCards: PromptCardConfig[] = [
-  { key: "mission_summary", title: "Mission Overview", defaultMessage: "Building mission overview..." },
-  { key: "recent_changes", title: "What Changed", defaultMessage: "Querying recent changes..." },
-  { key: "daily_summary", title: "Last 24 Hours", defaultMessage: "Not ready yet." }
-];
-
-const getPromptDisplay = (
-  prompt: PipelineDashboardData["prompts"][number] | undefined,
-  defaultMessage: string
-): { text: string; statusLabel: string } => {
-  if (!prompt) {
-    return { text: defaultMessage, statusLabel: "not ready" };
-  }
-
-  if (prompt.status === "success" && prompt.output) {
-    return { text: prompt.output, statusLabel: "ready" };
-  }
-
-  if (prompt.status === "running") {
-    return { text: "Querying...", statusLabel: "querying" };
-  }
-
-  if (prompt.status === "failed") {
-    return { text: "Not ready.", statusLabel: "not ready" };
-  }
-
-  return { text: "Building...", statusLabel: "building" };
+type ChatMessage = {
+  role: "user" | "assistant";
+  text: string;
+  strategy?: ChatResponse["strategy"];
 };
 
 export const DashboardPage: FC = () => {
@@ -50,7 +21,9 @@ export const DashboardPage: FC = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [pipeline, setPipeline] = useState<PipelineDashboardData | null>(null);
   const [chatInput, setChatInput] = useState(starterQueries[0]);
-  const [chatAnswer, setChatAnswer] = useState("");
+  const [chatMode, setChatMode] = useState<ChatMode>("rag");
+  const [isThinking, setIsThinking] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   useEffect(() => {
     const loadData = async (): Promise<void> => {
@@ -77,8 +50,34 @@ export const DashboardPage: FC = () => {
 
   const onChat = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    const result = await chat(chatInput);
-    setChatAnswer(result.answer);
+
+    const trimmed = chatInput.trim();
+    if (!trimmed || isThinking) {
+      return;
+    }
+
+    setChatMessages((previous) => [...previous, { role: "user", text: trimmed }]);
+    setIsThinking(true);
+
+    try {
+      const result = await chat(trimmed, chatMode);
+      setChatMessages((previous) => [
+        ...previous,
+        {
+          role: "assistant",
+          text: result.answer,
+          strategy: result.strategy
+        }
+      ]);
+    } catch (error) {
+      clientLogger.error("Chat request failed", { error });
+      setChatMessages((previous) => [
+        ...previous,
+        { role: "assistant", text: "Unable to run chat right now. Please verify LLM connectivity and try again." }
+      ]);
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   const latestDay = data?.days[data.days.length - 1];
@@ -175,12 +174,51 @@ export const DashboardPage: FC = () => {
         <p className="subtle">{latestDay?.day ? `Latest day in cache: ${latestDay.day}` : "No ingested day yet."}</p>
       </section>
 
-      <section className="panel space-panel">
-        <h2>Search + Chat</h2>
-        <form onSubmit={(event) => void onChat(event)} className="chat-form">
-          <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} />
-          <button type="submit">Ask</button>
+      <section className="panel space-panel span2 chat-window-panel">
+        <div className="chat-panel-header">
+          <h2>Mission Chat</h2>
+          <label className="chat-mode-picker" htmlFor="chat-mode">
+            Context Mode
+            <select id="chat-mode" value={chatMode} onChange={(event) => setChatMode(event.target.value as ChatMode)}>
+              <option value="rag">Targeted Retrieval (RAG-style)</option>
+              <option value="all">Broad Sweep (largest context slice)</option>
+            </select>
+          </label>
+        </div>
+
+        <p className="chat-helper-text">
+          Targeted retrieval is faster and safer for large transcript sets. Broad sweep sends a much larger context sample so the model can decide what matters.
+        </p>
+
+        <div className="chat-window" role="log" aria-live="polite">
+          {chatMessages.length === 0 ? <p className="chat-empty">Ask about systems, anomalies, channels, or timeline changes.</p> : null}
+          {chatMessages.map((message, index) => (
+            <article key={`${message.role}-${index}`} className={`chat-bubble ${message.role === "user" ? "chat-user" : "chat-assistant"}`}>
+              <header>{message.role === "user" ? "You" : "Mission Analyst"}</header>
+              <p>{message.text}</p>
+              {message.strategy ? (
+                <small>
+                  Mode: {message.strategy.mode} · Context {message.strategy.contextUtterances}/{message.strategy.totalUtterances}
+                  {message.strategy.wasTruncated ? " · truncated for token safety" : ""}
+                </small>
+              ) : null}
+            </article>
+          ))}
+          {isThinking ? <article className="chat-bubble chat-assistant thinking-bubble">thinking</article> : null}
+        </div>
+
+        <form onSubmit={(event) => void onChat(event)} className="chat-form chat-window-form">
+          <textarea
+            value={chatInput}
+            onChange={(event) => setChatInput(event.target.value)}
+            rows={3}
+            placeholder="Type your mission question..."
+          />
+          <button type="submit" disabled={isThinking || !chatInput.trim()}>
+            Submit
+          </button>
         </form>
+
         <div className="query-chip-row">
           {starterQueries.map((query) => (
             <button key={query} type="button" onClick={() => setChatInput(query)}>
@@ -188,7 +226,6 @@ export const DashboardPage: FC = () => {
             </button>
           ))}
         </div>
-        <pre>{chatAnswer || "Ask about systems, anomalies, channels, or timeline changes."}</pre>
       </section>
 
       <section className="panel space-panel span2">

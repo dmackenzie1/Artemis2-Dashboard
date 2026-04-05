@@ -29,14 +29,18 @@ describe("api helpers", () => {
   });
 
   it("sends chat request with body", async () => {
-    const payload = { answer: "ok", evidence: [] };
+    const payload = {
+      answer: "ok",
+      evidence: [],
+      strategy: { mode: "rag", totalUtterances: 50, contextUtterances: 20, wasTruncated: false }
+    };
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => payload } as Response);
 
     await expect(chat("status")).resolves.toEqual(payload);
     expect(mockFetch).toHaveBeenCalledWith("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: "status" })
+      body: JSON.stringify({ query: "status", mode: "rag" })
     });
   });
 
