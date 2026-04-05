@@ -5,6 +5,14 @@ type GenerateOptions = {
   userPrompt: string;
 };
 
+export type LlmConnectivityStatus = {
+  connected: boolean;
+  model: string | null;
+  baseUrl: string | null;
+  checkedAt: string;
+  error: string | null;
+};
+
 export class LlmClient {
   constructor(
     private readonly apiUrl?: string,
@@ -21,12 +29,19 @@ export class LlmClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: this.apiKey ? `Bearer ${this.apiKey}` : ""
+        ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}`, "x-api-key": this.apiKey } : {}),
+        "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
         model: this.model,
         system: options.systemPrompt,
-        prompt: options.userPrompt
+        max_tokens: 300,
+        messages: [
+          {
+            role: "user",
+            content: options.userPrompt
+          }
+        ]
       })
     });
 
@@ -35,8 +50,58 @@ export class LlmClient {
       throw new Error(`LLM request failed: ${response.status} ${text}`);
     }
 
-    const payload = (await response.json()) as { text?: string; content?: string };
-    return payload.text ?? payload.content ?? "";
+    const payload = (await response.json()) as {
+      text?: string;
+      content?: string;
+      completion?: string;
+      content_blocks?: Array<{ text?: string }>;
+      messages?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+      error?: { message?: string };
+    };
+
+    const messageContent = payload.messages?.[0]?.content
+      ?.filter((block) => block.type === "text")
+      .map((block) => block.text ?? "")
+      .join("\n");
+    const contentBlocks = payload.content_blocks?.map((item) => item.text ?? "").join("\n");
+    return payload.text ?? payload.content ?? payload.completion ?? contentBlocks ?? messageContent ?? "";
+  }
+
+  async checkConnectivity(): Promise<LlmConnectivityStatus> {
+    const checkedAt = new Date().toISOString();
+
+    if (!this.apiUrl) {
+      return {
+        connected: false,
+        model: this.model ?? null,
+        baseUrl: null,
+        checkedAt,
+        error: "ANTHROPIC_BASE_URL is not configured; running in fallback mode."
+      };
+    }
+
+    try {
+      await this.generateText({
+        systemPrompt: "You are a connectivity check.",
+        userPrompt: 'Reply with exactly "ok".'
+      });
+
+      return {
+        connected: true,
+        model: this.model ?? null,
+        baseUrl: this.apiUrl,
+        checkedAt,
+        error: null
+      };
+    } catch (error) {
+      return {
+        connected: false,
+        model: this.model ?? null,
+        baseUrl: this.apiUrl,
+        checkedAt,
+        error: error instanceof Error ? error.message : "Unknown connectivity error"
+      };
+    }
   }
 
   parseTopics(raw: string): Topic[] {

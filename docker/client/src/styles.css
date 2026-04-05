@@ -57,3 +57,18 @@ input, button {
 }
 
 pre { white-space: pre-wrap; }
+
+.health-ok {
+  color: #6ad08f;
+}
+
+.health-bad {
+  color: #ff8f8f;
+}
+
+.query-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}

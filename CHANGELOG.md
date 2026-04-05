@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: surface startup LLM connectivity status and add starter chat query presets in the dashboard, while updating request formatting for Anthropic-compatible gateway models. Intent: Give operators immediate confidence that configured model access is live and speed up analysis workflows with pre-populated mission query prompts.
 - fix: switch backend analysis service lodash usage to default CommonJS interop import for Node ESM runtime compatibility. Intent: Prevent containerized API startup crashes caused by invalid named imports from `lodash` and restore dashboard API availability.
 - chore: refresh frontend/backend dependency baselines, bump container image tags, and harden the Playwright capture script for Codex screenshot workflows. Intent: Keep local/dev tooling current while making automated UI snapshot capture reliable for agent-driven validation.
 - feat: add DB-backed source-file ingestion and sequential scheduled prompt execution pipeline with run metadata APIs. Intent: Precompute dashboard summaries server-side and avoid live prompt fanout on every page view while preserving traceable prompt/run history.
@@ -11,4 +12,3 @@
 - refactor: relocate backend and frontend workspaces under docker/server and docker/client. Intent: Match repository layout to the requested container-oriented ownership model while preserving existing build/test workflows.
 - feat: add end-to-end Artemis 2 mission intelligence prototype with CSV ingestion, LLM-derived summaries/topics/chat, and mission-control dashboard. Intent: Deliver a fast, demo-ready internal system for transcript-driven mission situational awareness.
 - chore: standardize container files under /docker/client, /docker/server, and /docker/nginx. Intent: Align Docker asset layout with team workflow and simplify container ownership boundaries.
-
