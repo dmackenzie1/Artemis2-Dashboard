@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- refactor: rename the Docker Compose API service from `backend` to `server` and update nginx upstream/dependency references accordingly. Intent: Align container/service naming with team terminology while preserving existing API routing behavior.
 - fix: resolve DashboardPage merge fallout by restoring health polling, correcting Promise.all payload ordering, and re-adding DashboardToolbar import/state wiring. Intent: Unblock Docker frontend TypeScript builds and recover dashboard runtime status rendering after a bad merge.
 - fix: serialize all server-side LLM calls through a single queue, log compact request/response previews, and disable hourly summary prompt generation during ingestion. Intent: Let operators verify exactly what is sent/received while preventing overlapping LLM executions and unwanted hourly-summary prompt traffic.
 - feat: restyle the Overview dashboard into a cinematic mission-control layout with hero summary/readout panels, a narrow right rail for stats and mission query console, top-bar LLM status, and a mission-wide utterances-per-hour histogram strip inspired by the provided reference comps. Intent: Align operator scanning workflows with a premium Artemis intelligence visual language while preserving existing routes, data polling, and backend API behavior.
