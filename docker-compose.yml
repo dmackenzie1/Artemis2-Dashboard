@@ -8,7 +8,7 @@ services:
     volumes:
       - ./sample_data:/app/sample_data:ro
       - ./prompts:/app/prompts:ro
-      - ./backend/data:/app/data
+      - ./docker/server/data:/app/data
 
   frontend:
     build:
