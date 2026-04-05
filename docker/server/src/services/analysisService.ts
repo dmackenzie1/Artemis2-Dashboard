@@ -3,7 +3,7 @@ import path from "node:path";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
 import lodash from "lodash";
-import type { DashboardCache, DayInsights, TranscriptUtterance } from "../types.js";
+import type { DashboardCache, DayInsights, NotableUtterance, TranscriptUtterance } from "../types.js";
 import { ingestCsvDirectory } from "../lib/csvIngest.js";
 import { getPrompt } from "../lib/prompts.js";
 import { LlmClient } from "./llmClient.js";
@@ -12,6 +12,15 @@ import { serverLogger } from "../utils/logging/serverLogger.js";
 dayjs.extend(utc);
 
 const { groupBy, uniq } = lodash;
+
+
+const notableSignalPattern = /\b(abort|risk|issue|anomaly|dropout|dropouts|fail|failure|fault|leak|warning|urgent|off-nominal|degraded|concern)\b/i;
+
+const tokenize = (value: string): string[] =>
+  value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 4);
 
 export type ChatMode = "rag" | "all";
 
@@ -161,6 +170,78 @@ export class AnalysisService {
       context: this.utterances.slice(-MAX_CONTEXT),
       wasTruncated: true
     };
+  }
+
+  getTopNotableUtterances(limit = 10, days = 7): NotableUtterance[] {
+    if (this.utterances.length === 0) {
+      return [];
+    }
+
+    const sortedDays = [...new Set(this.utterances.map((entry) => entry.day))].sort();
+    const latestDay = sortedDays[sortedDays.length - 1];
+
+    if (!latestDay) {
+      return [];
+    }
+
+    const dayWindow = Math.max(days, 1);
+    const cutoff = dayjs(latestDay).utc().subtract(dayWindow - 1, "day").format("YYYY-MM-DD");
+    const scoped = this.utterances.filter((entry) => entry.day >= cutoff);
+
+    if (scoped.length === 0) {
+      return [];
+    }
+
+    const tokenFrequency = new Map<string, number>();
+
+    for (const entry of scoped) {
+      const uniqueTokens = new Set(tokenize(entry.text));
+      for (const token of uniqueTokens) {
+        tokenFrequency.set(token, (tokenFrequency.get(token) ?? 0) + 1);
+      }
+    }
+
+    const ranked = scoped.map((entry) => {
+      const uniqueTokens = [...new Set(tokenize(entry.text))];
+      const rarityScore = uniqueTokens.reduce((total, token) => total + 1 / Math.max(tokenFrequency.get(token) ?? 1, 1), 0);
+      const normalizedRarity = rarityScore / Math.max(uniqueTokens.length, 1);
+      const wordCount = entry.text.trim().split(/\s+/).filter(Boolean).length;
+      const lengthScore = wordCount >= 6 && wordCount <= 60 ? 0.35 : 0;
+      const signalScore = notableSignalPattern.test(entry.text) ? 0.8 : 0;
+      const channelScore = /manager|flight|fdo|eec|eclss|gnc/i.test(entry.channel) ? 0.25 : 0;
+      const recencyDays = Math.max(dayjs(latestDay).diff(dayjs(entry.day), "day"), 0);
+      const recencyScore = Math.max(0, 1 - recencyDays / Math.max(dayWindow, 1)) * 0.25;
+      const score = Number((normalizedRarity + lengthScore + signalScore + channelScore + recencyScore).toFixed(4));
+
+      const reasons: string[] = [];
+      if (signalScore > 0) {
+        reasons.push("contains anomaly/risk signal terms");
+      }
+      if (normalizedRarity > 0.18) {
+        reasons.push("highly specific wording vs weekly baseline");
+      }
+      if (channelScore > 0) {
+        reasons.push("high-priority mission channel");
+      }
+      if (recencyScore > 0.18) {
+        reasons.push("recent within selected window");
+      }
+
+      return {
+        id: entry.id,
+        timestamp: entry.timestamp,
+        day: entry.day,
+        channel: entry.channel,
+        filename: entry.filename,
+        text: entry.text,
+        score,
+        reasons: reasons.length > 0 ? reasons : ["high aggregate significance score"]
+      };
+    });
+
+    return ranked
+      .sort((left, right) => right.score - left.score)
+      .slice(0, Math.min(Math.max(limit, 1), 50));
   }
 
   async chat(

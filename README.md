@@ -42,7 +42,7 @@ docker compose up --build
 
 4. Open `http://localhost:8080`
 
-5. In the app, click **Rebuild from CSV folder** to ingest and regenerate mission intelligence.
+5. Backend startup now auto-runs ingestion and scheduled prompt workflow; once loaded, open the Overview page for mission outputs.
 
 ## Run without Docker (local Node dev)
 
@@ -70,9 +70,9 @@ npm run dev:client
 
 ### Do I need Postgres for local dev?
 
-- **No**, not for the existing dashboard ingestion/chat flow (`/api/ingest`, `/api/dashboard`, `/api/chat`).
-- The new transcript context endpoint (`/api/transcripts/context`) is **optional** and only enabled when `TRANSCRIPTS_DB_ENABLED=true`.
-- If you want transcript DB features without Docker, run a local Postgres instance and set `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, and `DB_NAME` in `.env`.
+- **By default, yes.** Database-backed transcript/pipeline features are enabled by default (`TRANSCRIPTS_DB_ENABLED=true`).
+- If Postgres is not available for a local-only frontend/backend smoke run, set `TRANSCRIPTS_DB_ENABLED=false` to disable transcript/pipeline DB routes temporarily.
+- For full local functionality without Docker, run a local Postgres instance and set `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, and `DB_NAME` in `.env`.
 
 
 ## Capture client screenshots (Codex-friendly)
@@ -89,6 +89,14 @@ This writes `artifacts/client-screenshot.png` and supports optional overrides:
 npm run screenshot -- --url http://localhost:8080 --output artifacts/my-shot.png --retries 12 --timeout-ms 180000
 ```
 
+If Playwright cannot download its managed browser in your network, point the script to an existing Chromium/Chrome binary:
+
+```bash
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run screenshot:client
+# or
+npm run screenshot -- --url http://localhost:8080 --output artifacts/client-screenshot.png --browser-path /usr/bin/google-chrome
+```
+
 ## Ingestion workflow
 
 ### Docker volume mapping defaults
@@ -100,7 +108,7 @@ Containerized runs intentionally keep database/cache storage internal to Docker.
 - `./prompts -> /app/prompts`
 
 - Drop one or many CSV files into `TB-Artemis-Summaries/`
-- Re-run ingestion from the UI or call `POST /api/ingest`
+- Trigger a manual re-run with `POST /api/ingest` when you need an immediate refresh outside the startup/scheduled flow
 - Ingestion is safe to rerun and always rebuilds normalized records + derived intelligence
 
 ## Source-file workflow (new)
@@ -131,6 +139,7 @@ Prompts are editable text files in `/prompts`:
 - `GET /api/timeline`
 - `GET /api/stats`
 - `GET /api/topics/:topicTitle`
+- `GET /api/notable-utterances?limit=10&days=7`
 - `POST /api/chat` with `{ "query": "..." }`
 - `GET /api/pipeline/dashboard`
 - `POST /api/pipeline/ingest`

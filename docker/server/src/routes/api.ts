@@ -75,6 +75,28 @@ export const createApiRouter = (
     res.json(details);
   });
 
+
+  router.get("/notable-utterances", (req, res, next) => {
+    try {
+      const query = z
+        .object({
+          limit: z.coerce.number().int().min(1).max(50).optional(),
+          days: z.coerce.number().int().min(1).max(30).optional()
+        })
+        .parse(req.query);
+
+      const payload = analysisService.getTopNotableUtterances(query.limit ?? 10, query.days ?? 7);
+      res.json({
+        totalUtterances: payload.length,
+        limit: query.limit ?? 10,
+        days: query.days ?? 7,
+        utterances: payload
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post("/chat", async (req, res, next) => {
     try {
       const body = z

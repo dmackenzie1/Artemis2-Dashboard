@@ -1,6 +1,11 @@
 # Changelog
 
 ## [Unreleased]
+- fix: enable transcript/pipeline database mode by default while keeping `PIPELINE_AUTO_RUN=true` and `PIPELINE_INTERVAL_HOURS=6` defaults. Intent: Match runtime behavior with mission-ops expectations so ingestion-triggered and scheduled prompt runs are active without extra env toggles.
+- feat: add `/api/notable-utterances` with heuristic scoring to surface top mission-significant lines (e.g., top 10 from week-scale datasets). Intent: Give operators a direct high-signal shortlist from large transcript volumes without manual triage.
+- fix: add screenshot CLI fallback support for system Chromium/Chrome (`--browser-path` / `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`) with clearer missing-browser guidance. Intent: Keep dashboard screenshot workflows usable in restricted networks where Playwright CDN downloads are blocked.
+- feat: use NASA Earth imagery as low-opacity dashboard background layers and update mission imagery cards to match operator-provided reference visuals. Intent: Improve mission atmosphere and visual continuity with requested Earth-view styling while keeping dashboard readability.
+- fix: split the dashboard into focused mission components, add Artemis imagery styling updates, and backfill/enforce `prompt_executions.submitted_text` defaults before schema sync. Intent: Prevent startup migration crashes on existing databases without weakening data integrity for future prompt execution rows.
 - fix: restore missing dashboard chat typing/logger imports and reintroduce local chat message typing after merge fallout. Intent: Recover the Dashboard UI TypeScript build so operators can reliably load and use mission chat after conflicted merges.
 - feat: persist and surface per-prompt LLM submitted context alongside responses, replace dashboard stat tiles with a plain table, and remove the prompt workflow card grid in favor of an LLM query status table. Intent: Let operators verify exactly what text/context is being sent and returned for mission overview and 24-hour summaries while simplifying dashboard scanability.
 - feat: redesign mission chat into a true chat window with submit/thinking UX and add selectable RAG vs broad-sweep context modes. Intent: Give operators faster, clearer LLM interactions while making large-transcript query behavior explicit and controllable.

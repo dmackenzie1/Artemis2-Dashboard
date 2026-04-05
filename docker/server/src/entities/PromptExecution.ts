@@ -21,7 +21,7 @@ export const PromptExecutionSchema = new EntitySchema<PromptExecution>({
     startedAt: { type: "datetime", index: true },
     finishedAt: { type: "datetime", nullable: true, index: true },
     status: { type: "string", length: 16, index: true },
-    submittedText: { type: "text" },
+    submittedText: { type: "text", default: "" },
     output: { type: "text" },
     errorMessage: { type: "text", nullable: true }
   }
