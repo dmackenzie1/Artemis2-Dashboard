@@ -1,4 +1,5 @@
 import { clientLogger } from "./utils/logging/clientLogger";
+
 export type DashboardData = {
   generatedAt: string;
   missionSummary: string;
@@ -20,6 +21,19 @@ export type HealthData = {
     baseUrl: string | null;
     checkedAt: string;
     error: string | null;
+  };
+};
+
+export type ChatMode = "rag" | "all";
+
+export type ChatResponse = {
+  answer: string;
+  evidence: Array<{ timestamp: string; channel: string; text: string; filename: string }>;
+  strategy: {
+    mode: ChatMode;
+    totalUtterances: number;
+    contextUtterances: number;
+    wasTruncated: boolean;
   };
 };
 
@@ -57,16 +71,16 @@ export const fetchHealth = async (): Promise<HealthData> => {
   return (await response.json()) as HealthData;
 };
 
-export const chat = async (query: string): Promise<{ answer: string; evidence: Array<{ timestamp: string; channel: string; text: string; filename: string }> }> => {
+export const chat = async (query: string, mode: ChatMode = "rag"): Promise<ChatResponse> => {
   const response = await fetch(`${base}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query })
+    body: JSON.stringify({ query, mode })
   });
 
   if (!response.ok) {
     throw new Error("Unable to run chat");
   }
 
-  return (await response.json()) as { answer: string; evidence: Array<{ timestamp: string; channel: string; text: string; filename: string }> };
+  return (await response.json()) as ChatResponse;
 };

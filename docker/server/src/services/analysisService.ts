@@ -13,6 +13,8 @@ dayjs.extend(utc);
 
 const { groupBy, uniq } = lodash;
 
+export type ChatMode = "rag" | "all";
+
 type ServiceConfig = {
   dataDir: string;
   promptsDir: string;
@@ -121,17 +123,77 @@ export class AnalysisService {
     return this.cache;
   }
 
-  async chat(query: string): Promise<{ answer: string; evidence: TranscriptUtterance[] }> {
-    const lowered = query.toLowerCase();
-    const evidence = this.utterances
-      .filter((item) => item.text.toLowerCase().includes(lowered) || item.channel.toLowerCase().includes(lowered))
-      .slice(0, 20);
+  private getEvidenceForRag(query: string): TranscriptUtterance[] {
+    const queryTokens = query
+      .toLowerCase()
+      .split(/\s+/)
+      .map((token) => token.replace(/[^a-z0-9]/g, ""))
+      .filter((token) => token.length > 2);
+
+    const scored = this.utterances
+      .map((item) => {
+        const haystack = `${item.channel} ${item.text}`.toLowerCase();
+        const score = queryTokens.reduce((total, token) => (haystack.includes(token) ? total + 1 : total), 0);
+        return { item, score };
+      })
+      .filter(({ score }) => score > 0)
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 48)
+      .map(({ item }) => item);
+
+    if (scored.length > 0) {
+      return scored;
+    }
+
+    return this.utterances.slice(0, 24);
+  }
+
+  private getEvidenceForBroadSweep(): { context: TranscriptUtterance[]; wasTruncated: boolean } {
+    const MAX_CONTEXT = 400;
+    if (this.utterances.length <= MAX_CONTEXT) {
+      return { context: this.utterances, wasTruncated: false };
+    }
+
+    return {
+      context: this.utterances.slice(-MAX_CONTEXT),
+      wasTruncated: true
+    };
+  }
+
+  async chat(
+    query: string,
+    mode: ChatMode = "rag"
+  ): Promise<{
+    answer: string;
+    evidence: TranscriptUtterance[];
+    strategy: { mode: ChatMode; totalUtterances: number; contextUtterances: number; wasTruncated: boolean };
+  }> {
+    const ragEvidence = this.getEvidenceForRag(query);
+    const sweepContext = this.getEvidenceForBroadSweep();
+
+    const evidence = mode === "all" ? sweepContext.context : ragEvidence;
+    const wasTruncated = mode === "all" ? sweepContext.wasTruncated : false;
 
     const answer = await this.config.llmClient.generateText({
       systemPrompt: await getPrompt(this.config.promptsDir, "chat_system.txt"),
-      userPrompt: JSON.stringify({ query, evidence })
+      userPrompt: JSON.stringify({
+        query,
+        mode,
+        totalUtterances: this.utterances.length,
+        contextUtterances: evidence.length,
+        evidence
+      })
     });
 
-    return { answer, evidence };
+    return {
+      answer,
+      evidence,
+      strategy: {
+        mode,
+        totalUtterances: this.utterances.length,
+        contextUtterances: evidence.length,
+        wasTruncated
+      }
+    };
   }
 }

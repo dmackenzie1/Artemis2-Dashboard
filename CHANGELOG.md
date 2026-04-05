@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: redesign mission chat into a true chat window with submit/thinking UX and add selectable RAG vs broad-sweep context modes. Intent: Give operators faster, clearer LLM interactions while making large-transcript query behavior explicit and controllable.
 - fix: add a backend `prestart` compile step and align root ignore rules to `docker/*/dist` workspace outputs. Intent: Ensure `npm start` reliably boots from a fresh checkout without missing `dist/index.js` runtime failures.
 - fix: hide connected-model details in the dashboard banner and add a non-secret `.env.settings` template for CAIO gateway configuration. Intent: Reduce operator-facing UI noise while standardizing shareable local env defaults without exposing API credentials.
 - fix: run backend container with `node dist/index.js` directly instead of `npm run start`. Intent: Eliminate misleading npm lifecycle SIGTERM errors during normal container shutdown so operators can focus on real startup failures.
