@@ -1,0 +1,6 @@
+Drop your dashboard background image here as:
+
+background.png
+
+Expected path used by the UI:
+./assets/backgrounds/background.png

@@ -2,6 +2,8 @@ import type { FunctionComponent, FormEvent } from "react";
 import type { ChatMode } from "../../api";
 import type { ChatMessage } from "./types";
 import { DashboardPanel } from "./primitives/DashboardPanel";
+import { LoadingIndicator } from "./primitives/LoadingIndicator";
+import { StatusBadge } from "./primitives/StatusBadge";
 
 type MissionChatPanelProps = {
   chatInput: string;
@@ -38,11 +40,8 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
       kicker="Intelligence Interface"
       title="Mission Query Console"
       headerAccessory={modePicker}
+      footer={<StatusBadge label={isThinking ? "querying" : "ready"} />}
     >
-      <p className="chat-helper-text">
-        Targeted mode isolates relevant evidence. Broad sweep sends a wider transcript slice for exploratory questions.
-      </p>
-
       <div className="chat-window" role="log" aria-live="polite">
         {chatMessages.length === 0 ? (
           <p className="chat-empty">Ask about anomalies, channels, timeline changes, or mission readiness.</p>
@@ -59,7 +58,7 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
             ) : null}
           </article>
         ))}
-        {isThinking ? <article className="chat-bubble chat-assistant">Analyzing mission context…</article> : null}
+        {isThinking ? <LoadingIndicator variant="console" message="Querying relevant utterances…" /> : null}
       </div>
 
       <form onSubmit={(event) => void onChatSubmit(event)} className="chat-form chat-window-form">

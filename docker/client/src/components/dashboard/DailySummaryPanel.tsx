@@ -1,6 +1,7 @@
 import type { FunctionComponent } from "react";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
+import { StatusBadge } from "./primitives/StatusBadge";
 
 type DailySummaryPanelProps = {
   statusLabel: string;
@@ -28,15 +29,11 @@ export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
       className="daily-summary-panel"
       kicker="Operational Readout"
       title="Last 24 Hours"
-      footer={
-        <>
-          <small className="status-label">Status: {statusLabel}</small>
-          <small className="subtle">{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>
-        </>
-      }
+      headerAccessory={<StatusBadge label={statusLabel} />}
+      footer={<small className="subtle">{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>}
     >
       {rows.length === 0 ? (
-        <PaneStateMessage message="Not ready yet." />
+        <PaneStateMessage message="Building daily snapshot…" tone="loading" />
       ) : (
         <div className="summary-feed" role="list">
           {rows.map((row, index) => (
