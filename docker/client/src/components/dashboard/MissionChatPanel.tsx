@@ -69,7 +69,7 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
           placeholder="Query mission data..."
         />
         <button type="submit" disabled={isThinking || !chatInput.trim()}>
-          {isThinking ? "Running..." : "Run Query"}
+          {isThinking ? "Searching..." : "Search"}
         </button>
       </form>
     </DashboardPanel>

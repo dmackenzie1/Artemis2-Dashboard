@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchStatsHourlyByChannel } from "../api";
 import type { MissionHourlyChannelEntry } from "../api";
 import { DailySummaryPanel } from "../components/dashboard/DailySummaryPanel";
-import { DashboardToolbar } from "../components/dashboard/DashboardToolbar";
 import { MissionChatPanel } from "../components/dashboard/MissionChatPanel";
 import { MissionOverviewPanel } from "../components/dashboard/MissionOverviewPanel";
 import { StatsPanel } from "../components/dashboard/StatsPanel";
@@ -13,7 +12,6 @@ import { useDashboardController } from "./dashboard/useDashboardController";
 
 export const DashboardPage: FunctionComponent = () => {
   const {
-    health,
     viewModel,
     chatInput,
     chatMode,
@@ -69,10 +67,7 @@ export const DashboardPage: FunctionComponent = () => {
           summaryText={viewModel.missionSummary.text}
           lastRunAt={viewModel.missionSummary.lastRunAt}
         />
-        <div className="stack">
-          <DashboardToolbar health={health} />
-          <StatsPanel stats={viewModel.stats} />
-        </div>
+        <StatsPanel stats={viewModel.stats} />
       </section>
 
       <section className="dashboard-mid-row">
@@ -94,7 +89,6 @@ export const DashboardPage: FunctionComponent = () => {
 
       <section className="dashboard-bottom-row">
         <UtterancesTimelinePanel histogram={hourlyHistogram} />
-        <div className="right-rail-spacer" aria-hidden="true" />
       </section>
     </div>
   );
