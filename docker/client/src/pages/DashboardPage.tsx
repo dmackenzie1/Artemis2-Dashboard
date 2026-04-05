@@ -10,6 +10,8 @@ import { UtterancesTimelinePanel } from "../components/dashboard/UtterancesTimel
 import { clientLogger } from "../utils/logging/clientLogger";
 import { useDashboardController } from "./dashboard/useDashboardController";
 
+const HOURLY_STATS_POLL_INTERVAL_MS = 5 * 60 * 1000;
+
 export const DashboardPage: FunctionComponent = () => {
   const {
     viewModel,
@@ -36,7 +38,7 @@ export const DashboardPage: FunctionComponent = () => {
     void loadHourly();
     const pollHandle = window.setInterval(() => {
       void loadHourly();
-    }, 10000);
+    }, HOURLY_STATS_POLL_INTERVAL_MS);
 
     return () => {
       window.clearInterval(pollHandle);
