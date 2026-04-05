@@ -24,6 +24,7 @@ type PromptDashboardEntry = {
   promptUpdatedAt: string;
   lastRunAt: string | null;
   status: "running" | "success" | "failed" | "never";
+  submittedText: string | null;
   output: string | null;
 };
 
@@ -139,11 +140,20 @@ export class PipelineService {
 
     for (const prompt of prompts) {
       const startedAt = dayjs().utc().toDate();
+      const submittedText = JSON.stringify(
+        {
+          generatedAt: dayjs().utc().toISOString(),
+          sourceDocuments: sourceContext
+        },
+        null,
+        2
+      );
       const execution = this.em.create(PromptExecution, {
         prompt,
         startedAt,
         finishedAt: null,
         status: "running",
+        submittedText,
         output: "",
         errorMessage: null
       });
@@ -153,10 +163,7 @@ export class PipelineService {
       try {
         const output = await this.config.llmClient.generateText({
           systemPrompt: prompt.content,
-          userPrompt: JSON.stringify({
-            generatedAt: dayjs().utc().toISOString(),
-            sourceDocuments: sourceContext
-          })
+          userPrompt: submittedText
         });
 
         execution.status = "success";
@@ -191,6 +198,7 @@ export class PipelineService {
         promptUpdatedAt: dayjs(prompt.updatedAt).utc().toISOString(),
         lastRunAt: latestExecution ? dayjs(latestExecution.startedAt).utc().toISOString() : null,
         status: latestExecution?.status ?? "never",
+        submittedText: latestExecution?.submittedText ?? null,
         output: latestExecution?.status === "success" ? latestExecution.output : null
       });
     }

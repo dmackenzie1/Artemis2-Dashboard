@@ -22,6 +22,7 @@ export type PipelineDashboardData = {
     promptUpdatedAt: string;
     lastRunAt: string | null;
     status: "running" | "success" | "failed" | "never";
+    submittedText: string | null;
     output: string | null;
   }>;
 };
