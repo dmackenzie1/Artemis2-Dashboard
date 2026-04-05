@@ -28,6 +28,7 @@ export type DayInsights = {
     utteranceCount: number;
     wordCount: number;
     channelCount: number;
+    hourlyUtterances: Record<string, number>;
   };
 };
 

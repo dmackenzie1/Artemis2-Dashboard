@@ -6,7 +6,8 @@ import type { LlmConnectivityStatus } from "../services/llmClient.js";
 
 export const createApiRouter = (
   analysisService: AnalysisService,
-  getLlmConnectivityStatus: () => LlmConnectivityStatus
+  getLlmConnectivityStatus: () => LlmConnectivityStatus,
+  onIngestionComplete?: () => Promise<void>
 ): Router => {
   const router = Router();
 
@@ -18,6 +19,9 @@ export const createApiRouter = (
     try {
       serverLogger.info("Ingest endpoint invoked");
       const dashboard = await analysisService.ingestAndAnalyze();
+      if (onIngestionComplete) {
+        await onIngestionComplete();
+      }
       serverLogger.info("Ingest endpoint completed", { generatedAt: dashboard.generatedAt, totalDays: dashboard.days.length });
       res.json(dashboard);
     } catch (error) {

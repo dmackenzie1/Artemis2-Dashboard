@@ -9,6 +9,7 @@ import { createTranscriptRouter } from "./routes/transcripts.js";
 import ormConfig from "./mikro-orm.config.js";
 import { PipelineService } from "./services/pipelineService.js";
 import { createPipelineRouter } from "./routes/pipeline.js";
+import { serverLogger } from "./utils/logging/serverLogger.js";
 
 const app = express();
 app.use(cors({ origin: env.CORS_ORIGIN }));
@@ -25,14 +26,24 @@ const analysisService = new AnalysisService({
 });
 
 await analysisService.loadFromDisk();
-app.use("/api", createApiRouter(analysisService, () => llmConnectivityStatus));
+let pipelineService: PipelineService | null = null;
+app.use(
+  "/api",
+  createApiRouter(analysisService, () => llmConnectivityStatus, async () => {
+    const currentPipelineService = pipelineService;
+    if (currentPipelineService) {
+      await currentPipelineService.runPipelineCycle();
+      serverLogger.info("Prompt workflow completed after ingestion");
+    }
+  })
+);
 
 if (env.TRANSCRIPTS_DB_ENABLED) {
   const orm = await MikroORM.init(ormConfig);
   await orm.getSchemaGenerator().updateSchema();
   app.use("/api/transcripts", createTranscriptRouter(orm.em.fork()));
 
-  const pipelineService = new PipelineService(orm.em.fork(), {
+  pipelineService = new PipelineService(orm.em.fork(), {
     sourceFilesDir: env.SOURCE_FILES_DIR,
     promptsDir: env.PROMPTS_DIR,
     llmClient
@@ -42,10 +53,11 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
 
   if (env.PIPELINE_AUTO_RUN) {
     await pipelineService.runPipelineCycle();
+    const scheduledPipelineService = pipelineService;
 
     const intervalMs = env.PIPELINE_INTERVAL_HOURS * 60 * 60 * 1000;
     setInterval(() => {
-      pipelineService.runPipelineCycle().catch(() => {
+      scheduledPipelineService.runPipelineCycle().catch(() => {
         // no-op: failure is persisted in prompt_executions table
       });
     }, intervalMs);
@@ -64,6 +76,23 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
   });
 }
 
+const runStartupIngestion = async (): Promise<void> => {
+  serverLogger.info("Startup ingestion scheduled");
+
+  try {
+    const dashboard = await analysisService.ingestAndAnalyze();
+    serverLogger.info("Startup ingestion completed", { generatedAt: dashboard.generatedAt, totalDays: dashboard.days.length });
+
+    const currentPipelineService = pipelineService;
+    if (currentPipelineService) {
+      await currentPipelineService.runPipelineCycle();
+      serverLogger.info("Startup prompt workflow completed");
+    }
+  } catch (error) {
+    serverLogger.error("Startup ingestion failed", { error });
+  }
+};
+
 setInterval(() => {
   llmClient.checkConnectivity().then((status) => {
     llmConnectivityStatus = status;
@@ -77,4 +106,7 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
   res.status(500).json({ message });
 });
 
-app.listen(env.PORT);
+app.listen(env.PORT, () => {
+  serverLogger.info("Backend is ready", { port: env.PORT });
+  void runStartupIngestion();
+});

@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: auto-run ingestion and prompt workflow on backend startup, remove manual ingest UX, and surface prompt readiness placeholders on the dashboard with hour-bucket communication histograms. Intent: Ensure operators see progress immediately without manual rebuild actions while backend-generated mission outputs are still being prepared.
 - fix: add a backend `prestart` compile step and align root ignore rules to `docker/*/dist` workspace outputs. Intent: Ensure `npm start` reliably boots from a fresh checkout without missing `dist/index.js` runtime failures.
 - fix: hide connected-model details in the dashboard banner and add a non-secret `.env.settings` template for CAIO gateway configuration. Intent: Reduce operator-facing UI noise while standardizing shareable local env defaults without exposing API credentials.
 - fix: run backend container with `node dist/index.js` directly instead of `npm run start`. Intent: Eliminate misleading npm lifecycle SIGTERM errors during normal container shutdown so operators can focus on real startup failures.

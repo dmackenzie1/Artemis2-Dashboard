@@ -57,8 +57,10 @@ export class AnalysisService {
       const entries = byDay[day];
       const byHour = groupBy(entries, (item) => item.hour);
       const hourly: Record<string, string> = {};
+      const hourlyUtterances: Record<string, number> = {};
 
       for (const hour of Object.keys(byHour).sort()) {
+        hourlyUtterances[hour] = byHour[hour].length;
         const prompt = await getPrompt(this.config.promptsDir, "hourly_summary.txt");
         hourly[hour] = await this.config.llmClient.generateText({
           systemPrompt: prompt,
@@ -86,7 +88,8 @@ export class AnalysisService {
         stats: {
           utteranceCount: entries.length,
           wordCount: entries.reduce((count, item) => count + item.text.split(/\s+/).length, 0),
-          channelCount: uniq(entries.map((item) => item.channel)).length
+          channelCount: uniq(entries.map((item) => item.channel)).length,
+          hourlyUtterances
         }
       });
     }
