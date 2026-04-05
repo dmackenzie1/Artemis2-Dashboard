@@ -3,7 +3,7 @@ import { z } from "zod";
 const EnvSchema = z.object({
   PORT: z.coerce.number().default(4000),
   CORS_ORIGIN: z.string().default("http://localhost"),
-  DATA_DIR: z.string().default("/app/sample_data"),
+  DATA_DIR: z.string().default("/app/source_files"),
   PROMPTS_DIR: z.string().default("/app/prompts"),
   CACHE_FILE: z.string().default("/app/data/cache.json"),
   ANTHROPIC_BASE_URL: z.string().optional(),
@@ -15,7 +15,6 @@ const EnvSchema = z.object({
   DB_USER: z.string().default("artemis"),
   DB_PASS: z.string().default("artemis"),
   DB_NAME: z.string().default("artemis_transcripts"),
-  TRANSCRIPT_CSV_DIR: z.string().default("/app/TB-Artemis-Summaries"),
   SOURCE_FILES_DIR: z.string().default("/app/source_files"),
   PROMPT_SUBMISSIONS_DIR: z.string().default("/app/data/prompt-submissions"),
   PIPELINE_INTERVAL_HOURS: z.coerce.number().positive().default(6),

@@ -17,9 +17,9 @@ services:
     environment:
       TRANSCRIPTS_DB_ENABLED: "true"
       DB_HOST: db
+      DATA_DIR: /app/source_files
     volumes:
       - ./prompts:/app/prompts:ro
-      - ./TB-Artemis-Summaries:/app/TB-Artemis-Summaries:ro
       - ./source_files:/app/source_files:ro
     depends_on:
       - db

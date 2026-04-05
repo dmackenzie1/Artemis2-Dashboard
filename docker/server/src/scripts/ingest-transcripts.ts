@@ -9,7 +9,7 @@ const ingestDirectory = async (): Promise<void> => {
 
   try {
     await orm.getSchemaGenerator().updateSchema();
-    const summary = await ingestTranscriptCsvDirectory(env.TRANSCRIPT_CSV_DIR, orm.em.fork());
+    const summary = await ingestTranscriptCsvDirectory(env.DATA_DIR, orm.em.fork());
     serverLogger.info("Transcript ingestion finished", summary);
   } finally {
     await orm.close(true);
