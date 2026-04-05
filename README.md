@@ -15,7 +15,7 @@ A full-stack internal demo that ingests Artemis communication transcript CSVs an
   - chat responses with evidence snippets
 - Exposes APIs via Node + Express
 - Renders a polished mission-control style React UI
-- Runs locally with Docker Compose + NGINX reverse proxy
+- Runs locally with Docker Compose + NGINX reverse proxy (`/docker/client`, `/docker/server`, `/docker/nginx`)
 
 ## Quick start
 
@@ -30,6 +30,8 @@ cp .env.example .env
 ```bash
 npm install
 ```
+
+This project is Node/TypeScript only (no Python runtime required).
 
 3. Run with Docker:
 
