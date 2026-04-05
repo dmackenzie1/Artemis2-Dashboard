@@ -4,6 +4,7 @@ import type { ChatMessage } from "./types";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { LoadingIndicator } from "./primitives/LoadingIndicator";
 import { StatusBadge } from "./primitives/StatusBadge";
+import { useComponentIdentity } from "./primitives/useComponentIdentity";
 
 type MissionChatPanelProps = {
   chatInput: string;
@@ -24,10 +25,13 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
   onChatModeChange,
   onChatSubmit
 }) => {
+  const { componentUid } = useComponentIdentity("mission-chat-panel");
+  const modeFieldId = `chat-mode-${componentUid}`;
+
   const modePicker = (
-    <label className="chat-mode-picker" htmlFor="chat-mode">
+    <label className="chat-mode-picker" htmlFor={modeFieldId}>
       Context Mode
-      <select id="chat-mode" value={chatMode} onChange={(event) => onChatModeChange(event.target.value as ChatMode)}>
+      <select id={modeFieldId} value={chatMode} onChange={(event) => onChatModeChange(event.target.value as ChatMode)}>
         <option value="rag">Targeted Retrieval</option>
         <option value="all">Broad Sweep</option>
       </select>
@@ -36,6 +40,7 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
 
   return (
     <DashboardPanel
+      componentId="mission-chat-panel"
       className="mission-chat-panel"
       kicker="Intelligence Interface"
       title="Mission Query Console"

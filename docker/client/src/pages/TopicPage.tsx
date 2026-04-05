@@ -1,6 +1,7 @@
 import type { FC } from "react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 
 type TopicDetails = {
   title: string;
@@ -15,6 +16,7 @@ type TopicDetails = {
 export const TopicPage: FC = () => {
   const { title = "" } = useParams();
   const [topic, setTopic] = useState<TopicDetails | null>(null);
+  const { componentId, componentUid } = useComponentIdentity("topic-page");
 
   useEffect(() => {
     void fetch(`/api/topics/${title}`)
@@ -23,11 +25,15 @@ export const TopicPage: FC = () => {
   }, [title]);
 
   if (!topic) {
-    return <p>Loading topic intelligence...</p>;
+    return (
+      <p data-component-id={componentId} data-component-uid={componentUid}>
+        Loading topic intelligence...
+      </p>
+    );
   }
 
   return (
-    <article className="panel">
+    <article className="panel" data-component-id={componentId} data-component-uid={componentUid}>
       <h2>{topic.title}</h2>
       <p>{topic.description}</p>
       <p>First seen day: {topic.day.day}</p>

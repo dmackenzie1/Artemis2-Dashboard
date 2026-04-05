@@ -13,6 +13,7 @@ export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ hist
 
   return (
     <DashboardPanel
+      componentId="utterances-timeline-panel"
       className="timeline-strip-panel"
       kicker="Communications Activity"
       title="Mission Activity Signature"

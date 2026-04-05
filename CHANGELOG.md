@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: add consistent `data-component-id` and per-instance `data-component-uid` markers across dashboard/page primitives, and replace the static mission chat mode field id with an instance-safe UID-backed id. Intent: Ensure every rendered mission UI component can self-identify reliably for automation, telemetry, and targeted debugging without id collisions.
 - fix: slow topbar health and dashboard aggregate polling cadence from 10 seconds to 5 minutes to reduce background API chatter during steady-state monitoring. Intent: Minimize unnecessary recurring pulls when operators can work from mostly static mission state between explicit interactions.
 - fix: reduce dashboard hourly-channel stats polling from 10 seconds to 5 minutes while keeping initial page-load fetch behavior. Intent: Cut unnecessary repeated backend hourly stats queries for mostly static mission activity views and reduce avoidable API/database load.
 - feat: make the mission activity signature panel full width, remove the standalone pipeline widget, and compress dashboard spacing/typography while restoring visible query controls and stronger background imagery. Intent: Match the latest reference layout so all operator panes fit on screen without overlap and the mission query search action remains discoverable.
