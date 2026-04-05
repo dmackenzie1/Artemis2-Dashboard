@@ -9,6 +9,7 @@ export class TranscriptUtterance {
   timestamp!: Date;
   channel!: string;
   durationSec!: number;
+  wordCount!: number;
   language!: string;
   translated!: boolean;
   text!: string;
@@ -34,11 +35,16 @@ export class TranscriptUtterance {
     const minutes = Number(minutesRaw);
     const seconds = Number(secondsRaw);
     const durationSec = Number.isFinite(minutes) && Number.isFinite(seconds) ? minutes * 60 + seconds : 0;
+    const wordCount = row.text
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length;
 
     return {
       timestamp: parsedTimestamp.toDate(),
       channel: row.channel.trim(),
       durationSec,
+      wordCount,
       language: row.language.trim(),
       translated: row.translated.trim().toLowerCase() === "yes",
       text: row.text.trim(),
@@ -56,6 +62,7 @@ export const TranscriptUtteranceSchema = new EntitySchema<TranscriptUtterance>({
     timestamp: { type: "datetime", index: true },
     channel: { type: "string", length: 200, index: true },
     durationSec: { type: "number" },
+    wordCount: { type: "number" },
     language: { type: "string", length: 16 },
     translated: { type: "boolean" },
     text: { type: "text" },
