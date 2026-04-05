@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 - fix: align LLM environment variable names with Anthropic/Claude Code configuration (`ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`). Intent: Let operators reuse existing Claude Code credentials without translation and prevent runtime misconfiguration.
+- feat: add a Playwright-based CLI screenshot utility for capturing the React client at localhost:8080. Intent: Enable AI coding agents to generate visual snapshots of the running frontend for faster UI verification.
 - fix: make transcript PostgreSQL features optional for non-Docker local development and add direct workspace dev scripts. Intent: Let developers run server/client locally without requiring Docker or a running database unless transcript context APIs are needed.
 - feat: add PostgreSQL-backed transcript ingestion pipeline with streaming CSV imports and LLM context retrieval endpoint. Intent: Persist large communication transcript datasets for memory-efficient ingestion and prompt-ready querying on constrained infrastructure.
 - refactor: relocate backend and frontend workspaces under docker/server and docker/client. Intent: Match repository layout to the requested container-oriented ownership model while preserving existing build/test workflows.
