@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: repair DashboardPage merge conflict fallout by restoring the controller-based layout, reconnecting toolbar/chat pane wiring, and reintroducing hourly mission activity polling with aggregated timeline rendering. Intent: Recover a buildable client dashboard that matches the intended operator pane hierarchy after conflicted client merges.
 - feat: reposition overview panels so Mission Summary is the dominant top-left card, Stats moves to top-right, Last 24 Hours anchors below summary, Mission Query Console shifts to the right column, and the utterances-per-hour histogram returns as a full-width bottom strip while removing the backend auto-refresh helper copy. Intent: Match operator-requested mission dashboard scanning order and visual hierarchy from the latest reference markup.
 - fix: move pane-level LLM response event detection into mission/daily panel components and keep DashboardPage polling logic minimal to reduce merge-conflict pressure with ongoing UI work. Intent: Preserve pane-specific response logging while making dashboard integration easier to rebase as mainline layout code evolves.
 - fix: tag queued LLM calls with stable pane/component IDs, add prompt-output cache lookups keyed by prompt+submitted context hash, and surface submitted/output previews plus pane-level response events in dashboard panels. Intent: Ensure concurrent pane requests are routed back to the correct UI component with visible previews while avoiding redundant model calls when identical context is already cached in the database.
