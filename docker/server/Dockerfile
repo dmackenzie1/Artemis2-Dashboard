@@ -7,4 +7,4 @@ COPY . .
 WORKDIR /app/docker/server
 RUN npm run build
 EXPOSE 4000
-CMD ["npm", "run", "start"]
+CMD ["node", "dist/index.js"]
