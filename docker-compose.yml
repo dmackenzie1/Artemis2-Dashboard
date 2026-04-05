@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: ${DB_USER:-artemis}
       POSTGRES_PASSWORD: ${DB_PASS:-artemis}
@@ -34,7 +34,7 @@ services:
       dockerfile: docker/client/Dockerfile
 
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:1.29-alpine
     ports:
       - "8080:80"
     volumes:

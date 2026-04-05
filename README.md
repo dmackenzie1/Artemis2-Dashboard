@@ -74,6 +74,21 @@ npm run dev:client
 - The new transcript context endpoint (`/api/transcripts/context`) is **optional** and only enabled when `TRANSCRIPTS_DB_ENABLED=true`.
 - If you want transcript DB features without Docker, run a local Postgres instance and set `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, and `DB_NAME` in `.env`.
 
+
+## Capture client screenshots (Codex-friendly)
+
+When the stack is running at `http://localhost:8080`, run:
+
+```bash
+npm run screenshot:client
+```
+
+This writes `artifacts/client-screenshot.png` and supports optional overrides:
+
+```bash
+npm run screenshot -- --url http://localhost:8080 --output artifacts/my-shot.png --retries 12 --timeout-ms 180000
+```
+
 ## Ingestion workflow
 
 - Drop one or many CSV files into `sample_data/`

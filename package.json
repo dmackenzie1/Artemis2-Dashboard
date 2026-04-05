@@ -13,7 +13,8 @@
     "build": "npm run build -w backend && npm run build -w frontend",
     "dev:server": "npm run dev -w backend",
     "dev:client": "npm run dev -w frontend",
-    "screenshot": "node scripts/capture-screenshot.js"
+    "screenshot": "node scripts/capture-screenshot.js",
+    "screenshot:client": "node scripts/capture-screenshot.js --url http://localhost:8080 --output artifacts/client-screenshot.png"
   },
   "devDependencies": {
     "playwright": "^1.59.1"
