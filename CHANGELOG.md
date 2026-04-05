@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: inline the safe `days` window in hourly channel stats SQL and add structured error serialization for startup/API failures. Intent: Eliminate the PostgreSQL `$1` binding error while making production logs actionable with concrete error message/stack details.
 - fix: run schema synchronization before the prompt execution `submitted_text` backfill/constraint SQL during startup. Intent: Prevent fresh database boots from crashing when `prompt_executions` has not been created yet.
 - feat: add DB-backed `/api/stats/*` mission metrics (min/max day, total utterances/words/channels, daily rollups, and hourly-by-channel counts) plus dashboard wiring and prompt/ingestion observability logs without dumping full prompt payloads to stdout. Intent: Give operators verifiable backend activity and actionable mission statistics in the UI while keeping prompt bodies auditable via filesystem artifacts instead of noisy server logs.
 - fix: run the first automatic pipeline prompt cycle only after startup CSV ingestion completes, then start the recurring schedule. Intent: Prevent pre-ingestion prompt executions from using incomplete/placeholder source context during backend boot.

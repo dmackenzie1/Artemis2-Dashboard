@@ -9,7 +9,7 @@ import { createTranscriptRouter } from "./routes/transcripts.js";
 import ormConfig from "./mikro-orm.config.js";
 import { PipelineService } from "./services/pipelineService.js";
 import { createPipelineRouter } from "./routes/pipeline.js";
-import { serverLogger } from "./utils/logging/serverLogger.js";
+import { serializeUnknownError, serverLogger } from "./utils/logging/serverLogger.js";
 import { StatsService } from "./services/statsService.js";
 
 const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
@@ -132,7 +132,7 @@ const runStartupIngestion = async (): Promise<void> => {
       startPipelineSchedule();
     }
   } catch (error) {
-    serverLogger.error("Startup ingestion failed", { error });
+    serverLogger.error("Startup ingestion failed", { error: serializeUnknownError(error) });
   }
 };
 
@@ -145,6 +145,7 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  serverLogger.error("Unhandled API error", { error: serializeUnknownError(error) });
   const message = error instanceof Error ? error.message : "Unexpected error";
   res.status(500).json({ message });
 });

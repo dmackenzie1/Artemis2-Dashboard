@@ -5,6 +5,20 @@ dayjs.extend(utc);
 
 type LogContext = Record<string, unknown>;
 
+export const serializeUnknownError = (error: unknown): Record<string, unknown> => {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    };
+  }
+
+  return {
+    value: error
+  };
+};
+
 const formatPayload = (level: "INFO" | "WARN" | "ERROR", message: string, context?: LogContext): string => {
   return JSON.stringify({
     timestamp: dayjs().utc().format("YYYY-MM-DDTHH:mm:ss[Z]"),

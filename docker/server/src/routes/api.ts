@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { AnalysisService } from "../services/analysisService.js";
-import { serverLogger } from "../utils/logging/serverLogger.js";
+import { serializeUnknownError, serverLogger } from "../utils/logging/serverLogger.js";
 import type { LlmConnectivityStatus } from "../services/llmClient.js";
 import type { StatsService } from "../services/statsService.js";
 
@@ -27,7 +27,7 @@ export const createApiRouter = (
       serverLogger.info("Ingest endpoint completed", { generatedAt: dashboard.generatedAt, totalDays: dashboard.days.length });
       res.json(dashboard);
     } catch (error) {
-      serverLogger.error("Ingest endpoint failed", { error });
+      serverLogger.error("Ingest endpoint failed", { error: serializeUnknownError(error) });
       next(error);
     }
   });
@@ -73,6 +73,7 @@ export const createApiRouter = (
       const payload = await statsService.getSummary();
       res.json(payload);
     } catch (error) {
+      serverLogger.error("Stats summary request failed", { error: serializeUnknownError(error) });
       next(error);
     }
   });
@@ -89,6 +90,7 @@ export const createApiRouter = (
       const payload = await statsService.getStatsByDay();
       res.json(payload);
     } catch (error) {
+      serverLogger.error("Daily stats request failed", { error: serializeUnknownError(error) });
       next(error);
     }
   });
@@ -106,6 +108,7 @@ export const createApiRouter = (
       const payload = await statsService.getUtterancesPerHourPerChannel(query.days ?? 7);
       res.json(payload);
     } catch (error) {
+      serverLogger.error("Hourly channel stats request failed", { error: serializeUnknownError(error) });
       next(error);
     }
   });
