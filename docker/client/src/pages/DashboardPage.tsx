@@ -15,6 +15,7 @@ import type {
   PipelineDashboardData
 } from "../api";
 import { DailySummaryPanel } from "../components/dashboard/DailySummaryPanel";
+import { DashboardToolbar } from "../components/dashboard/DashboardToolbar";
 import { MissionChatPanel } from "../components/dashboard/MissionChatPanel";
 import { MissionOverviewPanel } from "../components/dashboard/MissionOverviewPanel";
 import { StatsPanel } from "../components/dashboard/StatsPanel";
@@ -30,6 +31,7 @@ const starterQueries = [
 
 export const DashboardPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [health, setHealth] = useState<HealthData | null>(null);
   const [pipeline, setPipeline] = useState<PipelineDashboardData | null>(null);
   const [statsSummary, setStatsSummary] = useState<MissionStatsSummaryData | null>(null);
   const [chatInput, setChatInput] = useState(starterQueries[0]);
@@ -42,11 +44,13 @@ export const DashboardPage: FC = () => {
       try {
         const [dashboardPayload, healthPayload, pipelinePayload, statsSummaryPayload] = await Promise.all([
           fetchDashboard(),
+          fetchHealth(),
           fetchPipelineDashboard(),
           fetchStatsSummary()
         ]);
 
         setData(dashboardPayload);
+        setHealth(healthPayload);
         setPipeline(pipelinePayload);
         setStatsSummary(statsSummaryPayload);
       } catch (error) {
