@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- refactor: split dashboard mission UI into pane-focused components with shared panel primitives and a centralized page controller/view-model layer for polling/chat orchestration. Intent: Mirror the visible layout in code so future visual redesigns can iterate pane-by-pane without altering existing data flow or backend contracts.
 - refactor: rename the Docker Compose API service from `backend` to `server` and update nginx upstream/dependency references accordingly. Intent: Align container/service naming with team terminology while preserving existing API routing behavior.
 - fix: resolve DashboardPage merge fallout by restoring health polling, correcting Promise.all payload ordering, and re-adding DashboardToolbar import/state wiring. Intent: Unblock Docker frontend TypeScript builds and recover dashboard runtime status rendering after a bad merge.
 - fix: serialize all server-side LLM calls through a single queue, log compact request/response previews, and disable hourly summary prompt generation during ingestion. Intent: Let operators verify exactly what is sent/received while preventing overlapping LLM executions and unwanted hourly-summary prompt traffic.
