@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: tag all analysis/chat/connectivity LLM calls with explicit component IDs so server logs and debug prompt artifacts never fall back to `unknown-component`. Intent: Make prompt/response traceability deterministic for operators diagnosing mission-query behavior and LLM routing.
 - fix: prefer canonical full-day transcript summary files over matching `_partial` variants when composing `daily_summary` day groups, and add detailed grouping/chunk logs for traceability. Intent: Keep day-level prompt manifests accurate and easier to debug when operators validate daily-summary source selection.
 - fix: add consistent `data-component-id` and per-instance `data-component-uid` markers across dashboard/page primitives, and replace the static mission chat mode field id with an instance-safe UID-backed id. Intent: Ensure every rendered mission UI component can self-identify reliably for automation, telemetry, and targeted debugging without id collisions.
 - fix: slow topbar health and dashboard aggregate polling cadence from 10 seconds to 5 minutes to reduce background API chatter during steady-state monitoring. Intent: Minimize unnecessary recurring pulls when operators can work from mostly static mission state between explicit interactions.

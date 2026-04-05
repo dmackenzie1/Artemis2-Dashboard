@@ -90,7 +90,8 @@ export class AnalysisService {
       serverLogger.info("Prompting daily summary", { day, sampleSize: Math.min(entries.length, 120) });
       const dailySummary = await this.config.llmClient.generateText({
         systemPrompt: dailyPrompt,
-        userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) })
+        userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) }),
+        componentId: `analysis/daily_summary/${day}`
       });
       serverLogger.info("Prompt received for daily summary", { day });
 
@@ -98,7 +99,8 @@ export class AnalysisService {
       serverLogger.info("Prompting top topics", { day, sampleSize: Math.min(entries.length, 120) });
       const topicsRaw = await this.config.llmClient.generateText({
         systemPrompt: topicsPrompt,
-        userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) })
+        userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) }),
+        componentId: `analysis/top_topics/${day}`
       });
       serverLogger.info("Prompt received for top topics", { day });
 
@@ -119,14 +121,16 @@ export class AnalysisService {
     serverLogger.info("Prompting mission overview summary", { totalDays: days.length });
     const missionSummary = await this.config.llmClient.generateText({
       systemPrompt: await getPrompt(this.config.promptsDir, "mission_summary.txt"),
-      userPrompt: JSON.stringify({ days: days.map((day) => ({ day: day.day, summary: day.summary })) })
+      userPrompt: JSON.stringify({ days: days.map((day) => ({ day: day.day, summary: day.summary })) }),
+      componentId: "analysis/mission_summary"
     });
     serverLogger.info("Prompt received for mission overview summary");
 
     serverLogger.info("Prompting recent changes summary", { scopedDays: Math.min(days.length, 2) });
     const recentChanges = await this.config.llmClient.generateText({
       systemPrompt: await getPrompt(this.config.promptsDir, "recent_changes.txt"),
-      userPrompt: JSON.stringify({ latestDays: days.slice(-2) })
+      userPrompt: JSON.stringify({ latestDays: days.slice(-2) }),
+      componentId: "analysis/recent_changes"
     });
     serverLogger.info("Prompt received for recent changes summary");
 
@@ -289,7 +293,8 @@ export class AnalysisService {
         totalUtterances: this.utterances.length,
         contextUtterances: evidence.length,
         evidence
-      })
+      }),
+      componentId: `analysis/chat/${mode}`
     });
 
     serverLogger.info("Chat prompt received", {

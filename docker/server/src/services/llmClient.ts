@@ -289,7 +289,8 @@ export class LlmClient {
     try {
       await this.generateText({
         systemPrompt: "You are a connectivity check.",
-        userPrompt: 'Reply with exactly "ok".'
+        userPrompt: 'Reply with exactly "ok".',
+        componentId: "system/connectivity-check"
       });
 
       return {
