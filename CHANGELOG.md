@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+- fix: repair dashboard page JSX/import regressions and expand client/server unit coverage for API and topic parsing paths. Intent: Restore reliable frontend build health and reduce regression risk in mission-ops dashboard workflows.
+- chore: perform a full repository code review and document prioritized build/test stability findings. Intent: Give maintainers a current, actionable quality baseline before additional Artemis 2 dashboard feature work.
 - chore: switch Docker Compose storage to internal named volumes and limit host bind mounts to transcript/prompt/source input directories. Intent: Avoid scratch-drive persistence during active development while keeping only operator-managed ingestion inputs mapped from host.
 - feat: add structured client/server ingestion lifecycle logging with per-file CSV counters. Intent: Give operators clear, auditable visibility that transcript ingestion is running and succeeding for each input file.
 - feat: surface startup LLM connectivity status and add starter chat query presets in the dashboard, while updating request formatting for Anthropic-compatible gateway models. Intent: Give operators immediate confidence that configured model access is live and speed up analysis workflows with pre-populated mission query prompts.
