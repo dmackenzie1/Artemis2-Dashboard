@@ -25,6 +25,8 @@ const starterQueries = [
   "show mentions of comm dropouts"
 ];
 
+const DASHBOARD_POLL_INTERVAL_MS = 5 * 60 * 1000;
+
 export type DashboardController = {
   health: HealthData | null;
   viewModel: ReturnType<typeof buildDashboardViewModel>;
@@ -69,7 +71,7 @@ export const useDashboardController = (): DashboardController => {
     void loadData();
     const pollHandle = window.setInterval(() => {
       void loadData();
-    }, 10000);
+    }, DASHBOARD_POLL_INTERVAL_MS);
 
     return () => {
       window.clearInterval(pollHandle);

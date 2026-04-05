@@ -12,7 +12,13 @@ export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats }) => {
   const statusLabel = stats.length > 0 ? "ready" : "loading";
 
   return (
-    <DashboardPanel className="stats-panel" kicker="Snapshot" title="Stats" headerAccessory={<StatusBadge label={statusLabel} />}>
+    <DashboardPanel
+      componentId="stats-panel"
+      className="stats-panel"
+      kicker="Snapshot"
+      title="Stats"
+      headerAccessory={<StatusBadge label={statusLabel} />}
+    >
       {stats.length === 0 ? (
         <PaneStateMessage message="Waiting for mission metrics…" tone="loading" />
       ) : (

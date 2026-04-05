@@ -1,7 +1,9 @@
 import type { FunctionComponent, ReactNode } from "react";
+import { useComponentIdentity } from "./useComponentIdentity";
 
 type DashboardPanelProps = {
   className?: string;
+  componentId?: string;
   kicker: string;
   title: string;
   headerAccessory?: ReactNode;
@@ -11,14 +13,17 @@ type DashboardPanelProps = {
 
 export const DashboardPanel: FunctionComponent<DashboardPanelProps> = ({
   className,
+  componentId = "dashboard-panel",
   kicker,
   title,
   headerAccessory,
   children,
   footer
 }) => {
+  const { componentUid } = useComponentIdentity(componentId);
+
   return (
-    <section className={`panel space-panel ${className ?? ""}`.trim()}>
+    <section className={`panel space-panel ${className ?? ""}`.trim()} data-component-id={componentId} data-component-uid={componentUid}>
       <div className="dashboard-panel-header">
         <div>
           <p className="panel-kicker">{kicker}</p>

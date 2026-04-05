@@ -4,14 +4,18 @@ import { NavLink, Route, Routes } from "react-router-dom";
 import { fetchHealth } from "./api";
 import type { HealthData } from "./api";
 import { StatusBadge } from "./components/dashboard/primitives/StatusBadge";
+import { useComponentIdentity } from "./components/dashboard/primitives/useComponentIdentity";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DailyPage } from "./pages/DailyPage";
 import { TimelinePage } from "./pages/TimelinePage";
 import { TopicPage } from "./pages/TopicPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 
+const HEALTH_POLL_INTERVAL_MS = 5 * 60 * 1000;
+
 export const App: FC = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
+  const { componentId, componentUid } = useComponentIdentity("app-shell");
 
   useEffect(() => {
     const loadHealth = async (): Promise<void> => {
@@ -26,7 +30,7 @@ export const App: FC = () => {
     void loadHealth();
     const pollHandle = window.setInterval(() => {
       void loadHealth();
-    }, 10000);
+    }, HEALTH_POLL_INTERVAL_MS);
 
     return () => {
       window.clearInterval(pollHandle);
@@ -36,7 +40,7 @@ export const App: FC = () => {
   const connected = useMemo(() => (!health ? true : health.llm.connected), [health]);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-component-id={componentId} data-component-uid={componentUid}>
       <header className="topbar">
         <h1>Artemis 2 Mission Intelligence</h1>
         <nav className="topbar-nav">
