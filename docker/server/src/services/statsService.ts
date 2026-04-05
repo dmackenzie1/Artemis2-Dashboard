@@ -1,6 +1,7 @@
 import { EntityManager } from "@mikro-orm/postgresql";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
+import { serverLogger } from "../utils/logging/serverLogger.js";
 
 dayjs.extend(utc);
 
@@ -94,6 +95,7 @@ export class StatsService {
 
   async getUtterancesPerHourPerChannel(days = 7): Promise<MissionHourlyChannelEntry[]> {
     const safeDays = Math.min(Math.max(days, 1), 30);
+    serverLogger.info("Running hourly channel stats query", { requestedDays: days, safeDays });
     const rows = await this.em.getConnection().execute<{ hour: string; channel: string; utterances: string }[]>(
       `
         with max_day as (
@@ -107,7 +109,7 @@ export class StatsService {
           from transcript_utterances
           cross join max_day
           where max_day.value is not null
-            and date(timestamp at time zone 'utc') >= max_day.value - (($1::int - 1) * interval '1 day')
+            and date(timestamp at time zone 'utc') >= max_day.value - ((${safeDays} - 1) * interval '1 day')
         )
         select
           to_char(scoped.bucket_hour at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') as "hour",
@@ -116,8 +118,7 @@ export class StatsService {
         from scoped
         group by 1, 2
         order by 1 asc, 2 asc
-      `,
-      [safeDays]
+      `
     );
 
     return rows.map((row) => ({
