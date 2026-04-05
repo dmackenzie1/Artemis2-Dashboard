@@ -73,23 +73,29 @@ export class AnalysisService {
       for (const hour of Object.keys(byHour).sort()) {
         hourlyUtterances[hour] = byHour[hour].length;
         const prompt = await getPrompt(this.config.promptsDir, "hourly_summary.txt");
+        serverLogger.info("Prompting hourly summary", { day, hour, sampleSize: Math.min(byHour[hour].length, 40) });
         hourly[hour] = await this.config.llmClient.generateText({
           systemPrompt: prompt,
           userPrompt: JSON.stringify({ day, hour, sample: byHour[hour].slice(0, 40) })
         });
+        serverLogger.info("Prompt received for hourly summary", { day, hour });
       }
 
       const dailyPrompt = await getPrompt(this.config.promptsDir, "daily_summary.txt");
+      serverLogger.info("Prompting daily summary", { day, sampleSize: Math.min(entries.length, 120) });
       const dailySummary = await this.config.llmClient.generateText({
         systemPrompt: dailyPrompt,
         userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) })
       });
+      serverLogger.info("Prompt received for daily summary", { day });
 
       const topicsPrompt = await getPrompt(this.config.promptsDir, "top_topics.txt");
+      serverLogger.info("Prompting top topics", { day, sampleSize: Math.min(entries.length, 120) });
       const topicsRaw = await this.config.llmClient.generateText({
         systemPrompt: topicsPrompt,
         userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) })
       });
+      serverLogger.info("Prompt received for top topics", { day });
 
       days.push({
         day,
@@ -105,15 +111,19 @@ export class AnalysisService {
       });
     }
 
+    serverLogger.info("Prompting mission overview summary", { totalDays: days.length });
     const missionSummary = await this.config.llmClient.generateText({
       systemPrompt: await getPrompt(this.config.promptsDir, "mission_summary.txt"),
       userPrompt: JSON.stringify({ days: days.map((day) => ({ day: day.day, summary: day.summary })) })
     });
+    serverLogger.info("Prompt received for mission overview summary");
 
+    serverLogger.info("Prompting recent changes summary", { scopedDays: Math.min(days.length, 2) });
     const recentChanges = await this.config.llmClient.generateText({
       systemPrompt: await getPrompt(this.config.promptsDir, "recent_changes.txt"),
       userPrompt: JSON.stringify({ latestDays: days.slice(-2) })
     });
+    serverLogger.info("Prompt received for recent changes summary");
 
     this.cache = { generatedAt: dayjs().utc().toISOString(), missionSummary, recentChanges, days };
 
@@ -252,6 +262,11 @@ export class AnalysisService {
     evidence: TranscriptUtterance[];
     strategy: { mode: ChatMode; totalUtterances: number; contextUtterances: number; wasTruncated: boolean };
   }> {
+    serverLogger.info("Chat prompt requested", {
+      mode,
+      queryLength: query.length
+    });
+
     const ragEvidence = this.getEvidenceForRag(query);
     const sweepContext = this.getEvidenceForBroadSweep();
 
@@ -267,6 +282,12 @@ export class AnalysisService {
         contextUtterances: evidence.length,
         evidence
       })
+    });
+
+    serverLogger.info("Chat prompt received", {
+      mode,
+      evidenceCount: evidence.length,
+      wasTruncated
     });
 
     return {

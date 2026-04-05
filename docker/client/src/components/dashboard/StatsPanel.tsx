@@ -7,7 +7,7 @@ type StatEntry = {
 
 type StatsPanelProps = {
   stats: StatEntry[];
-  histogram: Array<{ hour: string; utterances: number }>;
+  histogram: Array<{ hour: string; channel: string; utterances: number }>;
 };
 
 export const StatsPanel: FC<StatsPanelProps> = ({ stats, histogram }) => {
@@ -31,7 +31,7 @@ export const StatsPanel: FC<StatsPanelProps> = ({ stats, histogram }) => {
         {histogram.length === 0 ? <p className="subtle">No transcript data yet.</p> : null}
         {histogram.map((entry) => (
           <div key={entry.hour} className="histogram-row">
-            <span className="histogram-label">{entry.hour.slice(5, 16).replace("T", " ")}</span>
+            <span className="histogram-label">{entry.hour.slice(5, 16).replace("T", " ")} · {entry.channel}</span>
             <div className="histogram-bar-track">
               <div
                 className="histogram-bar-fill"

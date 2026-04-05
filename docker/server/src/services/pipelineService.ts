@@ -16,6 +16,7 @@ type PipelineConfig = {
   sourceFilesDir: string;
   promptsDir: string;
   llmClient: LlmClient;
+  promptSubmissionsDir: string;
 };
 
 type PromptDashboardEntry = {
@@ -59,6 +60,17 @@ export class PipelineService {
     private readonly em: EntityManager,
     private readonly config: PipelineConfig
   ) {}
+
+  private async persistPromptSubmission(promptKey: string, submittedText: string): Promise<string> {
+    const timestamp = dayjs().utc().format("YYYYMMDDTHHmmssSSS");
+    const fileName = `${timestamp}-${promptKey}.json`;
+    const outputPath = path.join(this.config.promptSubmissionsDir, fileName);
+
+    await fs.mkdir(this.config.promptSubmissionsDir, { recursive: true });
+    await fs.writeFile(outputPath, submittedText, "utf8");
+
+    return outputPath;
+  }
 
   async syncSourceDocuments(): Promise<number> {
     const entries = await fs.readdir(this.config.sourceFilesDir, { withFileTypes: true });
@@ -182,9 +194,11 @@ export class PipelineService {
       });
       this.em.persist(execution);
       await this.em.flush();
+      const promptSubmissionPath = await this.persistPromptSubmission(prompt.key, submittedText);
       serverLogger.info("Prompt execution started", {
         promptKey: prompt.key,
-        submittedText
+        sourceDocumentCount: sourceContext.length,
+        submissionPath: promptSubmissionPath
       });
 
       try {
@@ -196,11 +210,20 @@ export class PipelineService {
         execution.status = "success";
         execution.output = output;
         execution.finishedAt = dayjs().utc().toDate();
+        serverLogger.info("Prompt response received", {
+          promptKey: prompt.key,
+          status: execution.status,
+          outputLength: output.length
+        });
       } catch (error) {
         execution.status = "failed";
         execution.output = "";
         execution.errorMessage = error instanceof Error ? error.message : "Unknown error";
         execution.finishedAt = dayjs().utc().toDate();
+        serverLogger.error("Prompt response failed", {
+          promptKey: prompt.key,
+          errorMessage: execution.errorMessage
+        });
       }
 
       await this.em.flush();
@@ -238,6 +261,7 @@ export class PipelineService {
 
   async runManualReingest(): Promise<{ changedDocuments: number }> {
     const changedDocuments = await this.syncSourceDocuments();
+    serverLogger.info("Source documents reingested", { changedDocuments });
     this.missionStatsCache = null;
     return { changedDocuments };
   }

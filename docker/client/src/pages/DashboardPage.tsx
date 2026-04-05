@@ -1,7 +1,23 @@
 import type { FC, FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { chat, fetchDashboard, fetchHealth, fetchPipelineDashboard, fetchPipelineStats } from "../api";
-import type { ChatMode, DashboardData, HealthData, PipelineDashboardData, PipelineStatsData } from "../api";
+import {
+  chat,
+  fetchDashboard,
+  fetchHealth,
+  fetchPipelineDashboard,
+  fetchStatsByDay,
+  fetchStatsHourlyByChannel,
+  fetchStatsSummary
+} from "../api";
+import type {
+  ChatMode,
+  DashboardData,
+  HealthData,
+  MissionHourlyChannelEntry,
+  MissionStatsByDayEntry,
+  MissionStatsSummaryData,
+  PipelineDashboardData
+} from "../api";
 import { DashboardToolbar } from "../components/dashboard/DashboardToolbar";
 import { DailySummaryPanel } from "../components/dashboard/DailySummaryPanel";
 import { MissionChatPanel } from "../components/dashboard/MissionChatPanel";
@@ -21,7 +37,9 @@ export const DashboardPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [health, setHealth] = useState<HealthData | null>(null);
   const [pipeline, setPipeline] = useState<PipelineDashboardData | null>(null);
-  const [pipelineStats, setPipelineStats] = useState<PipelineStatsData | null>(null);
+  const [statsSummary, setStatsSummary] = useState<MissionStatsSummaryData | null>(null);
+  const [statsByDay, setStatsByDay] = useState<MissionStatsByDayEntry[]>([]);
+  const [hourlyByChannel, setHourlyByChannel] = useState<MissionHourlyChannelEntry[]>([]);
   const [chatInput, setChatInput] = useState(starterQueries[0]);
   const [chatMode, setChatMode] = useState<ChatMode>("rag");
   const [isThinking, setIsThinking] = useState(false);
@@ -30,17 +48,21 @@ export const DashboardPage: FC = () => {
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       try {
-        const [dashboardPayload, healthPayload, pipelinePayload, pipelineStatsPayload] = await Promise.all([
+        const [dashboardPayload, healthPayload, pipelinePayload, statsSummaryPayload, statsByDayPayload, hourlyByChannelPayload] = await Promise.all([
           fetchDashboard(),
           fetchHealth(),
           fetchPipelineDashboard(),
-          fetchPipelineStats()
+          fetchStatsSummary(),
+          fetchStatsByDay(),
+          fetchStatsHourlyByChannel(7)
         ]);
 
         setData(dashboardPayload);
         setHealth(healthPayload);
         setPipeline(pipelinePayload);
-        setPipelineStats(pipelineStatsPayload);
+        setStatsSummary(statsSummaryPayload);
+        setStatsByDay(statsByDayPayload);
+        setHourlyByChannel(hourlyByChannelPayload);
       } catch (error) {
         clientLogger.error("Dashboard polling failed", { error });
       }
@@ -94,19 +116,23 @@ export const DashboardPage: FC = () => {
 
   const stats = useMemo(
     () => [
-      { label: "Data Days", value: `${pipelineStats?.totals.dataDays ?? 0}` },
-      { label: "Utterances", value: `${pipelineStats?.totals.utterances ?? 0}` },
-      { label: "Lines", value: `${pipelineStats?.totals.lines ?? 0}` },
-      { label: "Words", value: `${pipelineStats?.totals.words ?? 0}` }
+      { label: "Data Days", value: `${statsByDay.length}` },
+      { label: "Min Day", value: statsSummary?.days.minDay ?? "n/a" },
+      { label: "Max Day", value: statsSummary?.days.maxDay ?? "n/a" },
+      { label: "Total Utterances", value: `${statsSummary?.totals.utterances ?? 0}` },
+      { label: "Total Words", value: `${statsSummary?.totals.words ?? 0}` },
+      { label: "Distinct Channels", value: `${statsSummary?.totals.channels ?? 0}` }
     ],
-    [pipelineStats]
+    [statsByDay.length, statsSummary]
   );
+
+  const histogram = useMemo(() => hourlyByChannel.slice(-120), [hourlyByChannel]);
 
   return (
     <div className="dashboard-layout dashboard-layout-single">
       <DashboardToolbar health={health} />
       <MissionOverviewPanel prompt={missionPrompt} />
-      <StatsPanel stats={stats} histogram={pipelineStats?.utterancesPerHour ?? []} />
+      <StatsPanel stats={stats} histogram={histogram} />
       <DailySummaryPanel prompt={dailyPrompt} latestDay={latestDay?.day} />
       <MissionChatPanel
         chatInput={chatInput}
