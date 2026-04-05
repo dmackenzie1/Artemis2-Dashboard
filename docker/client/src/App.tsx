@@ -9,7 +9,7 @@ export const App: FC = () => {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <h1>Artemis 2 Mission Intelligence</h1>
+        <h1>Artemis 2 Communications Dashboard</h1>
         <nav>
           <NavLink to="/">Overview</NavLink>
           <NavLink to="/daily">Daily</NavLink>
