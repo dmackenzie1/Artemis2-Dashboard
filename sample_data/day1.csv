@@ -1,0 +1,6 @@
+Date,Channel,Duration,Language,Translated,Text,Filename,
+2026-03-28T08:01:03Z,ORION MER MANAGER,00:14,en,"","
+MER opening loop. Guidance reports nominal star tracker lock and no thermal redlines.",A2_0328_080103.wav,
+2026-03-28T09:12:33Z,PROPULSION,00:22,en,"","RCS manifold pressure oscillation observed. Requesting trend watch for next 30 minutes.",A2_0328_091233.wav,
+2026-03-28T10:45:11Z,ECLSS,00:18,en,"","Crew reports wastewater separator vibration above baseline, no immediate constraint.",A2_0328_104511.wav,
+2026-03-28T11:03:48Z,FLIGHT,00:20,en,"","Copy all, capture as watch item and notify systems integration.",A2_0328_110348.wav,

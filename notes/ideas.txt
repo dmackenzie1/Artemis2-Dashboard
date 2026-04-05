@@ -1,0 +1,5 @@
+- Add embeddings + vector retrieval for better cross-day semantic chat.
+- Add confidence scoring to LLM outputs and show low-confidence flags in UI.
+- Add topic co-occurrence graph.
+- Add incremental ingestion by source filename hash.
+- Add export to PowerPoint briefing format for daily mission standup.
