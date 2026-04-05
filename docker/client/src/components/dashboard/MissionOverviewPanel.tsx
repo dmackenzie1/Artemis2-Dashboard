@@ -1,11 +1,11 @@
-import type { FC } from "react";
-import { useEffect, useRef } from "react";
-import type { PipelineDashboardData } from "../../api";
-import { getPromptDisplay } from "./promptDisplay";
-import { clientLogger } from "../../utils/logging/clientLogger";
+import type { FunctionComponent } from "react";
+import { DashboardPanel } from "./primitives/DashboardPanel";
+import { PaneStateMessage } from "./primitives/PaneStateMessage";
 
 type MissionOverviewPanelProps = {
-  prompt: PipelineDashboardData["prompts"][number] | undefined;
+  statusLabel: string;
+  summaryText: string;
+  lastRunAt: string | null;
 };
 
 const splitSummary = (text: string): { lead: string; bullets: string[] } => {
@@ -22,39 +22,25 @@ const splitSummary = (text: string): { lead: string; bullets: string[] } => {
   };
 };
 
-export const MissionOverviewPanel: FC<MissionOverviewPanelProps> = ({ prompt }) => {
-  const display = getPromptDisplay(prompt, "Building mission overview...");
-  const parsed = splitSummary(display.text);
-  const latestRunMarker = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!prompt || prompt.status !== "success") {
-      return;
-    }
-
-    const runMarker = `${prompt.lastRunAt ?? "never"}:${prompt.status}`;
-    if (!latestRunMarker.current) {
-      latestRunMarker.current = runMarker;
-      return;
-    }
-
-    if (latestRunMarker.current === runMarker) {
-      return;
-    }
-
-    clientLogger.info("LLM response received for dashboard pane", {
-      paneId: prompt.componentId,
-      promptKey: prompt.key,
-      cacheHit: prompt.cacheHit,
-      preview: prompt.outputPreview ?? ""
-    });
-    latestRunMarker.current = runMarker;
-  }, [prompt]);
+export const MissionOverviewPanel: FunctionComponent<MissionOverviewPanelProps> = ({
+  statusLabel,
+  summaryText,
+  lastRunAt
+}) => {
+  const parsed = splitSummary(summaryText);
 
   return (
-    <section className="panel space-panel mission-summary-panel">
-      <p className="panel-kicker">Mission Intelligence</p>
-      <h2>Mission Summary</h2>
+    <DashboardPanel
+      className="mission-summary-panel"
+      kicker="Mission Intelligence"
+      title="Mission Summary"
+      footer={
+        <>
+          <small className="status-label">Status: {statusLabel}</small>
+          <small className="subtle">{lastRunAt ? `Run: ${lastRunAt}` : "Awaiting first run"}</small>
+        </>
+      }
+    >
       <p className="panel-lead">{parsed.lead}</p>
       {parsed.bullets.length > 0 ? (
         <>
@@ -65,14 +51,9 @@ export const MissionOverviewPanel: FC<MissionOverviewPanelProps> = ({ prompt }) 
             ))}
           </ul>
         </>
-      ) : null}
-      <div className="panel-footer-row">
-        <small className="status-label">Status: {display.statusLabel}</small>
-        <small className="subtle">{prompt?.lastRunAt ? `Run: ${prompt.lastRunAt}` : "Awaiting first run"}</small>
-      </div>
-      {display.preview ? (
-        <p className="subtle">Preview: {display.preview}</p>
-      ) : null}
-    </section>
+      ) : (
+        <PaneStateMessage message="No supporting bullets yet." />
+      )}
+    </DashboardPanel>
   );
 };

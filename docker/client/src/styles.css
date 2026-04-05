@@ -186,6 +186,25 @@ main {
   backdrop-filter: blur(7px);
 }
 
+
+.dashboard-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.dashboard-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pane-state-message {
+  margin: 0.75rem 0 0;
+}
+
 .panel h2 {
   margin: 0;
   font-weight: 510;
@@ -318,14 +337,7 @@ main {
   box-shadow: 0 0 8px rgba(97, 204, 255, 0.28);
 }
 
-.chat-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.7rem;
-}
-
-.chat-panel-header h2 {
+.mission-chat-panel h2 {
   font-size: 1.25rem;
 }
 
