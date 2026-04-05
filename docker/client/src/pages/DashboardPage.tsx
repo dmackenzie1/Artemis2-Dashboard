@@ -89,7 +89,7 @@ export const DashboardPage: FC = () => {
         <p className={health?.llm.connected ? "health-ok" : "health-bad"}>
           LLM Connectivity:{" "}
           {health?.llm.connected
-            ? `Connected (${health.llm.model ?? "unknown model"})`
+            ? "Connected"
             : `Disconnected${health?.llm.error ? ` - ${health.llm.error}` : ""}`}
         </p>
         <p>{data?.missionSummary ?? "Run ingestion to generate mission intelligence."}</p>
