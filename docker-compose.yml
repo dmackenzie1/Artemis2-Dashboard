@@ -5,8 +5,6 @@ services:
       POSTGRES_USER: ${DB_USER:-artemis}
       POSTGRES_PASSWORD: ${DB_PASS:-artemis}
       POSTGRES_DB: ${DB_NAME:-artemis_transcripts}
-    volumes:
-      - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
@@ -40,6 +38,3 @@ services:
     depends_on:
       - frontend
       - backend
-
-volumes:
-  db_data:

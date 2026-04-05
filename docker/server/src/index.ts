@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { MikroORM } from "@mikro-orm/postgresql";
+import { EntityManager, MikroORM } from "@mikro-orm/postgresql";
 import { env } from "./env.config.js";
 import { LlmClient } from "./services/llmClient.js";
 import { AnalysisService } from "./services/analysisService.js";
@@ -11,6 +11,7 @@ import { PipelineService } from "./services/pipelineService.js";
 import { createPipelineRouter } from "./routes/pipeline.js";
 import { serializeUnknownError, serverLogger } from "./utils/logging/serverLogger.js";
 import { StatsService } from "./services/statsService.js";
+import { ingestTranscriptCsvDirectory } from "./services/transcriptIngestionService.js";
 
 const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
   await orm.em.getConnection().execute(`
@@ -48,6 +49,7 @@ const analysisService = new AnalysisService({
 await analysisService.loadFromDisk();
 let pipelineService: PipelineService | null = null;
 let statsService: StatsService | null = null;
+let ingestionEntityManager: EntityManager | null = null;
 let pipelineIntervalStarted = false;
 const startPipelineSchedule = (): void => {
   if (!pipelineService || !env.PIPELINE_AUTO_RUN || pipelineIntervalStarted) {
@@ -68,6 +70,12 @@ const startPipelineSchedule = (): void => {
 app.use(
   "/api",
   createApiRouter(analysisService, () => llmConnectivityStatus, async () => {
+    const em = ingestionEntityManager;
+    if (em) {
+      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.TRANSCRIPT_CSV_DIR, em);
+      serverLogger.info("Manual transcript ingestion completed", transcriptIngestion);
+    }
+
     const currentPipelineService = pipelineService;
     if (currentPipelineService) {
       await currentPipelineService.runPipelineCycle();
@@ -86,6 +94,7 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
   });
   await orm.getSchemaGenerator().updateSchema();
   await ensurePromptExecutionSubmittedTextColumn(orm);
+  ingestionEntityManager = orm.em.fork();
   app.use("/api/transcripts", createTranscriptRouter(orm.em.fork()));
   statsService = new StatsService(orm.em.fork());
 
@@ -122,6 +131,12 @@ const runStartupIngestion = async (): Promise<void> => {
   serverLogger.info("Startup ingestion scheduled");
 
   try {
+    const em = ingestionEntityManager;
+    if (em) {
+      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.TRANSCRIPT_CSV_DIR, em);
+      serverLogger.info("Startup transcript ingestion completed", transcriptIngestion);
+    }
+
     const dashboard = await analysisService.ingestAndAnalyze();
     serverLogger.info("Startup ingestion completed", { generatedAt: dashboard.generatedAt, totalDays: dashboard.days.length });
 
@@ -151,6 +166,8 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
 });
 
 app.listen(env.PORT, () => {
-  serverLogger.info("Backend is ready", { port: env.PORT });
-  void runStartupIngestion();
+  void (async () => {
+    await runStartupIngestion();
+    serverLogger.info("Backend is ready", { port: env.PORT });
+  })();
 });
