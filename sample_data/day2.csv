@@ -1,0 +1,5 @@
+Date,Channel,Duration,Language,Translated,Text,Filename,
+2026-03-29T07:58:10Z,ORION MER MANAGER,00:16,en,"","Daily kickoff: focus on propulsion trending and crew timeline compression.",A2_0329_075810.wav,
+2026-03-29T08:20:40Z,PROPULSION,00:21,en,"","RCS manifold oscillation damped after valve cycle. Residual drift remains within margin.",A2_0329_082040.wav,
+2026-03-29T10:09:10Z,GUIDANCE,00:15,en,"","Navigation filter accepted uplink patch. Star tracker dropout no longer recurring.",A2_0329_100910.wav,
+2026-03-29T13:05:27Z,MEDICAL,00:12,en,"","Crew member reports minor sleep debt, no med intervention required.",A2_0329_130527.wav,

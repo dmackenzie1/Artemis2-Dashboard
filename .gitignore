@@ -1,0 +1,7 @@
+node_modules
+frontend/dist
+backend/dist
+.env
+backend/data/cache.json
+
+frontend/tsconfig.tsbuildinfo

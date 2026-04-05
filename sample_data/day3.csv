@@ -1,0 +1,5 @@
+Date,Channel,Duration,Language,Translated,Text,Filename,
+2026-03-30T06:11:01Z,ORION MER MANAGER,00:17,en,"","Mission day starts with comm relay configuration update and payload prep.",A2_0330_061101.wav,
+2026-03-30T08:44:45Z,COMMS,00:20,en,"","High-gain antenna handover completed, packet loss dropped to near-zero.",A2_0330_084445.wav,
+2026-03-30T09:02:33Z,PAYLOADS,00:19,en,"","Bio-sample locker temp recovered after controller reset. Science timeline restored.",A2_0330_090233.wav,
+2026-03-30T11:17:04Z,FLIGHT,00:14,en,"","Team notes posture shift from anomaly watch to execution confidence.",A2_0330_111704.wav,
