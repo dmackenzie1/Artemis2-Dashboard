@@ -15,3 +15,10 @@
 ## Follow-up Recommendations
 - Add a unique key/upsert strategy for ingestion reruns so repeated imports do not duplicate rows.
 - Consider adding a materialized view for common time-window/channel combinations if query load increases.
+
+## Incremental Update (CSV Quote Handling)
+### What Was Built
+- Updated startup transcript CSV parsing to enable relaxed quote handling (`relax_quotes`) so rows with unescaped quote characters in `Filename` are ingested instead of crashing the stream parser.
+
+### What Did Not Work
+- Keeping strict default quote parsing caused startup ingestion to abort with `Invalid Opening Quote` when encountering filenames that include raw quote characters from source exports.
