@@ -43,6 +43,9 @@ export const MissionOverviewPanel: FC<MissionOverviewPanelProps> = ({ prompt }) 
         <small className="status-label">Status: {display.statusLabel}</small>
         <small className="subtle">{prompt?.lastRunAt ? `Run: ${prompt.lastRunAt}` : "Awaiting first run"}</small>
       </div>
+      {display.preview ? (
+        <p className="subtle">Preview: {display.preview}</p>
+      ) : null}
     </section>
   );
 };

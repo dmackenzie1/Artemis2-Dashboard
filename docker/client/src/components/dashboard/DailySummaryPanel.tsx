@@ -34,6 +34,9 @@ export const DailySummaryPanel: FC<DailySummaryPanelProps> = ({ prompt, latestDa
         <small className="status-label">Status: {display.statusLabel}</small>
         <small className="subtle">{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>
       </div>
+      {display.preview ? (
+        <p className="subtle">Preview: {display.preview}</p>
+      ) : null}
     </section>
   );
 };
