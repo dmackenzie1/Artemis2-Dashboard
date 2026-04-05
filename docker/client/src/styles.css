@@ -9,7 +9,6 @@ body {
   margin: 0;
 }
 
-
 body::before,
 body::after {
   content: "";
@@ -86,10 +85,6 @@ main {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.dashboard-layout-single {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 .dashboard-toolbar {
   display: flex;
   justify-content: space-between;
@@ -138,39 +133,27 @@ main {
   font-weight: 500;
 }
 
-.histogram-grid {
+.timeline-chart {
   margin-top: 0.5rem;
+  height: 180px;
+  width: 100%;
   display: grid;
-  gap: 0.4rem;
-  max-height: 320px;
-  overflow-y: auto;
-  padding-right: 0.2rem;
-}
-
-.histogram-row {
-  display: grid;
-  grid-template-columns: 130px 1fr 44px;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.histogram-label,
-.histogram-value {
-  font-size: 0.78rem;
-  color: #9fb8de;
-}
-
-.histogram-bar-track {
-  height: 11px;
-  border-radius: 999px;
-  background: rgba(138, 180, 255, 0.12);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(3px, 1fr);
+  gap: 1px;
+  align-items: end;
+  padding: 0.35rem;
+  border-radius: 6px;
+  border: 1px solid rgba(138, 180, 255, 0.2);
+  background: linear-gradient(180deg, rgba(6, 12, 23, 0.95), rgba(9, 18, 33, 0.85));
   overflow: hidden;
 }
 
-.histogram-bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #4f8cff, #88b6ff);
+.timeline-bar {
+  width: 100%;
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(180deg, #90bfff, #4f8cff);
 }
 
 .chat-form {
@@ -307,4 +290,14 @@ pre {
 
 .chat-window-form {
   margin-top: 0.65rem;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .span2 {
+    grid-column: auto;
+  }
 }
