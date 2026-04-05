@@ -1,3 +1,4 @@
+import { clientLogger } from "./utils/logging/clientLogger";
 export type DashboardData = {
   generatedAt: string;
   missionSummary: string;
@@ -9,6 +10,17 @@ export type DashboardData = {
     topics: Array<{ title: string; description: string }>;
     stats: { utteranceCount: number; wordCount: number; channelCount: number };
   }>;
+};
+
+export type HealthData = {
+  ok: boolean;
+  llm: {
+    connected: boolean;
+    model: string | null;
+    baseUrl: string | null;
+    checkedAt: string;
+    error: string | null;
+  };
 };
 
 const base = "/api";
@@ -23,12 +35,26 @@ export const fetchDashboard = async (): Promise<DashboardData | null> => {
 };
 
 export const triggerIngest = async (): Promise<DashboardData> => {
+  clientLogger.info("Requesting ingest run from client");
   const response = await fetch(`${base}/ingest`, { method: "POST" });
   if (!response.ok) {
+    clientLogger.error("Ingest request failed", { status: response.status });
     throw new Error("Unable to ingest data");
   }
 
-  return (await response.json()) as DashboardData;
+  const payload = (await response.json()) as DashboardData;
+  clientLogger.info("Ingest request completed", { generatedAt: payload.generatedAt, totalDays: payload.days.length });
+
+  return payload;
+};
+
+export const fetchHealth = async (): Promise<HealthData> => {
+  const response = await fetch(`${base}/health`);
+  if (!response.ok) {
+    throw new Error("Unable to load health status");
+  }
+
+  return (await response.json()) as HealthData;
 };
 
 export const chat = async (query: string): Promise<{ answer: string; evidence: Array<{ timestamp: string; channel: string; text: string; filename: string }> }> => {

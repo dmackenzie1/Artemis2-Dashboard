@@ -7,6 +7,7 @@ import type { DashboardCache, DayInsights, TranscriptUtterance } from "../types.
 import { ingestCsvDirectory } from "../lib/csvIngest.js";
 import { getPrompt } from "../lib/prompts.js";
 import { LlmClient } from "./llmClient.js";
+import { serverLogger } from "../utils/logging/serverLogger.js";
 
 dayjs.extend(utc);
 
@@ -35,7 +36,19 @@ export class AnalysisService {
   }
 
   async ingestAndAnalyze(): Promise<DashboardCache> {
-    this.utterances = await ingestCsvDirectory(this.config.dataDir);
+    serverLogger.info("Starting CSV ingestion", { dataDir: this.config.dataDir });
+
+    this.utterances = await ingestCsvDirectory(this.config.dataDir, {
+      onDirectoryRead: ({ directoryPath, totalFiles }) => {
+        serverLogger.info("CSV directory scanned", { directoryPath, totalFiles });
+      },
+      onFileIngested: ({ file, rowsParsed, rowsAccepted, rowsSkipped }) => {
+        serverLogger.info("CSV file ingested", { file, rowsParsed, rowsAccepted, rowsSkipped });
+      },
+      onIngestComplete: ({ totalFiles, totalRowsAccepted, totalRowsSkipped }) => {
+        serverLogger.info("CSV ingestion completed", { totalFiles, totalRowsAccepted, totalRowsSkipped });
+      }
+    });
     const byDay = groupBy(this.utterances, (item) => item.day);
     const dayKeys = Object.keys(byDay).sort();
     const days: DayInsights[] = [];
@@ -90,8 +103,16 @@ export class AnalysisService {
 
     this.cache = { generatedAt: dayjs().utc().toISOString(), missionSummary, recentChanges, days };
 
+    serverLogger.info("Analysis cache generated", {
+      generatedAt: this.cache.generatedAt,
+      totalDays: days.length,
+      cacheFile: this.config.cacheFile
+    });
+
     await fs.mkdir(path.dirname(this.config.cacheFile), { recursive: true });
     await fs.writeFile(this.config.cacheFile, JSON.stringify(this.cache, null, 2), "utf8");
+
+    serverLogger.info("Analysis cache persisted", { cacheFile: this.config.cacheFile });
 
     return this.cache;
   }
