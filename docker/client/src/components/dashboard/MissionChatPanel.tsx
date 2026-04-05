@@ -1,6 +1,7 @@
-import type { FC, FormEvent } from "react";
+import type { FunctionComponent, FormEvent } from "react";
 import type { ChatMode } from "../../api";
 import type { ChatMessage } from "./types";
+import { DashboardPanel } from "./primitives/DashboardPanel";
 
 type MissionChatPanelProps = {
   chatInput: string;
@@ -12,7 +13,7 @@ type MissionChatPanelProps = {
   onChatSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
-export const MissionChatPanel: FC<MissionChatPanelProps> = ({
+export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
   chatInput,
   chatMode,
   isThinking,
@@ -21,26 +22,31 @@ export const MissionChatPanel: FC<MissionChatPanelProps> = ({
   onChatModeChange,
   onChatSubmit
 }) => {
-  return (
-    <section className="panel space-panel mission-chat-panel">
-      <div className="chat-panel-header">
-        <div>
-          <p className="panel-kicker">Intelligence Interface</p>
-          <h2>Mission Query Console</h2>
-        </div>
-        <label className="chat-mode-picker" htmlFor="chat-mode">
-          Context Mode
-          <select id="chat-mode" value={chatMode} onChange={(event) => onChatModeChange(event.target.value as ChatMode)}>
-            <option value="rag">Targeted Retrieval</option>
-            <option value="all">Broad Sweep</option>
-          </select>
-        </label>
-      </div>
+  const modePicker = (
+    <label className="chat-mode-picker" htmlFor="chat-mode">
+      Context Mode
+      <select id="chat-mode" value={chatMode} onChange={(event) => onChatModeChange(event.target.value as ChatMode)}>
+        <option value="rag">Targeted Retrieval</option>
+        <option value="all">Broad Sweep</option>
+      </select>
+    </label>
+  );
 
-      <p className="chat-helper-text">Targeted mode isolates relevant evidence. Broad sweep sends a wider transcript slice for exploratory questions.</p>
+  return (
+    <DashboardPanel
+      className="mission-chat-panel"
+      kicker="Intelligence Interface"
+      title="Mission Query Console"
+      headerAccessory={modePicker}
+    >
+      <p className="chat-helper-text">
+        Targeted mode isolates relevant evidence. Broad sweep sends a wider transcript slice for exploratory questions.
+      </p>
 
       <div className="chat-window" role="log" aria-live="polite">
-        {chatMessages.length === 0 ? <p className="chat-empty">Ask about anomalies, channels, timeline changes, or mission readiness.</p> : null}
+        {chatMessages.length === 0 ? (
+          <p className="chat-empty">Ask about anomalies, channels, timeline changes, or mission readiness.</p>
+        ) : null}
         {chatMessages.map((message, index) => (
           <article key={`${message.role}-${index}`} className={`chat-bubble ${message.role === "user" ? "chat-user" : "chat-assistant"}`}>
             <header>{message.role === "user" ? "Operator" : "Mission Analyst"}</header>
@@ -67,6 +73,6 @@ export const MissionChatPanel: FC<MissionChatPanelProps> = ({
           {isThinking ? "Running..." : "Run Query"}
         </button>
       </form>
-    </section>
+    </DashboardPanel>
   );
 };
