@@ -2,6 +2,7 @@ import type { FC, FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { chat, fetchDashboard, triggerIngest, type DashboardData } from "../api";
+import { clientLogger } from "../utils/logging/clientLogger";
 
 export const DashboardPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -18,6 +19,7 @@ export const DashboardPage: FC = () => {
   }, []);
 
   const onIngest = async (): Promise<void> => {
+    clientLogger.info("Dashboard ingest button clicked");
     const payload = await triggerIngest();
     setData(payload);
   };

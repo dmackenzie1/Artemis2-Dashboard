@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: add structured client/server ingestion lifecycle logging with per-file CSV counters. Intent: Give operators clear, auditable visibility that transcript ingestion is running and succeeding for each input file.
 - feat: redesign the dashboard UI with a denser two-column mission layout, top-right rebuild controls, and a full-width communications histogram footer. Intent: Improve mission operator scanning speed with a space-themed visual hierarchy aligned to Artemis 2 comms workflows.
 - fix: switch backend analysis service lodash usage to default CommonJS interop import for Node ESM runtime compatibility. Intent: Prevent containerized API startup crashes caused by invalid named imports from `lodash` and restore dashboard API availability.
 - chore: refresh frontend/backend dependency baselines, bump container image tags, and harden the Playwright capture script for Codex screenshot workflows. Intent: Keep local/dev tooling current while making automated UI snapshot capture reliable for agent-driven validation.
