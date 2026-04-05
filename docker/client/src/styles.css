@@ -62,22 +62,10 @@ main {
 }
 
 .dashboard-toolbar {
-  grid-column: span 2;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: 0.65rem;
-}
-
-.toolbar-links {
-  display: flex;
-  gap: 0.55rem;
-}
-
-.toolbar-links a {
-  color: #9dc6ff;
-  text-decoration: none;
-  font-size: 0.92rem;
 }
 
 .span2 {
@@ -163,4 +151,59 @@ pre { white-space: pre-wrap; }
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.75rem;
+}
+
+.status-label {
+  color: #95a7c7;
+  text-transform: lowercase;
+}
+
+.subtle {
+  color: #95a7c7;
+  margin-top: 0.4rem;
+}
+
+.prompt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.prompt-grid .metric-card p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #b9d0f0;
+}
+
+.histogram {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
+  gap: 0.3rem;
+}
+
+.histogram-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.bars {
+  width: 100%;
+  min-height: 120px;
+  border: 1px solid rgba(102, 152, 242, 0.25);
+  border-radius: 8px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(9, 18, 32, 0.85);
+}
+
+.bar {
+  width: 70%;
+  border-radius: 6px 6px 0 0;
+}
+
+.bar-utterances {
+  background: linear-gradient(180deg, #6ca7ff, #2f61ad);
 }

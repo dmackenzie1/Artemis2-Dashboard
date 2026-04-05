@@ -1,9 +1,7 @@
 import type { FC, FormEvent } from "react";
-import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { chat, fetchDashboard, fetchHealth, triggerIngest } from "../api";
-import type { DashboardData, HealthData } from "../api";
-import { clientLogger } from "../utils/logging/clientLogger";
+import { chat, fetchDashboard, fetchHealth, fetchPipelineDashboard } from "../api";
+import type { DashboardData, HealthData, PipelineDashboardData } from "../api";
 
 const starterQueries = [
   "summarize MER manager activity",
@@ -12,27 +10,70 @@ const starterQueries = [
   "show mentions of comm dropouts"
 ];
 
+type PromptCardConfig = {
+  key: string;
+  title: string;
+  defaultMessage: string;
+};
+
+const promptCards: PromptCardConfig[] = [
+  { key: "mission_summary", title: "Mission Overview", defaultMessage: "Building mission overview..." },
+  { key: "recent_changes", title: "What Changed", defaultMessage: "Querying recent changes..." },
+  { key: "daily_summary", title: "Last 24 Hours", defaultMessage: "Not ready yet." }
+];
+
+const getPromptDisplay = (
+  prompt: PipelineDashboardData["prompts"][number] | undefined,
+  defaultMessage: string
+): { text: string; statusLabel: string } => {
+  if (!prompt) {
+    return { text: defaultMessage, statusLabel: "not ready" };
+  }
+
+  if (prompt.status === "success" && prompt.output) {
+    return { text: prompt.output, statusLabel: "ready" };
+  }
+
+  if (prompt.status === "running") {
+    return { text: "Querying...", statusLabel: "querying" };
+  }
+
+  if (prompt.status === "failed") {
+    return { text: "Not ready.", statusLabel: "not ready" };
+  }
+
+  return { text: "Building...", statusLabel: "building" };
+};
+
 export const DashboardPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [health, setHealth] = useState<HealthData | null>(null);
+  const [pipeline, setPipeline] = useState<PipelineDashboardData | null>(null);
   const [chatInput, setChatInput] = useState(starterQueries[0]);
   const [chatAnswer, setChatAnswer] = useState("");
 
-  const loadStartupData = async (): Promise<void> => {
-    const [dashboardPayload, healthPayload] = await Promise.all([fetchDashboard(), fetchHealth()]);
-    setData(dashboardPayload);
-    setHealth(healthPayload);
-  };
-
   useEffect(() => {
-    void loadStartupData();
-  }, []);
+    const loadData = async (): Promise<void> => {
+      const [dashboardPayload, healthPayload, pipelinePayload] = await Promise.all([
+        fetchDashboard(),
+        fetchHealth(),
+        fetchPipelineDashboard()
+      ]);
 
-  const onIngest = async (): Promise<void> => {
-    clientLogger.info("Dashboard ingest button clicked");
-    const payload = await triggerIngest();
-    setData(payload);
-  };
+      setData(dashboardPayload);
+      setHealth(healthPayload);
+      setPipeline(pipelinePayload);
+    };
+
+    void loadData();
+    const pollHandle = window.setInterval(() => {
+      void loadData();
+    }, 10000);
+
+    return () => {
+      window.clearInterval(pollHandle);
+    };
+  }, []);
 
   const onChat = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -61,43 +102,54 @@ export const DashboardPage: FC = () => {
     ];
   }, [data]);
 
-  const histogramData = useMemo(() => {
-    const maxUtterances = Math.max(...(data?.days.map((day) => day.stats.utteranceCount) ?? [1]));
-    const maxChannels = Math.max(...(data?.days.map((day) => day.stats.channelCount) ?? [1]));
+  const hourlyHistogram = useMemo(() => {
+    const buckets: Record<string, number> = {};
+    for (let hour = 0; hour < 24; hour += 1) {
+      buckets[`${hour.toString().padStart(2, "0")}:00`] = 0;
+    }
 
-    return (
-      data?.days.map((day) => ({
-        day: day.day,
-        utteranceHeight: `${Math.max((day.stats.utteranceCount / maxUtterances) * 100, 8)}%`,
-        channelHeight: `${Math.max((day.stats.channelCount / maxChannels) * 100, 8)}%`,
-        utterances: day.stats.utteranceCount,
-        channels: day.stats.channelCount
-      })) ?? []
-    );
+    for (const day of data?.days ?? []) {
+      for (const [hour, count] of Object.entries(day.stats.hourlyUtterances ?? {})) {
+        buckets[hour] = (buckets[hour] ?? 0) + count;
+      }
+    }
+
+    const maxBucket = Math.max(...Object.values(buckets), 1);
+
+    return Object.entries(buckets).map(([hour, total]) => ({
+      hour,
+      total,
+      height: `${Math.max((total / maxBucket) * 100, 4)}%`
+    }));
   }, [data]);
 
   return (
     <div className="dashboard-layout">
-      <div className="dashboard-toolbar">
-        <div className="toolbar-links">
-          <Link to="/daily">Review Daily</Link>
-          <Link to="/timeline">Review Timeline</Link>
-          <button type="button" onClick={() => void onIngest()}>
-            Rebuild from CSV folder
-          </button>
-        </div>
-        <p className={health?.llm.connected ? "health-ok" : "health-bad"}>
-          LLM Connectivity:{" "}
-          {health?.llm.connected
-            ? "Connected"
-            : `Disconnected${health?.llm.error ? ` - ${health.llm.error}` : ""}`}
-        </p>
-        <p>{data?.missionSummary ?? "Run ingestion to generate mission intelligence."}</p>
+      <div className="dashboard-toolbar span2">
+        {health && !health.llm.connected ? (
+          <p className="health-bad">
+            LLM Disconnected{health.llm.error ? ` - ${health.llm.error}` : ""}
+          </p>
+        ) : null}
+        <p>Data refreshes automatically when backend starts.</p>
       </div>
 
       <section className="panel space-panel">
         <h2>Mission Overview</h2>
-        <p>{data?.missionSummary ?? "Run ingestion to generate the latest Artemis 2 communications intelligence."}</p>
+        {(() => {
+          const prompt = pipeline?.prompts.find((entry) => entry.key === "mission_summary");
+          const display = getPromptDisplay(prompt, "Building mission overview...");
+          return (
+            <>
+              <p>{display.text}</p>
+              <small className="status-label">Status: {display.statusLabel}</small>
+            </>
+          );
+        })()}
+      </section>
+
+      <section className="panel space-panel">
+        <h2>Stats</h2>
         <div className="overview-metrics">
           {stats.map((stat) => (
             <article key={stat.label} className="metric-card">
@@ -110,32 +162,17 @@ export const DashboardPage: FC = () => {
 
       <section className="panel space-panel">
         <h2>Last 24 Hours</h2>
-        <p>{latestDay?.summary ?? "No daily summaries yet."}</p>
-      </section>
-
-      <section className="panel space-panel">
-        <h2>Daily Topics</h2>
-        <ul>
-          {latestDay?.topics.map((topic) => (
-            <li key={topic.title}>
-              <Link to={`/topics/${encodeURIComponent(topic.title)}`}>{topic.title}</Link>
-            </li>
-          )) ?? <li>Run ingestion to generate topics.</li>}
-        </ul>
-      </section>
-
-      <section className="panel space-panel">
-        <h2>Channel Snapshot</h2>
-        <p>
-          {latestDay
-            ? `${latestDay.stats.channelCount} active channels and ${latestDay.stats.utteranceCount} communications observed on ${latestDay.day}.`
-            : "Ingest CSV files to populate channel activity."}
-        </p>
-      </section>
-
-      <section className="panel space-panel">
-        <h2>What Changed Recently</h2>
-        <p>{data?.recentChanges ?? "No recent trend analysis yet."}</p>
+        {(() => {
+          const prompt = pipeline?.prompts.find((entry) => entry.key === "daily_summary");
+          const display = getPromptDisplay(prompt, "Not ready yet.");
+          return (
+            <>
+              <p>{display.text}</p>
+              <small className="status-label">Status: {display.statusLabel}</small>
+            </>
+          );
+        })()}
+        <p className="subtle">{latestDay?.day ? `Latest day in cache: ${latestDay.day}` : "No ingested day yet."}</p>
       </section>
 
       <section className="panel space-panel">
@@ -154,23 +191,35 @@ export const DashboardPage: FC = () => {
         <pre>{chatAnswer || "Ask about systems, anomalies, channels, or timeline changes."}</pre>
       </section>
 
+      <section className="panel space-panel span2">
+        <h2>Prompt Workflow</h2>
+        <div className="prompt-grid">
+          {promptCards.map((card) => {
+            const prompt = pipeline?.prompts.find((entry) => entry.key === card.key);
+            const display = getPromptDisplay(prompt, card.defaultMessage);
+            return (
+              <article key={card.key} className="metric-card">
+                <span>{card.title}</span>
+                <strong>{display.statusLabel}</strong>
+                <p>{display.text}</p>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="panel histogram-panel span2">
         <h2>Communications Over Time</h2>
-        <p>Daily trend view by total communications and active channels.</p>
-        <div className="histogram">
-          {histogramData.length > 0 ? (
-            histogramData.map((day) => (
-              <article key={day.day} className="histogram-group">
-                <div className="bars">
-                  <div className="bar bar-utterances" style={{ height: day.utteranceHeight }} title={`${day.utterances} utterances`} />
-                  <div className="bar bar-channels" style={{ height: day.channelHeight }} title={`${day.channels} channels`} />
-                </div>
-                <span>{day.day}</span>
-              </article>
-            ))
-          ) : (
-            <div className="histogram-empty">Run ingestion to render communication activity.</div>
-          )}
+        <p>Hour buckets aggregated across all ingested days.</p>
+        <div className="histogram histogram-hourly">
+          {hourlyHistogram.map((bucket) => (
+            <article key={bucket.hour} className="histogram-group">
+              <div className="bars">
+                <div className="bar bar-utterances" style={{ height: bucket.height }} title={`${bucket.total} utterances`} />
+              </div>
+              <span>{bucket.hour}</span>
+            </article>
+          ))}
         </div>
       </section>
     </div>

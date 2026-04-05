@@ -1,4 +1,5 @@
 import { clientLogger } from "./utils/logging/clientLogger";
+
 export type DashboardData = {
   generatedAt: string;
   missionSummary: string;
@@ -8,7 +9,20 @@ export type DashboardData = {
     summary: string;
     hourly: Record<string, string>;
     topics: Array<{ title: string; description: string }>;
-    stats: { utteranceCount: number; wordCount: number; channelCount: number };
+    stats: { utteranceCount: number; wordCount: number; channelCount: number; hourlyUtterances: Record<string, number> };
+  }>;
+};
+
+export type PipelineDashboardData = {
+  generatedAt: string;
+  prompts: Array<{
+    id: number;
+    key: string;
+    fileName: string;
+    promptUpdatedAt: string;
+    lastRunAt: string | null;
+    status: "running" | "success" | "failed" | "never";
+    output: string | null;
   }>;
 };
 
@@ -46,6 +60,16 @@ export const triggerIngest = async (): Promise<DashboardData> => {
   clientLogger.info("Ingest request completed", { generatedAt: payload.generatedAt, totalDays: payload.days.length });
 
   return payload;
+};
+
+export const fetchPipelineDashboard = async (): Promise<PipelineDashboardData | null> => {
+  const response = await fetch(`${base}/pipeline/dashboard`);
+  if (!response.ok) {
+    clientLogger.warn("Pipeline dashboard unavailable", { status: response.status });
+    return null;
+  }
+
+  return (await response.json()) as PipelineDashboardData;
 };
 
 export const fetchHealth = async (): Promise<HealthData> => {
