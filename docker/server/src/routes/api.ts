@@ -77,8 +77,13 @@ export const createApiRouter = (
 
   router.post("/chat", async (req, res, next) => {
     try {
-      const body = z.object({ query: z.string().min(1) }).parse(req.body);
-      const result = await analysisService.chat(body.query);
+      const body = z
+        .object({
+          query: z.string().min(1),
+          mode: z.enum(["rag", "all"]).optional()
+        })
+        .parse(req.body);
+      const result = await analysisService.chat(body.query, body.mode ?? "rag");
       res.json(result);
     } catch (error) {
       next(error);
