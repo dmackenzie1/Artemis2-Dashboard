@@ -5,14 +5,12 @@ import {
   fetchDashboard,
   fetchHealth,
   fetchPipelineDashboard,
-  fetchStatsHourlyByChannel,
   fetchStatsSummary
 } from "../api";
 import type {
   ChatMode,
   DashboardData,
   HealthData,
-  MissionHourlyChannelEntry,
   MissionStatsSummaryData,
   PipelineDashboardData
 } from "../api";
@@ -21,7 +19,6 @@ import { DailySummaryPanel } from "../components/dashboard/DailySummaryPanel";
 import { MissionChatPanel } from "../components/dashboard/MissionChatPanel";
 import { MissionOverviewPanel } from "../components/dashboard/MissionOverviewPanel";
 import { StatsPanel } from "../components/dashboard/StatsPanel";
-import { UtterancesTimelinePanel } from "../components/dashboard/UtterancesTimelinePanel";
 import type { ChatMessage } from "../components/dashboard/types";
 import { clientLogger } from "../utils/logging/clientLogger";
 
@@ -37,7 +34,6 @@ export const DashboardPage: FC = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [pipeline, setPipeline] = useState<PipelineDashboardData | null>(null);
   const [statsSummary, setStatsSummary] = useState<MissionStatsSummaryData | null>(null);
-  const [hourlyByChannel, setHourlyByChannel] = useState<MissionHourlyChannelEntry[]>([]);
   const [chatInput, setChatInput] = useState(starterQueries[0]);
   const [chatMode, setChatMode] = useState<ChatMode>("rag");
   const [isThinking, setIsThinking] = useState(false);
@@ -46,19 +42,17 @@ export const DashboardPage: FC = () => {
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       try {
-        const [dashboardPayload, healthPayload, pipelinePayload, statsSummaryPayload, hourlyByChannelPayload] = await Promise.all([
+        const [dashboardPayload, healthPayload, pipelinePayload, statsSummaryPayload] = await Promise.all([
           fetchDashboard(),
           fetchHealth(),
           fetchPipelineDashboard(),
-          fetchStatsSummary(),
-          fetchStatsHourlyByChannel(7)
+          fetchStatsSummary()
         ]);
 
         setData(dashboardPayload);
         setHealth(healthPayload);
         setPipeline(pipelinePayload);
         setStatsSummary(statsSummaryPayload);
-        setHourlyByChannel(hourlyByChannelPayload);
       } catch (error) {
         clientLogger.error("Dashboard polling failed", { error });
       }
@@ -121,8 +115,6 @@ export const DashboardPage: FC = () => {
     [statsSummary]
   );
 
-  const histogram = useMemo(() => hourlyByChannel.slice(-168), [hourlyByChannel]);
-
   return (
     <div className="dashboard-layout">
       <DashboardToolbar health={health} />
@@ -138,7 +130,6 @@ export const DashboardPage: FC = () => {
         onChatModeChange={setChatMode}
         onChatSubmit={onChat}
       />
-      <UtterancesTimelinePanel histogram={histogram} />
     </div>
   );
 };
