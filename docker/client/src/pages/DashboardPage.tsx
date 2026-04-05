@@ -1,22 +1,13 @@
 import type { FC, FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  chat,
-  fetchDashboard,
-  fetchHealth,
-  fetchPipelineDashboard,
-  fetchStatsHourlyByChannel,
-  fetchStatsSummary
-} from "../api";
+import { chat, fetchDashboard, fetchPipelineDashboard, fetchStatsHourlyByChannel, fetchStatsSummary } from "../api";
 import type {
   ChatMode,
   DashboardData,
-  HealthData,
   MissionHourlyChannelEntry,
   MissionStatsSummaryData,
   PipelineDashboardData
 } from "../api";
-import { DashboardToolbar } from "../components/dashboard/DashboardToolbar";
 import { DailySummaryPanel } from "../components/dashboard/DailySummaryPanel";
 import { MissionChatPanel } from "../components/dashboard/MissionChatPanel";
 import { MissionOverviewPanel } from "../components/dashboard/MissionOverviewPanel";
@@ -34,7 +25,6 @@ const starterQueries = [
 
 export const DashboardPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [health, setHealth] = useState<HealthData | null>(null);
   const [pipeline, setPipeline] = useState<PipelineDashboardData | null>(null);
   const [statsSummary, setStatsSummary] = useState<MissionStatsSummaryData | null>(null);
   const [hourlyByChannel, setHourlyByChannel] = useState<MissionHourlyChannelEntry[]>([]);
@@ -46,16 +36,14 @@ export const DashboardPage: FC = () => {
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       try {
-        const [dashboardPayload, healthPayload, pipelinePayload, statsSummaryPayload, hourlyByChannelPayload] = await Promise.all([
+        const [dashboardPayload, pipelinePayload, statsSummaryPayload, hourlyByChannelPayload] = await Promise.all([
           fetchDashboard(),
-          fetchHealth(),
           fetchPipelineDashboard(),
           fetchStatsSummary(),
           fetchStatsHourlyByChannel(7)
         ]);
 
         setData(dashboardPayload);
-        setHealth(healthPayload);
         setPipeline(pipelinePayload);
         setStatsSummary(statsSummaryPayload);
         setHourlyByChannel(hourlyByChannelPayload);
@@ -121,23 +109,42 @@ export const DashboardPage: FC = () => {
     [statsSummary]
   );
 
-  const histogram = useMemo(() => hourlyByChannel.slice(-168), [hourlyByChannel]);
+  const histogram = useMemo(() => {
+    const totalsByHour = new Map<string, number>();
+
+    for (const entry of hourlyByChannel) {
+      totalsByHour.set(entry.hour, (totalsByHour.get(entry.hour) ?? 0) + entry.utterances);
+    }
+
+    return [...totalsByHour.entries()]
+      .map(([hour, utterances]) => ({
+        hour,
+        channel: "all",
+        utterances
+      }))
+      .sort((left, right) => left.hour.localeCompare(right.hour));
+  }, [hourlyByChannel]);
 
   return (
     <div className="dashboard-layout">
-      <DashboardToolbar health={health} />
-      <MissionOverviewPanel prompt={missionPrompt} />
-      <DailySummaryPanel prompt={dailyPrompt} latestDay={latestDay?.day} />
-      <StatsPanel stats={stats} />
-      <MissionChatPanel
-        chatInput={chatInput}
-        chatMode={chatMode}
-        isThinking={isThinking}
-        chatMessages={chatMessages}
-        onChatInputChange={setChatInput}
-        onChatModeChange={setChatMode}
-        onChatSubmit={onChat}
-      />
+      <section className="dashboard-main-grid">
+        <MissionOverviewPanel prompt={missionPrompt} />
+        <DailySummaryPanel prompt={dailyPrompt} latestDay={latestDay?.day} />
+      </section>
+
+      <aside className="dashboard-right-rail">
+        <StatsPanel stats={stats} />
+        <MissionChatPanel
+          chatInput={chatInput}
+          chatMode={chatMode}
+          isThinking={isThinking}
+          chatMessages={chatMessages}
+          onChatInputChange={setChatInput}
+          onChatModeChange={setChatMode}
+          onChatSubmit={onChat}
+        />
+      </aside>
+
       <UtterancesTimelinePanel histogram={histogram} />
     </div>
   );

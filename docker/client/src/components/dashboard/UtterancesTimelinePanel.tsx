@@ -9,24 +9,27 @@ export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ hist
   const maxUtterances = Math.max(...histogram.map((entry) => entry.utterances), 1);
 
   return (
-    <section className="panel space-panel span2">
-      <h2>Utterances Over Time</h2>
+    <section className="panel space-panel timeline-strip-panel">
+      <div className="timeline-strip-header">
+        <h2>Mission Activity Signature</h2>
+        <small className="subtle">Utterances per hour across all channels</small>
+      </div>
       {histogram.length === 0 ? <p className="subtle">No transcript data yet.</p> : null}
-      <div className="timeline-chart" role="img" aria-label="Utterances over time chart">
+      <div className="timeline-chart" role="img" aria-label="Utterances per hour for the mission timeline">
         {histogram.map((entry) => {
-          const barHeight = Math.max((entry.utterances / maxUtterances) * 100, entry.utterances > 0 ? 3 : 0);
+          const barHeight = Math.max((entry.utterances / maxUtterances) * 100, entry.utterances > 0 ? 4 : 0);
 
           return (
             <div
-              key={`${entry.hour}-${entry.channel}`}
+              key={entry.hour}
               className="timeline-bar"
               style={{ height: `${barHeight}%` }}
-              title={`${entry.hour} · ${entry.channel}: ${entry.utterances}`}
+              title={`${entry.hour}: ${entry.utterances} utterances`}
             />
           );
         })}
       </div>
-      <p className="subtle">Window: latest {histogram.length} hourly channel buckets.</p>
+      <p className="subtle">Coverage: {histogram.length} hourly buckets.</p>
     </section>
   );
 };

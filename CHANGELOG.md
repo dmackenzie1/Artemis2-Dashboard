@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: restyle the Overview dashboard into a cinematic mission-control layout with hero summary/readout panels, a narrow right rail for stats and mission query console, top-bar LLM status, and a mission-wide utterances-per-hour histogram strip inspired by the provided reference comps. Intent: Align operator scanning workflows with a premium Artemis intelligence visual language while preserving existing routes, data polling, and backend API behavior.
 - feat: prioritize queued LLM prompt execution as mission overview first and last-24-hours second, skip hourly summary runs, surface prompt failure messages in dashboard panels, and move utterances-per-hour into its own full-width timeline panel while simplifying stats. Intent: Ensure operators see mission-critical LLM outputs earliest with clear failure visibility and a cleaner mission-layout UI focused on daily-level summaries.
 - fix: tolerate malformed CSV records during transcript DB ingestion by skipping parser failures, logging source file/line details, and continuing with remaining files while reporting parse error totals. Intent: Keep ingestion resilient to real-world quote/formatting defects without blocking valid transcript rows from being inserted.
 - fix: accept unescaped quote characters in CSV transcript fields by enabling relaxed quote parsing and adding ingest regression coverage. Intent: Prevent backend startup ingestion from failing on real mission-export rows that include measurements such as `2'6"` in transcript text/filename columns.
