@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { fetchHealth } from "./api";
 import type { HealthData } from "./api";
+import { StatusBadge } from "./components/dashboard/primitives/StatusBadge";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DailyPage } from "./pages/DailyPage";
 import { TimelinePage } from "./pages/TimelinePage";
@@ -43,8 +44,7 @@ export const App: FC = () => {
           <NavLink to="/daily">Daily</NavLink>
           <NavLink to="/timeline">Timeline</NavLink>
           <div className="topbar-status" title={connected ? "LLM connected" : "LLM disconnected"}>
-            <span className={`llm-indicator-dot ${connected ? "llm-indicator-ok" : "llm-indicator-bad"}`} />
-            <span>{connected ? "LLM Connected" : "LLM Offline"}</span>
+            <StatusBadge label={connected ? "connected" : "disconnected"} />
           </div>
         </nav>
       </header>

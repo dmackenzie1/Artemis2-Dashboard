@@ -26,7 +26,7 @@ export const DashboardPanel: FunctionComponent<DashboardPanelProps> = ({
         </div>
         {headerAccessory}
       </div>
-      {children}
+      <div className="panel-body">{children}</div>
       {footer ? <div className="panel-footer-row">{footer}</div> : null}
     </section>
   );

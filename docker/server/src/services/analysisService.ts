@@ -34,6 +34,7 @@ type ServiceConfig = {
 export class AnalysisService {
   private utterances: TranscriptUtterance[] = [];
   private cache: DashboardCache | null = null;
+  private isIngesting = false;
 
   constructor(private readonly config: ServiceConfig) {}
 
@@ -47,7 +48,17 @@ export class AnalysisService {
   }
 
   async ingestAndAnalyze(): Promise<DashboardCache> {
-    serverLogger.info("Starting CSV ingestion", { dataDir: this.config.dataDir });
+    if (this.isIngesting) {
+      if (this.cache) {
+        serverLogger.info("Ingestion already in progress, returning cache");
+        return this.cache;
+      }
+      throw new Error("Ingestion already in progress and no cache available");
+    }
+
+    this.isIngesting = true;
+    try {
+      serverLogger.info("Starting CSV ingestion", { dataDir: this.config.dataDir });
 
     this.utterances = await ingestCsvDirectory(this.config.dataDir, {
       onDirectoryRead: ({ directoryPath, totalFiles }) => {
@@ -133,6 +144,9 @@ export class AnalysisService {
     serverLogger.info("Analysis cache persisted", { cacheFile: this.config.cacheFile });
 
     return this.cache;
+    } finally {
+      this.isIngesting = false;
+    }
   }
 
   getCache(): DashboardCache | null {

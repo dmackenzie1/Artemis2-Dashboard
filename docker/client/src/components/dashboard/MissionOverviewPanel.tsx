@@ -1,6 +1,7 @@
 import type { FunctionComponent } from "react";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
+import { StatusBadge } from "./primitives/StatusBadge";
 
 type MissionOverviewPanelProps = {
   statusLabel: string;
@@ -34,12 +35,8 @@ export const MissionOverviewPanel: FunctionComponent<MissionOverviewPanelProps> 
       className="mission-summary-panel"
       kicker="Mission Intelligence"
       title="Mission Summary"
-      footer={
-        <>
-          <small className="status-label">Status: {statusLabel}</small>
-          <small className="subtle">{lastRunAt ? `Run: ${lastRunAt}` : "Awaiting first run"}</small>
-        </>
-      }
+      headerAccessory={<StatusBadge label={statusLabel} />}
+      footer={<small className="subtle">{lastRunAt ? `Run: ${lastRunAt}` : "Awaiting first run"}</small>}
     >
       <p className="panel-lead">{parsed.lead}</p>
       {parsed.bullets.length > 0 ? (
@@ -52,7 +49,7 @@ export const MissionOverviewPanel: FunctionComponent<MissionOverviewPanelProps> 
           </ul>
         </>
       ) : (
-        <PaneStateMessage message="No supporting bullets yet." />
+        <PaneStateMessage message="Waiting for key points…" tone="loading" />
       )}
     </DashboardPanel>
   );

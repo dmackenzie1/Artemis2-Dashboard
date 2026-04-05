@@ -8,7 +8,7 @@ You are operating within the EMSS (Earth Observing System Mission Support) group
 ## The EMSS Standard Stack
 While versions occasionally drift, our target architecture for all web applications is:
 - **Language**: TypeScript (Strict mode enabled)
-- **Frontend**: React 19 + Vite 7 + Redux Toolkit
+- **Frontend**: React 19 + Vite 7 (Redux Toolkit only if needed)
 - **Backend**: Express 5 + PostgreSQL + MikroORM
 - **Authentication**: NASA LaunchPad OAuth2 (via `oauth2-proxy` and `@emss/oauth2-proxy-*` packages)
 - **Testing**: Vitest (Do not use Jest unless modifying legacy `maestro` code)
@@ -56,14 +56,14 @@ Regardless of the repository (`coda`, `talky-bot`, `aegis`, `maestro`, `logs`), 
 - **Component Declarations:** Use `FunctionComponent` (or `FC`) with strongly typed inline props. (e.g., `export const FrameHeader: FunctionComponent<{ id: number }> = ({ id }) => { ... }`). Do not use standard `function Component()` unless in legacy code.
 - **Styling:** The EMSS standard uses **CSS Modules** (`import styles from "./frame.module.css"`), *not* Tailwind CSS (except in `EMSSpresso`).
 - **Type Imports:** Always use `import type` for interfaces.
-- **Redux Toolkit:** Export `initialState` explicitly at the top of the file, and strictly type the `action: { payload: T }` inline within reducers. 
+- **State Management:** Use standard React hooks (`useState`, `useContext`) by default. If Redux Toolkit is strictly needed for complex global state, export `initialState` explicitly at the top of the file, and strictly type the `action: { payload: T }` inline within reducers. 
 - **Utilities:** Rely heavily on `lodash` for checks (`import isNil from "lodash/isNil";`).
 - **No `console.log`:** Use the internal logger: `import { clientLogger } from "utils/logging/clientLogger"`.
 
 ### Node.js & Express (Backend)
 - **Dependency Injection:** Do not pass socket instances through long chains. Use the global `DI` object (`DI.socketio.emit(...)`).
 - **Validation:** Use `zod` for validating all incoming request payloads.
-- **ORM Types:** Use `@mikro-orm/postgresql`'s `EntityDTO` type when returning records via the API.
+- **API Types:** Use standard TypeScript interfaces or custom DTOs for returning records via the API.
 - **Time/Date:** Exclusively use `dayjs` extended with the `utc` plugin. Never use raw `Date` objects or `moment`.
 - **Environment:** NEVER read from `process.env` directly inside business logic.
 
