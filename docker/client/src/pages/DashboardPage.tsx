@@ -1,8 +1,9 @@
 import type { FC, FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { chat, fetchDashboard, fetchHealth, triggerIngest } from "../api";
 import type { DashboardData, HealthData } from "../api";
+import { clientLogger } from "../utils/logging/clientLogger";
 
 const starterQueries = [
   "summarize MER manager activity",
@@ -81,6 +82,9 @@ export const DashboardPage: FC = () => {
         <div className="toolbar-links">
           <Link to="/daily">Review Daily</Link>
           <Link to="/timeline">Review Timeline</Link>
+          <button type="button" onClick={() => void onIngest()}>
+            Rebuild from CSV folder
+          </button>
         </div>
         <p className={health?.llm.connected ? "health-ok" : "health-bad"}>
           LLM Connectivity:{" "}
@@ -89,7 +93,7 @@ export const DashboardPage: FC = () => {
             : `Disconnected${health?.llm.error ? ` - ${health.llm.error}` : ""}`}
         </p>
         <p>{data?.missionSummary ?? "Run ingestion to generate mission intelligence."}</p>
-      </section>
+      </div>
 
       <section className="panel space-panel">
         <h2>Mission Overview</h2>
