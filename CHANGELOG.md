@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: serialize all server-side LLM calls through a single queue, log compact request/response previews, and disable hourly summary prompt generation during ingestion. Intent: Let operators verify exactly what is sent/received while preventing overlapping LLM executions and unwanted hourly-summary prompt traffic.
 - fix: stop dashboard polling from calling `/api/stats/channels/hourly` and remove the hourly timeline panel so the mission view focuses on daily summaries. Intent: Prevent recurring hourly-summary-style requests when operators only need daily summary behavior.
 - feat: prioritize queued LLM prompt execution as mission overview first and last-24-hours second, skip hourly summary runs, surface prompt failure messages in dashboard panels, and move utterances-per-hour into its own full-width timeline panel while simplifying stats. Intent: Ensure operators see mission-critical LLM outputs earliest with clear failure visibility and a cleaner mission-layout UI focused on daily-level summaries.
 - fix: tolerate malformed CSV records during transcript DB ingestion by skipping parser failures, logging source file/line details, and continuing with remaining files while reporting parse error totals. Intent: Keep ingestion resilient to real-world quote/formatting defects without blocking valid transcript rows from being inserted.

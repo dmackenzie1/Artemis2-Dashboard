@@ -72,13 +72,7 @@ export class AnalysisService {
 
       for (const hour of Object.keys(byHour).sort()) {
         hourlyUtterances[hour] = byHour[hour].length;
-        const prompt = await getPrompt(this.config.promptsDir, "hourly_summary.txt");
-        serverLogger.info("Prompting hourly summary", { day, hour, sampleSize: Math.min(byHour[hour].length, 40) });
-        hourly[hour] = await this.config.llmClient.generateText({
-          systemPrompt: prompt,
-          userPrompt: JSON.stringify({ day, hour, sample: byHour[hour].slice(0, 40) })
-        });
-        serverLogger.info("Prompt received for hourly summary", { day, hour });
+        hourly[hour] = "Hourly summary generation is disabled.";
       }
 
       const dailyPrompt = await getPrompt(this.config.promptsDir, "daily_summary.txt");
