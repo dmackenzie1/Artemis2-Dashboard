@@ -1,6 +1,6 @@
 import type { FC, FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { chat, fetchDashboard, triggerIngest, type DashboardData } from "../api";
 
 export const DashboardPage: FC = () => {
@@ -30,27 +30,69 @@ export const DashboardPage: FC = () => {
 
   const latestDay = data?.days[data.days.length - 1];
 
+  const stats = useMemo(() => {
+    const totals = data?.days.reduce(
+      (acc, currentDay) => {
+        acc.utterances += currentDay.stats.utteranceCount;
+        acc.words += currentDay.stats.wordCount;
+        acc.channels += currentDay.stats.channelCount;
+        return acc;
+      },
+      { utterances: 0, words: 0, channels: 0 }
+    );
+
+    return [
+      { label: "Data Days", value: `${data?.days.length ?? 0}` },
+      { label: "Utterances", value: `${totals?.utterances ?? 0}` },
+      { label: "Words", value: `${totals?.words ?? 0}` },
+      { label: "Avg Channels/Day", value: `${Math.round((totals?.channels ?? 0) / Math.max(data?.days.length ?? 1, 1))}` }
+    ];
+  }, [data]);
+
+  const histogramData = useMemo(() => {
+    const maxUtterances = Math.max(...(data?.days.map((day) => day.stats.utteranceCount) ?? [1]));
+    const maxChannels = Math.max(...(data?.days.map((day) => day.stats.channelCount) ?? [1]));
+
+    return (
+      data?.days.map((day) => ({
+        day: day.day,
+        utteranceHeight: `${Math.max((day.stats.utteranceCount / maxUtterances) * 100, 8)}%`,
+        channelHeight: `${Math.max((day.stats.channelCount / maxChannels) * 100, 8)}%`,
+        utterances: day.stats.utteranceCount,
+        channels: day.stats.channelCount
+      })) ?? []
+    );
+  }, [data]);
+
   return (
-    <div className="grid">
-      <section className="panel span2">
-        <div className="panel-header">
-          <h2>Mission Overview</h2>
-          <button onClick={() => void onIngest()}>Rebuild from CSV folder</button>
+    <div className="dashboard-layout">
+      <div className="dashboard-toolbar">
+        <div className="toolbar-links">
+          <Link to="/daily">Review Daily</Link>
+          <Link to="/timeline">Review Timeline</Link>
         </div>
-        <p>{data?.missionSummary ?? "Run ingestion to generate mission intelligence."}</p>
+        <button onClick={() => void onIngest()}>Rebuild from CSV folder</button>
+      </div>
+
+      <section className="panel space-panel">
+        <h2>Mission Overview</h2>
+        <p>{data?.missionSummary ?? "Run ingestion to generate the latest Artemis 2 communications intelligence."}</p>
+        <div className="overview-metrics">
+          {stats.map((stat) => (
+            <article key={stat.label} className="metric-card">
+              <span>{stat.label}</span>
+              <strong>{stat.value}</strong>
+            </article>
+          ))}
+        </div>
       </section>
 
-      <section className="panel">
-        <h2>Latest Summary</h2>
+      <section className="panel space-panel">
+        <h2>Last 24 Hours</h2>
         <p>{latestDay?.summary ?? "No daily summaries yet."}</p>
       </section>
 
-      <section className="panel">
-        <h2>What Changed Recently</h2>
-        <p>{data?.recentChanges ?? "No recent trend analysis yet."}</p>
-      </section>
-
-      <section className="panel">
+      <section className="panel space-panel">
         <h2>Daily Topics</h2>
         <ul>
           {latestDay?.topics.map((topic) => (
@@ -61,13 +103,47 @@ export const DashboardPage: FC = () => {
         </ul>
       </section>
 
-      <section className="panel span2">
+      <section className="panel space-panel">
+        <h2>Channel Snapshot</h2>
+        <p>
+          {latestDay
+            ? `${latestDay.stats.channelCount} active channels and ${latestDay.stats.utteranceCount} communications observed on ${latestDay.day}.`
+            : "Ingest CSV files to populate channel activity."}
+        </p>
+      </section>
+
+      <section className="panel space-panel">
+        <h2>What Changed Recently</h2>
+        <p>{data?.recentChanges ?? "No recent trend analysis yet."}</p>
+      </section>
+
+      <section className="panel space-panel">
         <h2>Search + Chat</h2>
         <form onSubmit={(event) => void onChat(event)} className="chat-form">
           <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} />
           <button type="submit">Ask</button>
         </form>
         <pre>{chatAnswer || "Ask about systems, anomalies, channels, or timeline changes."}</pre>
+      </section>
+
+      <section className="panel histogram-panel span2">
+        <h2>Communications Over Time</h2>
+        <p>Daily trend view by total communications and active channels.</p>
+        <div className="histogram">
+          {histogramData.length > 0 ? (
+            histogramData.map((day) => (
+              <article key={day.day} className="histogram-group">
+                <div className="bars">
+                  <div className="bar bar-utterances" style={{ height: day.utteranceHeight }} title={`${day.utterances} utterances`} />
+                  <div className="bar bar-channels" style={{ height: day.channelHeight }} title={`${day.channels} channels`} />
+                </div>
+                <span>{day.day}</span>
+              </article>
+            ))
+          ) : (
+            <div className="histogram-empty">Run ingestion to render communication activity.</div>
+          )}
+        </div>
       </section>
     </div>
   );
