@@ -10,10 +10,27 @@ const starterQueries = [
   "show mentions of comm dropouts"
 ];
 
-type ChatMessage = {
-  role: "user" | "assistant";
-  text: string;
-  strategy?: ChatResponse["strategy"];
+const getPromptDisplay = (
+  prompt: PipelineDashboardData["prompts"][number] | undefined,
+  defaultMessage: string
+): { text: string; statusLabel: string } => {
+  if (!prompt) {
+    return { text: defaultMessage, statusLabel: "not ready" };
+  }
+
+  if (prompt.status === "success" && prompt.output) {
+    return { text: prompt.output, statusLabel: "ready" };
+  }
+
+  if (prompt.status === "running") {
+    return { text: "Querying...", statusLabel: "querying" };
+  }
+
+  if (prompt.status === "failed") {
+    return { text: "Not ready.", statusLabel: "not ready" };
+  }
+
+  return { text: "Building...", statusLabel: "building" };
 };
 
 export const DashboardPage: FC = () => {
@@ -81,6 +98,8 @@ export const DashboardPage: FC = () => {
   };
 
   const latestDay = data?.days[data.days.length - 1];
+  const missionPrompt = pipeline?.prompts.find((entry) => entry.key === "mission_summary");
+  const dailyPrompt = pipeline?.prompts.find((entry) => entry.key === "daily_summary");
 
   const stats = useMemo(() => {
     const totals = data?.days.reduce(
@@ -136,12 +155,17 @@ export const DashboardPage: FC = () => {
       <section className="panel space-panel">
         <h2>Mission Overview</h2>
         {(() => {
-          const prompt = pipeline?.prompts.find((entry) => entry.key === "mission_summary");
-          const display = getPromptDisplay(prompt, "Building mission overview...");
+          const display = getPromptDisplay(missionPrompt, "Building mission overview...");
           return (
             <>
               <p>{display.text}</p>
               <small className="status-label">Status: {display.statusLabel}</small>
+              {missionPrompt?.submittedText ? (
+                <>
+                  <h3>Submitted Context</h3>
+                  <pre>{missionPrompt.submittedText}</pre>
+                </>
+              ) : null}
             </>
           );
         })()}
@@ -149,25 +173,32 @@ export const DashboardPage: FC = () => {
 
       <section className="panel space-panel">
         <h2>Stats</h2>
-        <div className="overview-metrics">
-          {stats.map((stat) => (
-            <article key={stat.label} className="metric-card">
-              <span>{stat.label}</span>
-              <strong>{stat.value}</strong>
-            </article>
-          ))}
-        </div>
+        <table className="stats-table">
+          <tbody>
+            {stats.map((stat) => (
+              <tr key={stat.label}>
+                <th scope="row">{stat.label}</th>
+                <td>{stat.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
 
       <section className="panel space-panel">
         <h2>Last 24 Hours</h2>
         {(() => {
-          const prompt = pipeline?.prompts.find((entry) => entry.key === "daily_summary");
-          const display = getPromptDisplay(prompt, "Not ready yet.");
+          const display = getPromptDisplay(dailyPrompt, "Not ready yet.");
           return (
             <>
               <p>{display.text}</p>
               <small className="status-label">Status: {display.statusLabel}</small>
+              {dailyPrompt?.submittedText ? (
+                <>
+                  <h3>Submitted Context</h3>
+                  <pre>{dailyPrompt.submittedText}</pre>
+                </>
+              ) : null}
             </>
           );
         })()}
@@ -229,20 +260,25 @@ export const DashboardPage: FC = () => {
       </section>
 
       <section className="panel space-panel span2">
-        <h2>Prompt Workflow</h2>
-        <div className="prompt-grid">
-          {promptCards.map((card) => {
-            const prompt = pipeline?.prompts.find((entry) => entry.key === card.key);
-            const display = getPromptDisplay(prompt, card.defaultMessage);
-            return (
-              <article key={card.key} className="metric-card">
-                <span>{card.title}</span>
-                <strong>{display.statusLabel}</strong>
-                <p>{display.text}</p>
-              </article>
-            );
-          })}
-        </div>
+        <h2>LLM Query Window</h2>
+        <table className="stats-table">
+          <thead>
+            <tr>
+              <th scope="col">Prompt</th>
+              <th scope="col">Status</th>
+              <th scope="col">Last Run (UTC)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(pipeline?.prompts ?? []).map((prompt) => (
+              <tr key={prompt.id}>
+                <th scope="row">{prompt.key}</th>
+                <td>{prompt.status}</td>
+                <td>{prompt.lastRunAt ?? "never"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
 
       <section className="panel histogram-panel span2">

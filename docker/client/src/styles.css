@@ -96,30 +96,23 @@ main {
   align-items: center;
 }
 
-.overview-metrics {
+.stats-table {
+  width: 100%;
   margin-top: 0.65rem;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
+  border-collapse: collapse;
 }
 
-.metric-card {
-  border: 1px solid rgba(102, 152, 242, 0.32);
-  border-radius: 10px;
-  padding: 0.45rem 0.55rem;
-  background: rgba(10, 22, 44, 0.68);
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+.stats-table th,
+.stats-table td {
+  text-align: left;
+  font-size: 0.88rem;
+  padding: 0.4rem 0.2rem;
+  border-bottom: 1px solid rgba(138, 180, 255, 0.2);
 }
 
-.metric-card span {
+.stats-table th {
   color: #9fb8de;
-  font-size: 0.75rem;
-}
-
-.metric-card strong {
-  font-size: 1.05rem;
+  font-weight: 500;
 }
 
 .chat-form {
@@ -161,18 +154,6 @@ pre { white-space: pre-wrap; }
 .subtle {
   color: #95a7c7;
   margin-top: 0.4rem;
-}
-
-.prompt-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-
-.prompt-grid .metric-card p {
-  margin: 0;
-  font-size: 0.8rem;
-  color: #b9d0f0;
 }
 
 .histogram {
