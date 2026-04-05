@@ -11,6 +11,8 @@ import { TimelinePage } from "./pages/TimelinePage";
 import { TopicPage } from "./pages/TopicPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 
+const HEALTH_POLL_INTERVAL_MS = 5 * 60 * 1000;
+
 export const App: FC = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
   const { componentId, componentUid } = useComponentIdentity("app-shell");
@@ -28,7 +30,7 @@ export const App: FC = () => {
     void loadHealth();
     const pollHandle = window.setInterval(() => {
       void loadHealth();
-    }, 10000);
+    }, HEALTH_POLL_INTERVAL_MS);
 
     return () => {
       window.clearInterval(pollHandle);
