@@ -3,22 +3,22 @@ import { useEffect, useMemo, useState } from "react";
 import {
   chat,
   fetchDashboard,
-  fetchHealth,
   fetchPipelineDashboard,
+  fetchStatsHourlyByChannel,
   fetchStatsSummary
 } from "../api";
 import type {
   ChatMode,
   DashboardData,
-  HealthData,
+  MissionHourlyChannelEntry,
   MissionStatsSummaryData,
   PipelineDashboardData
 } from "../api";
 import { DailySummaryPanel } from "../components/dashboard/DailySummaryPanel";
-import { DashboardToolbar } from "../components/dashboard/DashboardToolbar";
 import { MissionChatPanel } from "../components/dashboard/MissionChatPanel";
 import { MissionOverviewPanel } from "../components/dashboard/MissionOverviewPanel";
 import { StatsPanel } from "../components/dashboard/StatsPanel";
+import { UtterancesTimelinePanel } from "../components/dashboard/UtterancesTimelinePanel";
 import type { ChatMessage } from "../components/dashboard/types";
 import { clientLogger } from "../utils/logging/clientLogger";
 
@@ -31,9 +31,9 @@ const starterQueries = [
 
 export const DashboardPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [health, setHealth] = useState<HealthData | null>(null);
   const [pipeline, setPipeline] = useState<PipelineDashboardData | null>(null);
   const [statsSummary, setStatsSummary] = useState<MissionStatsSummaryData | null>(null);
+  const [hourlyByChannel, setHourlyByChannel] = useState<MissionHourlyChannelEntry[]>([]);
   const [chatInput, setChatInput] = useState(starterQueries[0]);
   const [chatMode, setChatMode] = useState<ChatMode>("rag");
   const [isThinking, setIsThinking] = useState(false);
@@ -42,17 +42,17 @@ export const DashboardPage: FC = () => {
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       try {
-        const [dashboardPayload, healthPayload, pipelinePayload, statsSummaryPayload] = await Promise.all([
+        const [dashboardPayload, pipelinePayload, statsSummaryPayload, hourlyPayload] = await Promise.all([
           fetchDashboard(),
-          fetchHealth(),
           fetchPipelineDashboard(),
-          fetchStatsSummary()
+          fetchStatsSummary(),
+          fetchStatsHourlyByChannel(30)
         ]);
 
         setData(dashboardPayload);
-        setHealth(healthPayload);
         setPipeline(pipelinePayload);
         setStatsSummary(statsSummaryPayload);
+        setHourlyByChannel(hourlyPayload);
       } catch (error) {
         clientLogger.error("Dashboard polling failed", { error });
       }
@@ -115,21 +115,41 @@ export const DashboardPage: FC = () => {
     [statsSummary]
   );
 
+  const hourlyHistogram = useMemo(() => {
+    if (hourlyByChannel.length === 0) {
+      return [];
+    }
+
+    const totalsByHour = new Map<string, number>();
+    for (const entry of hourlyByChannel) {
+      const current = totalsByHour.get(entry.hour) ?? 0;
+      totalsByHour.set(entry.hour, current + entry.utterances);
+    }
+
+    return Array.from(totalsByHour.entries())
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([hour, utterances]) => ({ hour, channel: "all", utterances }));
+  }, [hourlyByChannel]);
+
   return (
     <div className="dashboard-layout">
-      <DashboardToolbar health={health} />
-      <MissionOverviewPanel prompt={missionPrompt} />
-      <DailySummaryPanel prompt={dailyPrompt} latestDay={latestDay?.day} />
-      <StatsPanel stats={stats} />
-      <MissionChatPanel
-        chatInput={chatInput}
-        chatMode={chatMode}
-        isThinking={isThinking}
-        chatMessages={chatMessages}
-        onChatInputChange={setChatInput}
-        onChatModeChange={setChatMode}
-        onChatSubmit={onChat}
-      />
+      <div className="dashboard-top-row">
+        <MissionOverviewPanel prompt={missionPrompt} />
+        <StatsPanel stats={stats} />
+      </div>
+      <div className="dashboard-mid-row">
+        <DailySummaryPanel prompt={dailyPrompt} latestDay={latestDay?.day} />
+        <MissionChatPanel
+          chatInput={chatInput}
+          chatMode={chatMode}
+          isThinking={isThinking}
+          chatMessages={chatMessages}
+          onChatInputChange={setChatInput}
+          onChatModeChange={setChatMode}
+          onChatSubmit={onChat}
+        />
+      </div>
+      <UtterancesTimelinePanel histogram={hourlyHistogram} />
     </div>
   );
 };

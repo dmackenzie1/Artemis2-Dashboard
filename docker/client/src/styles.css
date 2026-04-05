@@ -136,25 +136,31 @@ main {
 
 .dashboard-layout {
   display: grid;
-  grid-template-columns: minmax(0, 2.35fr) minmax(300px, 0.9fr);
-  grid-template-areas:
-    "main rail"
-    "timeline timeline";
   gap: 0.7rem;
 }
 
-.dashboard-main-grid {
-  grid-area: main;
+.dashboard-top-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 0.75fr);
   gap: 0.7rem;
 }
 
-.dashboard-right-rail {
-  grid-area: rail;
+.dashboard-mid-row {
   display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 0.75fr);
   gap: 0.7rem;
-  align-content: start;
+}
+
+.mission-summary-panel {
+  min-height: 280px;
+}
+
+.daily-summary-panel {
+  min-height: 230px;
+}
+
+.mission-chat-panel {
+  min-height: 230px;
 }
 
 .stack {
@@ -278,7 +284,7 @@ main {
 }
 
 .timeline-strip-panel {
-  grid-area: timeline;
+  min-height: 215px;
 }
 
 .timeline-strip-header {
@@ -480,15 +486,8 @@ pre {
     flex-wrap: wrap;
   }
 
-  .dashboard-layout {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "main"
-      "rail"
-      "timeline";
-  }
-
-  .dashboard-main-grid {
+  .dashboard-top-row,
+  .dashboard-mid-row {
     grid-template-columns: 1fr;
   }
 }
