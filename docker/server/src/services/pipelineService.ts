@@ -62,10 +62,17 @@ const dailySummaryTargetWords = {
   min: 5_000,
   max: 10_000
 } as const;
+const dailySummaryChunkCharacterLimit = 220_000;
 
 type SourceContextDocument = {
   path: string;
+  checksum: string;
   content: string;
+};
+
+type DailyDocumentGroup = {
+  day: string;
+  documents: SourceContextDocument[];
 };
 
 export class PipelineService {
@@ -118,7 +125,7 @@ export class PipelineService {
     return "unspecified-day";
   }
 
-  private buildDailySummaryPromptSubmission(sourceContext: SourceContextDocument[]): string {
+  private buildDailyGroups(sourceContext: SourceContextDocument[]): DailyDocumentGroup[] {
     const groupedByDay = sourceContext.reduce<Map<string, SourceContextDocument[]>>((grouped, document) => {
       const dayKey = this.deriveDayKey(document.path);
       const documents = grouped.get(dayKey) ?? [];
@@ -127,24 +134,34 @@ export class PipelineService {
       return grouped;
     }, new Map<string, SourceContextDocument[]>());
 
-    const orderedGroups = [...groupedByDay.entries()]
+    return [...groupedByDay.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([day, documents]) => ({
-        day,
-        sourceDocuments: documents,
-        instructions: {
-          minimumWordTarget: dailySummaryTargetWords.min,
-          maximumWordTarget: dailySummaryTargetWords.max,
-          objective:
-            "Produce a detailed day-level summary that can be cached in the database and reused by mission-level summaries."
-        }
-      }));
+      .map(([day, documents]) => ({ day, documents }));
+  }
+
+  private createDailySummaryCacheSubmission(sourceContext: SourceContextDocument[]): string {
+    const dayGroups = this.buildDailyGroups(sourceContext).map((group) => ({
+      day: group.day,
+      sourceDocuments: group.documents.map((document) => ({
+        path: document.path,
+        checksum: document.checksum
+      })),
+      instructions: {
+        minimumWordTarget: dailySummaryTargetWords.min,
+        maximumWordTarget: dailySummaryTargetWords.max,
+        objective:
+          "Produce a detailed day-level summary that can be cached in the database and reused by mission-level summaries."
+      }
+    }));
 
     return JSON.stringify(
       {
         generatedAt: dayjs().utc().toISOString(),
         strategy: "daily-layer-first",
-        dayGroups: orderedGroups
+        chunking: {
+          maxCharactersPerChunk: dailySummaryChunkCharacterLimit
+        },
+        dayGroups
       },
       null,
       2
@@ -153,7 +170,7 @@ export class PipelineService {
 
   private async buildPromptSubmission(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
     if (prompt.key === "daily_summary") {
-      return this.buildDailySummaryPromptSubmission(sourceContext);
+      return this.createDailySummaryCacheSubmission(sourceContext);
     }
 
     return JSON.stringify(
@@ -164,6 +181,116 @@ export class PipelineService {
       null,
       2
     );
+  }
+
+  private splitDayDocumentsIntoChunks(documents: SourceContextDocument[]): SourceContextDocument[][] {
+    const chunks: SourceContextDocument[][] = [];
+    let currentChunk: SourceContextDocument[] = [];
+    let currentCharacterCount = 0;
+
+    for (const document of documents) {
+      const documentCharacters = document.content.length;
+      if (currentChunk.length > 0 && currentCharacterCount + documentCharacters > dailySummaryChunkCharacterLimit) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentCharacterCount = 0;
+      }
+
+      if (documentCharacters > dailySummaryChunkCharacterLimit) {
+        const parts = Math.max(Math.ceil(documentCharacters / dailySummaryChunkCharacterLimit), 1);
+        const partSize = Math.ceil(documentCharacters / parts);
+
+        for (let partIndex = 0; partIndex < parts; partIndex += 1) {
+          const start = partIndex * partSize;
+          const end = Math.min(start + partSize, documentCharacters);
+          const partContent = document.content.slice(start, end);
+          chunks.push([
+            {
+              ...document,
+              path: `${document.path}#part-${partIndex + 1}`,
+              content: partContent
+            }
+          ]);
+        }
+        continue;
+      }
+
+      currentChunk.push(document);
+      currentCharacterCount += documentCharacters;
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  }
+
+  private async generateDailySummaryOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
+    const dayGroups = this.buildDailyGroups(sourceContext);
+    const dayOutputs: string[] = [];
+
+    for (const group of dayGroups) {
+      const documentChunks = this.splitDayDocumentsIntoChunks(group.documents);
+      const chunkOutputs: string[] = [];
+
+      for (const [chunkIndex, chunkDocuments] of documentChunks.entries()) {
+        const chunkOutput = await this.config.llmClient.generateText({
+          systemPrompt: prompt.content,
+          userPrompt: JSON.stringify(
+            {
+              mode: "daily-chunk-analysis",
+              day: group.day,
+              chunk: {
+                index: chunkIndex + 1,
+                total: documentChunks.length,
+                maxCharacters: dailySummaryChunkCharacterLimit
+              },
+              instructions: {
+                focus:
+                  "Extract timeline events, anomalies, decisions, and mission-impactful details for this chunk. Preserve factual specificity for downstream synthesis."
+              },
+              sourceDocuments: chunkDocuments.map((document) => ({
+                path: document.path,
+                content: document.content
+              }))
+            },
+            null,
+            2
+          ),
+          componentId: `${prompt.key}:${group.day}:chunk-${chunkIndex + 1}`
+        });
+
+        chunkOutputs.push(chunkOutput);
+      }
+
+      const synthesizedDaySummary = await this.config.llmClient.generateText({
+        systemPrompt: prompt.content,
+        userPrompt: JSON.stringify(
+          {
+            mode: "daily-final-synthesis",
+            day: group.day,
+            instructions: {
+              minimumWordTarget: dailySummaryTargetWords.min,
+              maximumWordTarget: dailySummaryTargetWords.max,
+              objective:
+                "Generate the final reusable day summary by synthesizing chunk analyses while removing repetition and preserving chronology."
+            },
+            chunkSummaries: chunkOutputs.map((summary, index) => ({
+              chunk: index + 1,
+              summary
+            }))
+          },
+          null,
+          2
+        ),
+        componentId: `${prompt.key}:${group.day}:final`
+      });
+
+      dayOutputs.push(`## ${group.day}\n\n${synthesizedDaySummary}`);
+    }
+
+    return dayOutputs.join("\n\n");
   }
 
   private buildPromptQueue(prompts: PromptDefinition[]): PromptDefinition[] {
@@ -290,6 +417,7 @@ export class PipelineService {
 
     const sourceContext: SourceContextDocument[] = sourceDocs.map((doc) => ({
       path: doc.relativePath,
+      checksum: doc.checksum,
       content: doc.content
     }));
     let latestDailySummaryOutput: string | null = null;
@@ -360,12 +488,15 @@ export class PipelineService {
           continue;
         }
 
-        const output = await this.config.llmClient.generateText({
-          systemPrompt: prompt.content,
-          userPrompt: missionSubmittedText,
-          componentId: execution.componentId,
-          requestId: `${execution.componentId}-${execution.id}`
-        });
+        const output =
+          prompt.key === "daily_summary"
+            ? await this.generateDailySummaryOutput(prompt, sourceContext)
+            : await this.config.llmClient.generateText({
+                systemPrompt: prompt.content,
+                userPrompt: missionSubmittedText,
+                componentId: execution.componentId,
+                requestId: `${execution.componentId}-${execution.id}`
+              });
 
         execution.status = "success";
         execution.cacheHit = false;
