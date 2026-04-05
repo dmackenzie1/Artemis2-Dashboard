@@ -4,7 +4,7 @@ A full-stack internal demo that ingests Artemis communication transcript CSVs an
 
 ## What it does
 
-- Ingests all CSV files from `sample_data/` (or configured data directory)
+- Ingests transcript CSV files from `TB-Artemis-Summaries/` (or configured data directory)
 - Ingests source text files from `source_files/` into Postgres for scheduled prompt runs
 - Handles quoted text, commas, multiline transcript text, and trailing CSV columns
 - Generates:
@@ -91,7 +91,15 @@ npm run screenshot -- --url http://localhost:8080 --output artifacts/my-shot.png
 
 ## Ingestion workflow
 
-- Drop one or many CSV files into `sample_data/`
+### Docker volume mapping defaults
+
+Containerized runs intentionally keep database/cache storage internal to Docker. Only operator-editable inputs are bind-mounted from the host:
+
+- `./TB-Artemis-Summaries -> /app/TB-Artemis-Summaries`
+- `./source_files -> /app/source_files`
+- `./prompts -> /app/prompts`
+
+- Drop one or many CSV files into `TB-Artemis-Summaries/`
 - Re-run ingestion from the UI or call `POST /api/ingest`
 - Ingestion is safe to rerun and always rebuilds normalized records + derived intelligence
 

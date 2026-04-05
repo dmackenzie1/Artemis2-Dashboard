@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- chore: switch Docker Compose storage to internal named volumes and limit host bind mounts to transcript/prompt/source input directories. Intent: Avoid scratch-drive persistence during active development while keeping only operator-managed ingestion inputs mapped from host.
 - feat: add structured client/server ingestion lifecycle logging with per-file CSV counters. Intent: Give operators clear, auditable visibility that transcript ingestion is running and succeeding for each input file.
 - feat: surface startup LLM connectivity status and add starter chat query presets in the dashboard, while updating request formatting for Anthropic-compatible gateway models. Intent: Give operators immediate confidence that configured model access is live and speed up analysis workflows with pre-populated mission query prompts.
 - feat: redesign the dashboard UI with a denser two-column mission layout, top-right rebuild controls, and a full-width communications histogram footer. Intent: Improve mission operator scanning speed with a space-themed visual hierarchy aligned to Artemis 2 comms workflows.
