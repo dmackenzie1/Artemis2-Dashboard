@@ -105,8 +105,8 @@ Prompts are editable text files in `/prompts`:
 
 Set in `.env`:
 
-- `LLM_API_URL`
-- `LLM_API_KEY`
-- `LLM_MODEL`
+- `ANTHROPIC_BASE_URL`
+- `ANTHROPIC_API_KEY`
+- `ANTHROPIC_MODEL`
 
-If `LLM_API_URL` is empty, backend uses deterministic fallback text to keep the demo working offline.
+If `ANTHROPIC_BASE_URL` is empty, backend uses deterministic fallback text to keep the demo working offline.
