@@ -8,6 +8,7 @@ import { PromptDefinition } from "../entities/PromptDefinition.js";
 import { PromptExecution } from "../entities/PromptExecution.js";
 import { SourceDocument } from "../entities/SourceDocument.js";
 import { LlmClient } from "./llmClient.js";
+import { serverLogger } from "../utils/logging/serverLogger.js";
 
 dayjs.extend(utc);
 
@@ -28,10 +29,31 @@ type PromptDashboardEntry = {
   output: string | null;
 };
 
+type MissionStatsHistogramBucket = {
+  hour: string;
+  utterances: number;
+};
+
+type MissionStatsView = {
+  generatedAt: string;
+  range: {
+    minTimestamp: string | null;
+    maxTimestamp: string | null;
+  };
+  totals: {
+    dataDays: number;
+    utterances: number;
+    lines: number;
+    words: number;
+  };
+  utterancesPerHour: MissionStatsHistogramBucket[];
+};
+
 const promptFilePattern = /\.txt$/i;
 
 export class PipelineService {
   private runInProgress = false;
+  private missionStatsCache: { computedAtMs: number; payload: MissionStatsView } | null = null;
 
   constructor(
     private readonly em: EntityManager,
@@ -124,6 +146,7 @@ export class PipelineService {
       await this.syncSourceDocuments();
       await this.syncPromptDefinitions();
       await this.executePromptsSequentially();
+      this.missionStatsCache = null;
     } finally {
       this.runInProgress = false;
     }
@@ -159,6 +182,10 @@ export class PipelineService {
       });
       this.em.persist(execution);
       await this.em.flush();
+      serverLogger.info("Prompt execution started", {
+        promptKey: prompt.key,
+        submittedText
+      });
 
       try {
         const output = await this.config.llmClient.generateText({
@@ -211,6 +238,85 @@ export class PipelineService {
 
   async runManualReingest(): Promise<{ changedDocuments: number }> {
     const changedDocuments = await this.syncSourceDocuments();
+    this.missionStatsCache = null;
     return { changedDocuments };
+  }
+
+  async getMissionStatsView(): Promise<MissionStatsView> {
+    const nowMs = Date.now();
+    if (this.missionStatsCache && nowMs - this.missionStatsCache.computedAtMs < 30_000) {
+      return this.missionStatsCache.payload;
+    }
+
+    const [{ minTimestamp, maxTimestamp, utterances, words }] = await this.em.getConnection().execute<{
+      minTimestamp: string | null;
+      maxTimestamp: string | null;
+      utterances: string;
+      words: string;
+    }[]>(
+      `
+        select
+          min(timestamp) as "minTimestamp",
+          max(timestamp) as "maxTimestamp",
+          count(*)::text as "utterances",
+          sum(cardinality(regexp_split_to_array(trim(text), E'\\s+')))::text as "words"
+        from transcript_utterances
+      `
+    );
+
+    const [{ dataDays }] = await this.em.getConnection().execute<{ dataDays: string }[]>(
+      `
+        select count(distinct date(timestamp at time zone 'utc'))::text as "dataDays"
+        from transcript_utterances
+      `
+    );
+
+    const utterancesPerHourRaw = await this.em.getConnection().execute<{ hour: string; utterances: string }[]>(
+      `
+        with bounds as (
+          select
+            date_trunc('hour', min(timestamp)) as min_hour,
+            date_trunc('hour', max(timestamp)) as max_hour
+          from transcript_utterances
+        ),
+        hours as (
+          select generate_series(bounds.min_hour, bounds.max_hour, interval '1 hour') as hour
+          from bounds
+          where bounds.min_hour is not null and bounds.max_hour is not null
+        ),
+        grouped as (
+          select date_trunc('hour', timestamp) as hour, count(*)::int as utterances
+          from transcript_utterances
+          group by 1
+        )
+        select
+          to_char(hours.hour at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') as hour,
+          coalesce(grouped.utterances, 0)::text as utterances
+        from hours
+        left join grouped on grouped.hour = hours.hour
+        order by hours.hour asc
+      `
+    );
+
+    const payload: MissionStatsView = {
+      generatedAt: dayjs().utc().toISOString(),
+      range: {
+        minTimestamp: minTimestamp ? dayjs(minTimestamp).utc().toISOString() : null,
+        maxTimestamp: maxTimestamp ? dayjs(maxTimestamp).utc().toISOString() : null
+      },
+      totals: {
+        dataDays: Number(dataDays ?? 0),
+        utterances: Number(utterances ?? 0),
+        lines: Number(utterances ?? 0),
+        words: Number(words ?? 0)
+      },
+      utterancesPerHour: utterancesPerHourRaw.map((entry) => ({
+        hour: entry.hour,
+        utterances: Number(entry.utterances)
+      }))
+    };
+
+    this.missionStatsCache = { computedAtMs: nowMs, payload };
+    return payload;
   }
 }

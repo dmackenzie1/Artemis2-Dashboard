@@ -32,5 +32,14 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
     }
   });
 
+  router.get("/stats", async (_req, res, next) => {
+    try {
+      const payload = await pipelineService.getMissionStatsView();
+      res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 };
