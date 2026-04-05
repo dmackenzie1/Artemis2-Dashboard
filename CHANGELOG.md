@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 - feat: redesign the dashboard UI with a denser two-column mission layout, top-right rebuild controls, and a full-width communications histogram footer. Intent: Improve mission operator scanning speed with a space-themed visual hierarchy aligned to Artemis 2 comms workflows.
+- fix: switch backend analysis service lodash usage to default CommonJS interop import for Node ESM runtime compatibility. Intent: Prevent containerized API startup crashes caused by invalid named imports from `lodash` and restore dashboard API availability.
 - chore: refresh frontend/backend dependency baselines, bump container image tags, and harden the Playwright capture script for Codex screenshot workflows. Intent: Keep local/dev tooling current while making automated UI snapshot capture reliable for agent-driven validation.
 - feat: add DB-backed source-file ingestion and sequential scheduled prompt execution pipeline with run metadata APIs. Intent: Precompute dashboard summaries server-side and avoid live prompt fanout on every page view while preserving traceable prompt/run history.
 - fix: align LLM environment variable names with Anthropic/Claude Code configuration (`ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`). Intent: Let operators reuse existing Claude Code credentials without translation and prevent runtime misconfiguration.
