@@ -8,6 +8,7 @@
 - Added a root-level `.env.settings` template with non-secret CAIO/OpenAI-compatible defaults (including production gateway path and model) to simplify local setup without sharing API keys.
 - Added a startup health fetch on the dashboard and rendered a visible connectivity indicator showing connected/disconnected state.
 - Updated the dashboard LLM connectivity banner to show only `Connected` on success (without exposing model name in the browser UI).
+- Added a startup health fetch on the dashboard and rendered a visible connectivity indicator showing connected/disconnected state and selected model.
 - Added starter query chips in the dashboard chat section to pre-populate common mission analysis prompts.
 - Added an unreleased changelog entry with explicit intent.
 
