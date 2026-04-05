@@ -8,7 +8,14 @@ const EnvSchema = z.object({
   CACHE_FILE: z.string().default("/app/data/cache.json"),
   LLM_API_URL: z.string().optional(),
   LLM_API_KEY: z.string().optional(),
-  LLM_MODEL: z.string().default("internal-gemini")
+  LLM_MODEL: z.string().default("internal-gemini"),
+  TRANSCRIPTS_DB_ENABLED: z.coerce.boolean().default(false),
+  DB_HOST: z.string().default("localhost"),
+  DB_PORT: z.coerce.number().int().positive().default(5432),
+  DB_USER: z.string().default("artemis"),
+  DB_PASS: z.string().default("artemis"),
+  DB_NAME: z.string().default("artemis_transcripts"),
+  TRANSCRIPT_CSV_DIR: z.string().default("/app/TB-Artemis-Summaries")
 });
 
 export const env = EnvSchema.parse(process.env);

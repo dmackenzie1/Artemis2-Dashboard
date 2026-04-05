@@ -1,14 +1,31 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-artemis}
+      POSTGRES_PASSWORD: ${DB_PASS:-artemis}
+      POSTGRES_DB: ${DB_NAME:-artemis_transcripts}
+    volumes:
+      - ./docker/db/data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
   backend:
     build:
       context: .
       dockerfile: docker/server/Dockerfile
     env_file:
       - .env
+    environment:
+      TRANSCRIPTS_DB_ENABLED: "true"
+      DB_HOST: db
     volumes:
       - ./sample_data:/app/sample_data:ro
       - ./prompts:/app/prompts:ro
       - ./docker/server/data:/app/data
+      - ./TB-Artemis-Summaries:/app/TB-Artemis-Summaries:ro
+    depends_on:
+      - db
 
   frontend:
     build:

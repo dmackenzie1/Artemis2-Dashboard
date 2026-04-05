@@ -43,6 +43,36 @@ docker compose up --build
 
 5. In the app, click **Rebuild from CSV folder** to ingest and regenerate mission intelligence.
 
+## Run without Docker (local Node dev)
+
+You can run client/server directly for fast local testing:
+
+1. Install deps:
+
+```bash
+npm install
+```
+
+2. Terminal A (backend):
+
+```bash
+npm run dev:server
+```
+
+3. Terminal B (frontend):
+
+```bash
+npm run dev:client
+```
+
+4. Open the Vite URL printed by the frontend dev server (typically `http://localhost:5173`).
+
+### Do I need Postgres for local dev?
+
+- **No**, not for the existing dashboard ingestion/chat flow (`/api/ingest`, `/api/dashboard`, `/api/chat`).
+- The new transcript context endpoint (`/api/transcripts/context`) is **optional** and only enabled when `TRANSCRIPTS_DB_ENABLED=true`.
+- If you want transcript DB features without Docker, run a local Postgres instance and set `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, and `DB_NAME` in `.env`.
+
 ## Ingestion workflow
 
 - Drop one or many CSV files into `sample_data/`
