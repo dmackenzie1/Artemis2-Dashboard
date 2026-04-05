@@ -13,8 +13,8 @@ A full-stack internal demo that ingests Artemis communication transcript CSVs an
   - top daily topics
   - recent change analysis
   - chat responses with evidence snippets
-- Exposes APIs via Node + Express
-- Renders a polished mission-control style React UI
+- Exposes APIs via Node + Express (`/docker/server`)
+- Renders a polished mission-control style React UI (`/docker/client`)
 - Runs locally with Docker Compose + NGINX reverse proxy (`/docker/client`, `/docker/server`, `/docker/nginx`)
 
 ## Quick start
