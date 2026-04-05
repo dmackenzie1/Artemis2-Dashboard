@@ -4,6 +4,8 @@ import { serverLogger } from "../utils/logging/serverLogger.js";
 type GenerateOptions = {
   systemPrompt: string;
   userPrompt: string;
+  componentId?: string;
+  requestId?: string;
 };
 
 export type LlmConnectivityStatus = {
@@ -16,6 +18,7 @@ export type LlmConnectivityStatus = {
 
 export class LlmClient {
   private queue = Promise.resolve();
+  private requestCounter = 0;
 
   constructor(
     private readonly apiUrl?: string,
@@ -43,11 +46,54 @@ export class LlmClient {
     return `${joined.slice(0, maxChars)}…`;
   }
 
+  private extractText(value: unknown): string {
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.extractText(item)).join("\n").trim();
+    }
+
+    if (value && typeof value === "object") {
+      const asRecord = value as Record<string, unknown>;
+      if (typeof asRecord.text === "string") {
+        return asRecord.text;
+      }
+
+      if (typeof asRecord.content === "string") {
+        return asRecord.content;
+      }
+
+      if ("content" in asRecord) {
+        return this.extractText(asRecord.content);
+      }
+    }
+
+    return "";
+  }
+
+  private firstNonEmpty(candidates: Array<unknown>): string {
+    for (const candidate of candidates) {
+      const extracted = this.extractText(candidate).trim();
+      if (extracted.length > 0) {
+        return extracted;
+      }
+    }
+
+    return "";
+  }
+
   async generateText(options: GenerateOptions): Promise<string> {
+    const requestId = options.requestId ?? `llm-${Date.now()}-${++this.requestCounter}`;
+    const componentId = options.componentId ?? "unknown-component";
+
     return this.enqueue(async () => {
       const requestUserPreview = this.createPreview(options.userPrompt, 350, 2);
       const requestSystemPreview = this.createPreview(options.systemPrompt, 350, 2);
       serverLogger.info("LLM request queued", {
+        requestId,
+        componentId,
         requestSystemPreview,
         requestUserPreview,
         requestSystemLength: options.systemPrompt.length,
@@ -57,6 +103,8 @@ export class LlmClient {
       if (!this.apiUrl) {
         const fallback = `Prototype fallback response:\n${options.userPrompt.slice(0, 500)}...`;
         serverLogger.info("LLM response received (fallback)", {
+          requestId,
+          componentId,
           responsePreview: this.createPreview(fallback, 450, 3),
           responseLength: fallback.length
         });
@@ -121,19 +169,18 @@ export class LlmClient {
         error?: { message?: string };
       };
 
-      const choiceContent = payload.choices?.[0]?.message?.content;
-      const choiceText = Array.isArray(choiceContent)
-        ? choiceContent.filter((item) => item.type === "text").map((item) => item.text ?? "").join("\n")
-        : choiceContent;
-
-      const messageContent = payload.messages?.[0]?.content
-        ?.filter((block) => block.type === "text")
-        .map((block) => block.text ?? "")
-        .join("\n");
-      const contentBlocks = payload.content_blocks?.map((item) => item.text ?? "").join("\n");
-      const output = payload.text ?? payload.content ?? payload.completion ?? contentBlocks ?? messageContent ?? choiceText ?? "";
+      const output = this.firstNonEmpty([
+        payload.text,
+        payload.content,
+        payload.completion,
+        payload.content_blocks,
+        payload.messages?.[0]?.content,
+        payload.choices?.[0]?.message?.content
+      ]);
 
       serverLogger.info("LLM response received", {
+        requestId,
+        componentId,
         responsePreview: this.createPreview(output, 450, 3),
         responseLength: output.length
       });

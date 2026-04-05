@@ -30,6 +30,48 @@ const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<
     alter column "submitted_text" set default '',
     alter column "submitted_text" set not null;
   `);
+
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    add column if not exists "component_id" varchar(128);
+  `);
+  await orm.em.getConnection().execute(`
+    update "prompt_executions"
+    set "component_id" = 'legacy'
+    where "component_id" is null;
+  `);
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    alter column "component_id" set not null;
+  `);
+
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    add column if not exists "cache_key" varchar(64);
+  `);
+  await orm.em.getConnection().execute(`
+    update "prompt_executions"
+    set "cache_key" = ''
+    where "cache_key" is null;
+  `);
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    alter column "cache_key" set not null;
+  `);
+
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    add column if not exists "cache_hit" boolean default false;
+  `);
+  await orm.em.getConnection().execute(`
+    update "prompt_executions"
+    set "cache_hit" = false
+    where "cache_hit" is null;
+  `);
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    alter column "cache_hit" set not null;
+  `);
 };
 
 const app = express();
