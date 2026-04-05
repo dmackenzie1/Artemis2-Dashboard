@@ -58,6 +58,22 @@ type MissionStatsView = {
 const promptFilePattern = /\.txt$/i;
 const promptExecutionPriority = ["mission_summary", "daily_summary"];
 const skippedPromptKeys = new Set(["hourly_summary"]);
+const dailySummaryTargetWords = {
+  min: 5_000,
+  max: 10_000
+} as const;
+const dailySummaryChunkCharacterLimit = 220_000;
+
+type SourceContextDocument = {
+  path: string;
+  checksum: string;
+  content: string;
+};
+
+type DailyDocumentGroup = {
+  day: string;
+  documents: SourceContextDocument[];
+};
 
 export class PipelineService {
   private runInProgress = false;
@@ -92,6 +108,189 @@ export class PipelineService {
     }
 
     return `${joined.slice(0, maxChars)}…`;
+  }
+
+  private deriveDayKey(relativePath: string): string {
+    const normalized = relativePath.toLowerCase();
+    const dateMatch = normalized.match(/(\d{4}-\d{2}-\d{2})/u);
+    if (dateMatch?.[1]) {
+      return dateMatch[1];
+    }
+
+    const dayNumberMatch = normalized.match(/\bday[\s_-]?(\d{1,3})\b/u);
+    if (dayNumberMatch?.[1]) {
+      return `day-${dayNumberMatch[1].padStart(2, "0")}`;
+    }
+
+    return "unspecified-day";
+  }
+
+  private buildDailyGroups(sourceContext: SourceContextDocument[]): DailyDocumentGroup[] {
+    const groupedByDay = sourceContext.reduce<Map<string, SourceContextDocument[]>>((grouped, document) => {
+      const dayKey = this.deriveDayKey(document.path);
+      const documents = grouped.get(dayKey) ?? [];
+      documents.push(document);
+      grouped.set(dayKey, documents);
+      return grouped;
+    }, new Map<string, SourceContextDocument[]>());
+
+    return [...groupedByDay.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([day, documents]) => ({ day, documents }));
+  }
+
+  private createDailySummaryCacheSubmission(sourceContext: SourceContextDocument[]): string {
+    const dayGroups = this.buildDailyGroups(sourceContext).map((group) => ({
+      day: group.day,
+      sourceDocuments: group.documents.map((document) => ({
+        path: document.path,
+        checksum: document.checksum
+      })),
+      instructions: {
+        minimumWordTarget: dailySummaryTargetWords.min,
+        maximumWordTarget: dailySummaryTargetWords.max,
+        objective:
+          "Produce a detailed day-level summary that can be cached in the database and reused by mission-level summaries."
+      }
+    }));
+
+    return JSON.stringify(
+      {
+        generatedAt: dayjs().utc().toISOString(),
+        strategy: "daily-layer-first",
+        chunking: {
+          maxCharactersPerChunk: dailySummaryChunkCharacterLimit
+        },
+        dayGroups
+      },
+      null,
+      2
+    );
+  }
+
+  private async buildPromptSubmission(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
+    if (prompt.key === "daily_summary") {
+      return this.createDailySummaryCacheSubmission(sourceContext);
+    }
+
+    return JSON.stringify(
+      {
+        generatedAt: dayjs().utc().toISOString(),
+        sourceDocuments: sourceContext
+      },
+      null,
+      2
+    );
+  }
+
+  private splitDayDocumentsIntoChunks(documents: SourceContextDocument[]): SourceContextDocument[][] {
+    const chunks: SourceContextDocument[][] = [];
+    let currentChunk: SourceContextDocument[] = [];
+    let currentCharacterCount = 0;
+
+    for (const document of documents) {
+      const documentCharacters = document.content.length;
+      if (currentChunk.length > 0 && currentCharacterCount + documentCharacters > dailySummaryChunkCharacterLimit) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentCharacterCount = 0;
+      }
+
+      if (documentCharacters > dailySummaryChunkCharacterLimit) {
+        const parts = Math.max(Math.ceil(documentCharacters / dailySummaryChunkCharacterLimit), 1);
+        const partSize = Math.ceil(documentCharacters / parts);
+
+        for (let partIndex = 0; partIndex < parts; partIndex += 1) {
+          const start = partIndex * partSize;
+          const end = Math.min(start + partSize, documentCharacters);
+          const partContent = document.content.slice(start, end);
+          chunks.push([
+            {
+              ...document,
+              path: `${document.path}#part-${partIndex + 1}`,
+              content: partContent
+            }
+          ]);
+        }
+        continue;
+      }
+
+      currentChunk.push(document);
+      currentCharacterCount += documentCharacters;
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  }
+
+  private async generateDailySummaryOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
+    const dayGroups = this.buildDailyGroups(sourceContext);
+    const dayOutputs: string[] = [];
+
+    for (const group of dayGroups) {
+      const documentChunks = this.splitDayDocumentsIntoChunks(group.documents);
+      const chunkOutputs: string[] = [];
+
+      for (const [chunkIndex, chunkDocuments] of documentChunks.entries()) {
+        const chunkOutput = await this.config.llmClient.generateText({
+          systemPrompt: prompt.content,
+          userPrompt: JSON.stringify(
+            {
+              mode: "daily-chunk-analysis",
+              day: group.day,
+              chunk: {
+                index: chunkIndex + 1,
+                total: documentChunks.length,
+                maxCharacters: dailySummaryChunkCharacterLimit
+              },
+              instructions: {
+                focus:
+                  "Extract timeline events, anomalies, decisions, and mission-impactful details for this chunk. Preserve factual specificity for downstream synthesis."
+              },
+              sourceDocuments: chunkDocuments.map((document) => ({
+                path: document.path,
+                content: document.content
+              }))
+            },
+            null,
+            2
+          ),
+          componentId: `${prompt.key}:${group.day}:chunk-${chunkIndex + 1}`
+        });
+
+        chunkOutputs.push(chunkOutput);
+      }
+
+      const synthesizedDaySummary = await this.config.llmClient.generateText({
+        systemPrompt: prompt.content,
+        userPrompt: JSON.stringify(
+          {
+            mode: "daily-final-synthesis",
+            day: group.day,
+            instructions: {
+              minimumWordTarget: dailySummaryTargetWords.min,
+              maximumWordTarget: dailySummaryTargetWords.max,
+              objective:
+                "Generate the final reusable day summary by synthesizing chunk analyses while removing repetition and preserving chronology."
+            },
+            chunkSummaries: chunkOutputs.map((summary, index) => ({
+              chunk: index + 1,
+              summary
+            }))
+          },
+          null,
+          2
+        ),
+        componentId: `${prompt.key}:${group.day}:final`
+      });
+
+      dayOutputs.push(`## ${group.day}\n\n${synthesizedDaySummary}`);
+    }
+
+    return dayOutputs.join("\n\n");
   }
 
   private buildPromptQueue(prompts: PromptDefinition[]): PromptDefinition[] {
@@ -216,36 +415,43 @@ export class PipelineService {
     const prompts = this.buildPromptQueue(allPrompts);
     const sourceDocs = await this.em.find(SourceDocument, {}, { orderBy: { relativePath: "asc" } });
 
-    const sourceContext = sourceDocs.map((doc) => ({
+    const sourceContext: SourceContextDocument[] = sourceDocs.map((doc) => ({
       path: doc.relativePath,
+      checksum: doc.checksum,
       content: doc.content
     }));
+    let latestDailySummaryOutput: string | null = null;
 
     for (const prompt of prompts) {
       const startedAt = dayjs().utc().toDate();
-      const submittedText = JSON.stringify(
-        {
-          generatedAt: dayjs().utc().toISOString(),
-          sourceDocuments: sourceContext
-        },
-        null,
-        2
-      );
-      const execution = this.em.create(PromptExecution, {
+      const submittedText = await this.buildPromptSubmission(prompt, sourceContext);
+      const missionSubmittedText: string =
+        prompt.key === "mission_summary" && latestDailySummaryOutput
+          ? JSON.stringify(
+              {
+                generatedAt: dayjs().utc().toISOString(),
+                strategy: "summaries-over-raw-docs",
+                dailySummaryOutput: latestDailySummaryOutput
+              },
+              null,
+              2
+            )
+          : submittedText;
+      const execution: PromptExecution = this.em.create(PromptExecution, {
         prompt,
         componentId: prompt.key,
-        cacheKey: this.createCacheKey(prompt.content, submittedText),
+        cacheKey: this.createCacheKey(prompt.content, missionSubmittedText),
         cacheHit: false,
         startedAt,
         finishedAt: null,
         status: "running",
-        submittedText,
+        submittedText: missionSubmittedText,
         output: "",
         errorMessage: null
       });
       this.em.persist(execution);
       await this.em.flush();
-      const promptSubmissionPath = await this.persistPromptSubmission(prompt.key, submittedText);
+      const promptSubmissionPath = await this.persistPromptSubmission(prompt.key, missionSubmittedText);
       serverLogger.info("Prompt execution started", {
         promptKey: prompt.key,
         sourceDocumentCount: sourceContext.length,
@@ -268,6 +474,9 @@ export class PipelineService {
           execution.cacheHit = true;
           execution.output = cachedExecution.output;
           execution.finishedAt = dayjs().utc().toDate();
+          if (prompt.key === "daily_summary") {
+            latestDailySummaryOutput = execution.output;
+          }
           serverLogger.info("Prompt response served from cache", {
             promptKey: prompt.key,
             componentId: execution.componentId,
@@ -279,17 +488,23 @@ export class PipelineService {
           continue;
         }
 
-        const output = await this.config.llmClient.generateText({
-          systemPrompt: prompt.content,
-          userPrompt: submittedText,
-          componentId: execution.componentId,
-          requestId: `${execution.componentId}-${execution.id}`
-        });
+        const output =
+          prompt.key === "daily_summary"
+            ? await this.generateDailySummaryOutput(prompt, sourceContext)
+            : await this.config.llmClient.generateText({
+                systemPrompt: prompt.content,
+                userPrompt: missionSubmittedText,
+                componentId: execution.componentId,
+                requestId: `${execution.componentId}-${execution.id}`
+              });
 
         execution.status = "success";
         execution.cacheHit = false;
         execution.output = output;
         execution.finishedAt = dayjs().utc().toDate();
+        if (prompt.key === "daily_summary") {
+          latestDailySummaryOutput = output;
+        }
         serverLogger.info("Prompt response received", {
           promptKey: prompt.key,
           componentId: execution.componentId,

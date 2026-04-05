@@ -27,7 +27,8 @@ export class LlmClient {
     private readonly apiUrl?: string,
     private readonly apiKey?: string,
     private readonly model?: string,
-    private readonly debugPromptsDir?: string
+    private readonly debugPromptsDir?: string,
+    private readonly maxTokens = 12_000
   ) {}
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
@@ -192,7 +193,7 @@ export class LlmClient {
           isOpenAiCompatible
             ? {
                 model: this.model,
-                max_tokens: 300,
+                max_tokens: this.maxTokens,
                 messages: [
                   {
                     role: "system",
@@ -207,7 +208,7 @@ export class LlmClient {
             : {
                 model: this.model,
                 system: options.systemPrompt,
-                max_tokens: 300,
+                max_tokens: this.maxTokens,
                 messages: [
                   {
                     role: "user",
