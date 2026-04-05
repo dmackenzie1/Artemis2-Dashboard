@@ -12,6 +12,17 @@ export type TranscriptUtterance = {
   sourceFile: string;
 };
 
+export type NotableUtterance = {
+  id: string;
+  timestamp: string;
+  day: string;
+  channel: string;
+  filename: string;
+  text: string;
+  score: number;
+  reasons: string[];
+};
+
 export type Topic = {
   title: string;
   description: string;

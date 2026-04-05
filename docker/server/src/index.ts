@@ -11,6 +11,25 @@ import { PipelineService } from "./services/pipelineService.js";
 import { createPipelineRouter } from "./routes/pipeline.js";
 import { serverLogger } from "./utils/logging/serverLogger.js";
 
+const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    add column if not exists "submitted_text" text;
+  `);
+
+  await orm.em.getConnection().execute(`
+    update "prompt_executions"
+    set "submitted_text" = ''
+    where "submitted_text" is null;
+  `);
+
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    alter column "submitted_text" set default '',
+    alter column "submitted_text" set not null;
+  `);
+};
+
 const app = express();
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json({ limit: "4mb" }));
@@ -40,6 +59,7 @@ app.use(
 
 if (env.TRANSCRIPTS_DB_ENABLED) {
   const orm = await MikroORM.init(ormConfig);
+  await ensurePromptExecutionSubmittedTextColumn(orm);
   await orm.getSchemaGenerator().updateSchema();
   app.use("/api/transcripts", createTranscriptRouter(orm.em.fork()));
 
