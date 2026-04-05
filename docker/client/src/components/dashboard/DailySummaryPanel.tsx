@@ -15,12 +15,6 @@ export const DailySummaryPanel: FC<DailySummaryPanelProps> = ({ prompt, latestDa
       <h2>Last 24 Hours</h2>
       <p>{display.text}</p>
       <small className="status-label">Status: {display.statusLabel}</small>
-      {prompt?.submittedText ? (
-        <>
-          <h3>Submitted Context</h3>
-          <pre>{prompt.submittedText}</pre>
-        </>
-      ) : null}
       <p className="subtle">{latestDay ? `Latest day in cache: ${latestDay}` : "No ingested day yet."}</p>
     </section>
   );

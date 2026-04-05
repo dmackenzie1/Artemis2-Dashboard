@@ -27,6 +27,24 @@ export type PipelineDashboardData = {
   }>;
 };
 
+export type PipelineStatsData = {
+  generatedAt: string;
+  range: {
+    minTimestamp: string | null;
+    maxTimestamp: string | null;
+  };
+  totals: {
+    dataDays: number;
+    utterances: number;
+    lines: number;
+    words: number;
+  };
+  utterancesPerHour: Array<{
+    hour: string;
+    utterances: number;
+  }>;
+};
+
 export type HealthData = {
   ok: boolean;
   llm: {
@@ -84,6 +102,16 @@ export const fetchPipelineDashboard = async (): Promise<PipelineDashboardData | 
   }
 
   return (await response.json()) as PipelineDashboardData;
+};
+
+export const fetchPipelineStats = async (): Promise<PipelineStatsData | null> => {
+  const response = await fetch(`${base}/pipeline/stats`);
+  if (!response.ok) {
+    clientLogger.warn("Pipeline stats unavailable", { status: response.status });
+    return null;
+  }
+
+  return (await response.json()) as PipelineStatsData;
 };
 
 export const fetchHealth = async (): Promise<HealthData> => {

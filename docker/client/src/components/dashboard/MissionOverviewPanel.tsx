@@ -14,12 +14,7 @@ export const MissionOverviewPanel: FC<MissionOverviewPanelProps> = ({ prompt }) 
       <h2>Mission Overview</h2>
       <p>{display.text}</p>
       <small className="status-label">Status: {display.statusLabel}</small>
-      {prompt?.submittedText ? (
-        <>
-          <h3>Submitted Context</h3>
-          <pre>{prompt.submittedText}</pre>
-        </>
-      ) : null}
+      <p className="subtle">{prompt?.lastRunAt ? `Last prompt run: ${prompt.lastRunAt}` : "Waiting for first prompt run."}</p>
     </section>
   );
 };
