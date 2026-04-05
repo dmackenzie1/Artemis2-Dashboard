@@ -1,20 +1,30 @@
 import type { FC, FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
-import { chat, fetchDashboard, triggerIngest, type DashboardData } from "../api";
+import { useEffect, useState } from "react";
+import { chat, fetchDashboard, fetchHealth, triggerIngest } from "../api";
+import type { DashboardData, HealthData } from "../api";
+
+const starterQueries = [
+  "summarize MER manager activity",
+  "what changed in Orion ECLSS today?",
+  "which channels discussed timeline risk?",
+  "show mentions of comm dropouts"
+];
 
 export const DashboardPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [chatInput, setChatInput] = useState("summarize MER manager activity");
+  const [health, setHealth] = useState<HealthData | null>(null);
+  const [chatInput, setChatInput] = useState(starterQueries[0]);
   const [chatAnswer, setChatAnswer] = useState("");
 
-  const loadData = async (): Promise<void> => {
-    const payload = await fetchDashboard();
-    setData(payload);
+  const loadStartupData = async (): Promise<void> => {
+    const [dashboardPayload, healthPayload] = await Promise.all([fetchDashboard(), fetchHealth()]);
+    setData(dashboardPayload);
+    setHealth(healthPayload);
   };
 
   useEffect(() => {
-    void loadData();
+    void loadStartupData();
   }, []);
 
   const onIngest = async (): Promise<void> => {
@@ -71,8 +81,14 @@ export const DashboardPage: FC = () => {
           <Link to="/daily">Review Daily</Link>
           <Link to="/timeline">Review Timeline</Link>
         </div>
-        <button onClick={() => void onIngest()}>Rebuild from CSV folder</button>
-      </div>
+        <p className={health?.llm.connected ? "health-ok" : "health-bad"}>
+          LLM Connectivity:{" "}
+          {health?.llm.connected
+            ? `Connected (${health.llm.model ?? "unknown model"})`
+            : `Disconnected${health?.llm.error ? ` - ${health.llm.error}` : ""}`}
+        </p>
+        <p>{data?.missionSummary ?? "Run ingestion to generate mission intelligence."}</p>
+      </section>
 
       <section className="panel space-panel">
         <h2>Mission Overview</h2>
@@ -123,6 +139,13 @@ export const DashboardPage: FC = () => {
           <input value={chatInput} onChange={(event) => setChatInput(event.target.value)} />
           <button type="submit">Ask</button>
         </form>
+        <div className="query-chip-row">
+          {starterQueries.map((query) => (
+            <button key={query} type="button" onClick={() => setChatInput(query)}>
+              {query}
+            </button>
+          ))}
+        </div>
         <pre>{chatAnswer || "Ask about systems, anomalies, channels, or timeline changes."}</pre>
       </section>
 

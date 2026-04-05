@@ -15,6 +15,7 @@ app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json({ limit: "4mb" }));
 
 const llmClient = new LlmClient(env.ANTHROPIC_BASE_URL, env.ANTHROPIC_API_KEY, env.ANTHROPIC_MODEL);
+let llmConnectivityStatus = await llmClient.checkConnectivity();
 
 const analysisService = new AnalysisService({
   dataDir: env.DATA_DIR,
@@ -24,7 +25,7 @@ const analysisService = new AnalysisService({
 });
 
 await analysisService.loadFromDisk();
-app.use("/api", createApiRouter(analysisService));
+app.use("/api", createApiRouter(analysisService, () => llmConnectivityStatus));
 
 if (env.TRANSCRIPTS_DB_ENABLED) {
   const orm = await MikroORM.init(ormConfig);
@@ -62,6 +63,14 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
     });
   });
 }
+
+setInterval(() => {
+  llmClient.checkConnectivity().then((status) => {
+    llmConnectivityStatus = status;
+  }).catch(() => {
+    // no-op
+  });
+}, 5 * 60 * 1000);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const message = error instanceof Error ? error.message : "Unexpected error";

@@ -148,66 +148,19 @@ button {
   padding: 0.5rem;
 }
 
-input {
-  width: 100%;
+pre { white-space: pre-wrap; }
+
+.health-ok {
+  color: #6ad08f;
 }
 
-pre {
-  white-space: pre-wrap;
+.health-bad {
+  color: #ff8f8f;
 }
 
-.histogram-panel {
-  margin-left: -0.75rem;
-  margin-right: -0.75rem;
-  border-radius: 0;
-  border-left: 0;
-  border-right: 0;
-  border-bottom: 0;
-  padding: 0.9rem 1rem 1.25rem;
-}
-
-.histogram {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+.query-chip-row {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.35rem;
-  align-items: end;
-  min-height: 210px;
-}
-
-.histogram-group {
-  display: grid;
-  justify-items: center;
-  gap: 0.4rem;
-}
-
-.bars {
-  width: 100%;
-  min-height: 170px;
-  display: flex;
-  gap: 0.25rem;
-  align-items: flex-end;
-}
-
-.bar {
-  width: 50%;
-  border-radius: 8px 8px 2px 2px;
-}
-
-.bar-utterances {
-  background: linear-gradient(180deg, #67a7ff 0%, #2661c9 100%);
-}
-
-.bar-channels {
-  background: linear-gradient(180deg, #8df4ea 0%, #2aa79a 100%);
-}
-
-.histogram-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #a0b3cd;
-  border: 1px dashed rgba(114, 149, 201, 0.5);
-  border-radius: 10px;
-  min-height: 130px;
+  margin-top: 0.75rem;
 }

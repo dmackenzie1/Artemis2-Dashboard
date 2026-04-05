@@ -1,12 +1,16 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { AnalysisService } from "../services/analysisService.js";
+import type { LlmConnectivityStatus } from "../services/llmClient.js";
 
-export const createApiRouter = (analysisService: AnalysisService): Router => {
+export const createApiRouter = (
+  analysisService: AnalysisService,
+  getLlmConnectivityStatus: () => LlmConnectivityStatus
+): Router => {
   const router = Router();
 
   router.get("/health", (_req, res) => {
-    res.json({ ok: true });
+    res.json({ ok: true, llm: getLlmConnectivityStatus() });
   });
 
   router.post("/ingest", async (_req, res, next) => {
