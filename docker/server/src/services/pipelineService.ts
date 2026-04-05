@@ -28,6 +28,7 @@ type PromptDashboardEntry = {
   status: "running" | "success" | "failed" | "never";
   submittedText: string | null;
   output: string | null;
+  errorMessage: string | null;
 };
 
 type MissionStatsHistogramBucket = {
@@ -51,6 +52,8 @@ type MissionStatsView = {
 };
 
 const promptFilePattern = /\.txt$/i;
+const promptExecutionPriority = ["mission_summary", "daily_summary"];
+const skippedPromptKeys = new Set(["hourly_summary"]);
 
 export class PipelineService {
   private runInProgress = false;
@@ -70,6 +73,31 @@ export class PipelineService {
     await fs.writeFile(outputPath, submittedText, "utf8");
 
     return outputPath;
+  }
+
+  private buildPromptQueue(prompts: PromptDefinition[]): PromptDefinition[] {
+    const indexByKey = new Map<string, number>(promptExecutionPriority.map((key, index) => [key, index]));
+
+    return prompts
+      .filter((prompt) => !skippedPromptKeys.has(prompt.key))
+      .sort((left, right) => {
+        const leftPriority = indexByKey.get(left.key);
+        const rightPriority = indexByKey.get(right.key);
+
+        if (typeof leftPriority === "number" && typeof rightPriority === "number") {
+          return leftPriority - rightPriority;
+        }
+
+        if (typeof leftPriority === "number") {
+          return -1;
+        }
+
+        if (typeof rightPriority === "number") {
+          return 1;
+        }
+
+        return left.key.localeCompare(right.key);
+      });
   }
 
   async syncSourceDocuments(): Promise<number> {
@@ -165,7 +193,8 @@ export class PipelineService {
   }
 
   async executePromptsSequentially(): Promise<void> {
-    const prompts = await this.em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
+    const allPrompts = await this.em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
+    const prompts = this.buildPromptQueue(allPrompts);
     const sourceDocs = await this.em.find(SourceDocument, {}, { orderBy: { relativePath: "asc" } });
 
     const sourceContext = sourceDocs.map((doc) => ({
@@ -249,7 +278,8 @@ export class PipelineService {
         lastRunAt: latestExecution ? dayjs(latestExecution.startedAt).utc().toISOString() : null,
         status: latestExecution?.status ?? "never",
         submittedText: latestExecution?.submittedText ?? null,
-        output: latestExecution?.status === "success" ? latestExecution.output : null
+        output: latestExecution?.status === "success" ? latestExecution.output : null,
+        errorMessage: latestExecution?.status === "failed" ? latestExecution.errorMessage : null
       });
     }
 
@@ -314,7 +344,7 @@ export class PipelineService {
           group by 1
         )
         select
-          to_char(hours.hour at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') as hour,
+          to_char(hours.hour at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as hour,
           coalesce(grouped.utterances, 0)::text as utterances
         from hours
         left join grouped on grouped.hour = hours.hour

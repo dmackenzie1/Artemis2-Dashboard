@@ -22,7 +22,7 @@ export const MissionChatPanel: FC<MissionChatPanelProps> = ({
   onChatSubmit
 }) => {
   return (
-    <section className="panel space-panel span2">
+    <section className="panel space-panel">
       <div className="chat-panel-header">
         <h2>Mission Chat</h2>
         <label className="chat-mode-picker" htmlFor="chat-mode">
