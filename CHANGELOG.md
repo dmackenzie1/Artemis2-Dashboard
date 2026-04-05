@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- chore: refresh frontend/backend dependency baselines, bump container image tags, and harden the Playwright capture script for Codex screenshot workflows. Intent: Keep local/dev tooling current while making automated UI snapshot capture reliable for agent-driven validation.
 - fix: align LLM environment variable names with Anthropic/Claude Code configuration (`ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`). Intent: Let operators reuse existing Claude Code credentials without translation and prevent runtime misconfiguration.
 - feat: add a Playwright-based CLI screenshot utility for capturing the React client at localhost:8080. Intent: Enable AI coding agents to generate visual snapshots of the running frontend for faster UI verification.
 - fix: make transcript PostgreSQL features optional for non-Docker local development and add direct workspace dev scripts. Intent: Let developers run server/client locally without requiring Docker or a running database unless transcript context APIs are needed.
