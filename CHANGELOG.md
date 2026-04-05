@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: run the first automatic pipeline prompt cycle only after startup CSV ingestion completes, then start the recurring schedule. Intent: Prevent pre-ingestion prompt executions from using incomplete/placeholder source context during backend boot.
 - feat: move dashboard mission view to a single-column operator layout, remove submitted-context/imagery UI clutter, add server-cached `/api/pipeline/stats`, and replace text LLM status with a top-right connectivity dot. Intent: Prioritize mission-ready signal (prompt outputs + transcript-derived stats/histogram) while moving verbose payload visibility to backend logs for clearer operations.
 - fix: enable transcript/pipeline database mode by default while keeping `PIPELINE_AUTO_RUN=true` and `PIPELINE_INTERVAL_HOURS=6` defaults. Intent: Match runtime behavior with mission-ops expectations so ingestion-triggered and scheduled prompt runs are active without extra env toggles.
 - feat: add `/api/notable-utterances` with heuristic scoring to surface top mission-significant lines (e.g., top 10 from week-scale datasets). Intent: Give operators a direct high-signal shortlist from large transcript volumes without manual triage.

@@ -46,6 +46,23 @@ const analysisService = new AnalysisService({
 
 await analysisService.loadFromDisk();
 let pipelineService: PipelineService | null = null;
+let pipelineIntervalStarted = false;
+const startPipelineSchedule = (): void => {
+  if (!pipelineService || !env.PIPELINE_AUTO_RUN || pipelineIntervalStarted) {
+    return;
+  }
+
+  pipelineIntervalStarted = true;
+  const scheduledPipelineService = pipelineService;
+  const intervalMs = env.PIPELINE_INTERVAL_HOURS * 60 * 60 * 1000;
+
+  setInterval(() => {
+    scheduledPipelineService.runPipelineCycle().catch(() => {
+      // no-op: failure is persisted in prompt_executions table
+    });
+  }, intervalMs);
+};
+
 app.use(
   "/api",
   createApiRouter(analysisService, () => llmConnectivityStatus, async () => {
@@ -70,18 +87,6 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
   });
 
   app.use("/api/pipeline", createPipelineRouter(pipelineService));
-
-  if (env.PIPELINE_AUTO_RUN) {
-    await pipelineService.runPipelineCycle();
-    const scheduledPipelineService = pipelineService;
-
-    const intervalMs = env.PIPELINE_INTERVAL_HOURS * 60 * 60 * 1000;
-    setInterval(() => {
-      scheduledPipelineService.runPipelineCycle().catch(() => {
-        // no-op: failure is persisted in prompt_executions table
-      });
-    }, intervalMs);
-  }
 } else {
   app.get("/api/transcripts/context", (_req, res) => {
     res.status(503).json({
@@ -107,6 +112,7 @@ const runStartupIngestion = async (): Promise<void> => {
     if (currentPipelineService) {
       await currentPipelineService.runPipelineCycle();
       serverLogger.info("Startup prompt workflow completed");
+      startPipelineSchedule();
     }
   } catch (error) {
     serverLogger.error("Startup ingestion failed", { error });
