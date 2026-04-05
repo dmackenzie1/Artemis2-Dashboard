@@ -78,7 +78,12 @@ const app = express();
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json({ limit: "4mb" }));
 
-const llmClient = new LlmClient(env.ANTHROPIC_BASE_URL, env.ANTHROPIC_API_KEY, env.ANTHROPIC_MODEL);
+const llmClient = new LlmClient(
+  env.ANTHROPIC_BASE_URL,
+  env.ANTHROPIC_API_KEY,
+  env.ANTHROPIC_MODEL,
+  env.LLM_DEBUG_PROMPTS_DIR
+);
 let llmConnectivityStatus = await llmClient.checkConnectivity();
 
 const analysisService = new AnalysisService({
@@ -114,7 +119,7 @@ app.use(
   createApiRouter(analysisService, () => llmConnectivityStatus, async () => {
     const em = ingestionEntityManager;
     if (em) {
-      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.TRANSCRIPT_CSV_DIR, em);
+      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
       serverLogger.info("Manual transcript ingestion completed", transcriptIngestion);
     }
 
@@ -175,7 +180,7 @@ const runStartupIngestion = async (): Promise<void> => {
   try {
     const em = ingestionEntityManager;
     if (em) {
-      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.TRANSCRIPT_CSV_DIR, em);
+      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
       serverLogger.info("Startup transcript ingestion completed", transcriptIngestion);
     }
 
