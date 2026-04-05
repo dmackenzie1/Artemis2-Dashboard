@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: hide connected-model details in the dashboard banner and add a non-secret `.env.settings` template for CAIO gateway configuration. Intent: Reduce operator-facing UI noise while standardizing shareable local env defaults without exposing API credentials.
 - fix: run backend container with `node dist/index.js` directly instead of `npm run start`. Intent: Eliminate misleading npm lifecycle SIGTERM errors during normal container shutdown so operators can focus on real startup failures.
 - fix: support CAIO dev `/v1/chat/completions` payload/header compatibility and parse OpenAI-style `choices` responses in the LLM client. Intent: Prevent false connectivity failures and empty chat answers when routing Artemis dashboard requests through CAIO dev gateway endpoints.
 - fix: repair dashboard page JSX/import regressions and expand client/server unit coverage for API and topic parsing paths. Intent: Restore reliable frontend build health and reduce regression risk in mission-ops dashboard workflows.
