@@ -11,7 +11,8 @@ type StatsPanelProps = {
 
 export const StatsPanel: FC<StatsPanelProps> = ({ stats }) => {
   return (
-    <section className="panel space-panel">
+    <section className="panel space-panel stats-panel">
+      <p className="panel-kicker">Snapshot</p>
       <h2>Stats</h2>
       <table className="stats-table">
         <tbody>

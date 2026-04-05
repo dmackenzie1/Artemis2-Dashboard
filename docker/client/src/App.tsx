@@ -1,19 +1,51 @@
 import type { FC } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
+import { fetchHealth } from "./api";
+import type { HealthData } from "./api";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DailyPage } from "./pages/DailyPage";
 import { TimelinePage } from "./pages/TimelinePage";
 import { TopicPage } from "./pages/TopicPage";
+import { clientLogger } from "./utils/logging/clientLogger";
 
 export const App: FC = () => {
+  const [health, setHealth] = useState<HealthData | null>(null);
+
+  useEffect(() => {
+    const loadHealth = async (): Promise<void> => {
+      try {
+        const payload = await fetchHealth();
+        setHealth(payload);
+      } catch (error) {
+        clientLogger.error("Topbar health poll failed", { error });
+      }
+    };
+
+    void loadHealth();
+    const pollHandle = window.setInterval(() => {
+      void loadHealth();
+    }, 10000);
+
+    return () => {
+      window.clearInterval(pollHandle);
+    };
+  }, []);
+
+  const connected = useMemo(() => (!health ? true : health.llm.connected), [health]);
+
   return (
     <div className="app-shell">
       <header className="topbar">
-        <h1>Artemis 2 Communications Dashboard</h1>
-        <nav>
+        <h1>Artemis 2 Mission Intelligence</h1>
+        <nav className="topbar-nav">
           <NavLink to="/">Overview</NavLink>
           <NavLink to="/daily">Daily</NavLink>
           <NavLink to="/timeline">Timeline</NavLink>
+          <div className="topbar-status" title={connected ? "LLM connected" : "LLM disconnected"}>
+            <span className={`llm-indicator-dot ${connected ? "llm-indicator-ok" : "llm-indicator-bad"}`} />
+            <span>{connected ? "LLM Connected" : "LLM Offline"}</span>
+          </div>
         </nav>
       </header>
 
