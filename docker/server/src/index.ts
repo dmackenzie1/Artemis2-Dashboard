@@ -16,7 +16,7 @@ const analysisService = new AnalysisService({
   dataDir: env.DATA_DIR,
   promptsDir: env.PROMPTS_DIR,
   cacheFile: env.CACHE_FILE,
-  llmClient: new LlmClient(env.LLM_API_URL, env.LLM_API_KEY, env.LLM_MODEL)
+  llmClient: new LlmClient(env.ANTHROPIC_BASE_URL, env.ANTHROPIC_API_KEY, env.ANTHROPIC_MODEL)
 });
 
 await analysisService.loadFromDisk();
