@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- chore: switch Docker Compose storage to internal named volumes and limit host bind mounts to transcript/prompt/source input directories. Intent: Avoid scratch-drive persistence during active development while keeping only operator-managed ingestion inputs mapped from host.
 - feat: redesign the dashboard UI with a denser two-column mission layout, top-right rebuild controls, and a full-width communications histogram footer. Intent: Improve mission operator scanning speed with a space-themed visual hierarchy aligned to Artemis 2 comms workflows.
 - fix: switch backend analysis service lodash usage to default CommonJS interop import for Node ESM runtime compatibility. Intent: Prevent containerized API startup crashes caused by invalid named imports from `lodash` and restore dashboard API availability.
 - chore: refresh frontend/backend dependency baselines, bump container image tags, and harden the Playwright capture script for Codex screenshot workflows. Intent: Keep local/dev tooling current while making automated UI snapshot capture reliable for agent-driven validation.
