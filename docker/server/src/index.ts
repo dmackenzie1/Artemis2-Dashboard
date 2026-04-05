@@ -82,7 +82,8 @@ const llmClient = new LlmClient(
   env.ANTHROPIC_BASE_URL,
   env.ANTHROPIC_API_KEY,
   env.ANTHROPIC_MODEL,
-  env.LLM_DEBUG_PROMPTS_DIR
+  env.LLM_DEBUG_PROMPTS_DIR,
+  env.LLM_MAX_TOKENS
 );
 let llmConnectivityStatus = await llmClient.checkConnectivity();
 

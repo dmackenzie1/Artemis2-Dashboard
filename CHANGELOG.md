@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: chunk day-level source documents into bounded prompt payloads, cache daily-summary submissions as checksum manifests, and run mission-summary synthesis from daily outputs with configurable LLM max token budget. Intent: Prevent context-window overflow on multi-million-token transcript sets while preserving reusable day abstractions for mission-level synthesis.
 - fix: remove the committed dashboard background binary and switch the client to a placeholder path (`./assets/backgrounds/background.png`) with a checked-in drop-location note file. Intent: Keep PRs binary-free while preserving the mission-control background wiring for user-supplied imagery.
 - feat: tighten the dashboard UI toward the mission-control reference by switching to reference-backed atmospheric imagery, refining fixed-panel composition, and restyling console/histogram visuals without changing frontend data behavior. Intent: Deliver a closer visual match to the target comp while keeping existing routes and business logic intact.
 - feat: restyle the dashboard shell/panels into a denser glass mission-control aesthetic and introduce shared status badges plus reusable loading indicators so pane readiness states are consistent during polling/query execution. Intent: Bring the UI closer to the reference visual language while preserving existing routes, data flow, and operator interactions.
