@@ -1,6 +1,8 @@
 import type { FC } from "react";
+import { useEffect, useRef } from "react";
 import type { PipelineDashboardData } from "../../api";
 import { getPromptDisplay } from "./promptDisplay";
+import { clientLogger } from "../../utils/logging/clientLogger";
 
 type DailySummaryPanelProps = {
   prompt: PipelineDashboardData["prompts"][number] | undefined;
@@ -18,6 +20,31 @@ const summarizeLines = (text: string): string[] => {
 export const DailySummaryPanel: FC<DailySummaryPanelProps> = ({ prompt, latestDay }) => {
   const display = getPromptDisplay(prompt, "Not ready yet.");
   const rows = summarizeLines(display.text);
+  const latestRunMarker = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!prompt || prompt.status !== "success") {
+      return;
+    }
+
+    const runMarker = `${prompt.lastRunAt ?? "never"}:${prompt.status}`;
+    if (!latestRunMarker.current) {
+      latestRunMarker.current = runMarker;
+      return;
+    }
+
+    if (latestRunMarker.current === runMarker) {
+      return;
+    }
+
+    clientLogger.info("LLM response received for dashboard pane", {
+      paneId: prompt.componentId,
+      promptKey: prompt.key,
+      cacheHit: prompt.cacheHit,
+      preview: prompt.outputPreview ?? ""
+    });
+    latestRunMarker.current = runMarker;
+  }, [prompt]);
 
   return (
     <section className="panel space-panel daily-summary-panel">

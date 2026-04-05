@@ -38,7 +38,6 @@ export const DashboardPage: FC = () => {
   const [chatMode, setChatMode] = useState<ChatMode>("rag");
   const [isThinking, setIsThinking] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [latestPromptStateByKey, setLatestPromptStateByKey] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const loadData = async (): Promise<void> => {
@@ -68,36 +67,6 @@ export const DashboardPage: FC = () => {
       window.clearInterval(pollHandle);
     };
   }, []);
-
-  useEffect(() => {
-    if (!pipeline?.prompts.length) {
-      return;
-    }
-
-    const nextStateByKey = pipeline.prompts.reduce<Record<string, string>>((accumulator, prompt) => {
-      accumulator[prompt.key] = `${prompt.status}:${prompt.lastRunAt ?? "never"}`;
-      return accumulator;
-    }, {});
-
-    setLatestPromptStateByKey((previousStateByKey) => {
-      pipeline.prompts.forEach((prompt) => {
-        const previousState = previousStateByKey[prompt.key];
-        const currentState = nextStateByKey[prompt.key];
-        if (!previousState || previousState === currentState || prompt.status !== "success") {
-          return;
-        }
-
-        clientLogger.info("LLM response received for dashboard pane", {
-          paneId: prompt.componentId,
-          promptKey: prompt.key,
-          cacheHit: prompt.cacheHit,
-          preview: prompt.outputPreview ?? ""
-        });
-      });
-
-      return nextStateByKey;
-    });
-  }, [pipeline]);
 
   const onChat = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();

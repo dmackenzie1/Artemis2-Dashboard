@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: move pane-level LLM response event detection into mission/daily panel components and keep DashboardPage polling logic minimal to reduce merge-conflict pressure with ongoing UI work. Intent: Preserve pane-specific response logging while making dashboard integration easier to rebase as mainline layout code evolves.
 - fix: tag queued LLM calls with stable pane/component IDs, add prompt-output cache lookups keyed by prompt+submitted context hash, and surface submitted/output previews plus pane-level response events in dashboard panels. Intent: Ensure concurrent pane requests are routed back to the correct UI component with visible previews while avoiding redundant model calls when identical context is already cached in the database.
 - refactor: rename the Docker Compose API service from `backend` to `server` and update nginx upstream/dependency references accordingly. Intent: Align container/service naming with team terminology while preserving existing API routing behavior.
 - fix: resolve DashboardPage merge fallout by restoring health polling, correcting Promise.all payload ordering, and re-adding DashboardToolbar import/state wiring. Intent: Unblock Docker frontend TypeScript builds and recover dashboard runtime status rendering after a bad merge.
