@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chat, fetchDashboard, fetchHealth, triggerIngest } from "./api";
+import { chat, fetchDashboard, fetchHealth, fetchStatsSummary, triggerIngest } from "./api";
 
 const mockFetch = vi.fn<typeof fetch>();
 
@@ -53,5 +53,17 @@ describe("api helpers", () => {
 
     await expect(fetchHealth()).resolves.toEqual(payload);
     expect(mockFetch).toHaveBeenCalledWith("/api/health");
+  });
+
+  it("loads database-backed mission stats summary", async () => {
+    const payload = {
+      generatedAt: "2026-04-05T12:00:00Z",
+      days: { minDay: "2026-04-01", maxDay: "2026-04-05" },
+      totals: { utterances: 12, words: 140, channels: 4 }
+    };
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => payload } as Response);
+
+    await expect(fetchStatsSummary()).resolves.toEqual(payload);
+    expect(mockFetch).toHaveBeenCalledWith("/api/stats/summary");
   });
 });

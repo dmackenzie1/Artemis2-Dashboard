@@ -45,6 +45,32 @@ export type PipelineStatsData = {
   }>;
 };
 
+export type MissionStatsSummaryData = {
+  generatedAt: string;
+  days: {
+    minDay: string | null;
+    maxDay: string | null;
+  };
+  totals: {
+    utterances: number;
+    words: number;
+    channels: number;
+  };
+};
+
+export type MissionStatsByDayEntry = {
+  day: string;
+  utterances: number;
+  words: number;
+  channels: number;
+};
+
+export type MissionHourlyChannelEntry = {
+  hour: string;
+  channel: string;
+  utterances: number;
+};
+
 export type HealthData = {
   ok: boolean;
   llm: {
@@ -112,6 +138,36 @@ export const fetchPipelineStats = async (): Promise<PipelineStatsData | null> =>
   }
 
   return (await response.json()) as PipelineStatsData;
+};
+
+export const fetchStatsSummary = async (): Promise<MissionStatsSummaryData | null> => {
+  const response = await fetch(`${base}/stats/summary`);
+  if (!response.ok) {
+    clientLogger.warn("Stats summary unavailable", { status: response.status });
+    return null;
+  }
+
+  return (await response.json()) as MissionStatsSummaryData;
+};
+
+export const fetchStatsByDay = async (): Promise<MissionStatsByDayEntry[]> => {
+  const response = await fetch(`${base}/stats/days`);
+  if (!response.ok) {
+    clientLogger.warn("Stats by day unavailable", { status: response.status });
+    return [];
+  }
+
+  return (await response.json()) as MissionStatsByDayEntry[];
+};
+
+export const fetchStatsHourlyByChannel = async (days = 7): Promise<MissionHourlyChannelEntry[]> => {
+  const response = await fetch(`${base}/stats/channels/hourly?days=${days}`);
+  if (!response.ok) {
+    clientLogger.warn("Hourly channel stats unavailable", { status: response.status, days });
+    return [];
+  }
+
+  return (await response.json()) as MissionHourlyChannelEntry[];
 };
 
 export const fetchHealth = async (): Promise<HealthData> => {

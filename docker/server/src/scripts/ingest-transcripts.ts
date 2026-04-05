@@ -6,6 +6,7 @@ import { parse } from "csv-parse";
 import config from "../mikro-orm.config.js";
 import { env } from "../env.config.js";
 import { TranscriptUtterance } from "../entities/TranscriptUtterance.js";
+import { serverLogger } from "../utils/logging/serverLogger.js";
 
 type CsvRow = {
   Date: string;
@@ -54,6 +55,11 @@ const ingestFile = async (filePath: string, orm: MikroORM): Promise<number> => {
     if (batch.length >= BATCH_SIZE) {
       await orm.em.insertMany(TranscriptUtterance, batch);
       insertedCount += batch.length;
+      serverLogger.info("Inserted transcript batch into database", {
+        sourceFile,
+        insertedRows: batch.length,
+        insertedSoFar: insertedCount
+      });
       batch = [];
     }
   }
@@ -61,6 +67,11 @@ const ingestFile = async (filePath: string, orm: MikroORM): Promise<number> => {
   if (batch.length > 0) {
     await orm.em.insertMany(TranscriptUtterance, batch);
     insertedCount += batch.length;
+    serverLogger.info("Inserted transcript batch into database", {
+      sourceFile,
+      insertedRows: batch.length,
+      insertedSoFar: insertedCount
+    });
   }
 
   return insertedCount;
@@ -82,10 +93,14 @@ const ingestDirectory = async (): Promise<void> => {
       const filePath = path.join(env.TRANSCRIPT_CSV_DIR, fileName);
       const inserted = await ingestFile(filePath, orm);
       totalInserted += inserted;
-      process.stdout.write(`Ingested ${inserted} rows from ${fileName}\n`);
+      serverLogger.info("Inserted records from transcript file", {
+        fileName,
+        insertedRecords: inserted,
+        totalInserted
+      });
     }
 
-    process.stdout.write(`Completed ingestion. Inserted ${totalInserted} rows total.\n`);
+    serverLogger.info("Transcript ingestion finished", { totalInsertedRecords: totalInserted });
   } finally {
     await orm.close(true);
   }

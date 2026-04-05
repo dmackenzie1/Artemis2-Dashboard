@@ -10,6 +10,7 @@ import ormConfig from "./mikro-orm.config.js";
 import { PipelineService } from "./services/pipelineService.js";
 import { createPipelineRouter } from "./routes/pipeline.js";
 import { serverLogger } from "./utils/logging/serverLogger.js";
+import { StatsService } from "./services/statsService.js";
 
 const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
   await orm.em.getConnection().execute(`
@@ -46,6 +47,7 @@ const analysisService = new AnalysisService({
 
 await analysisService.loadFromDisk();
 let pipelineService: PipelineService | null = null;
+let statsService: StatsService | null = null;
 let pipelineIntervalStarted = false;
 const startPipelineSchedule = (): void => {
   if (!pipelineService || !env.PIPELINE_AUTO_RUN || pipelineIntervalStarted) {
@@ -71,23 +73,32 @@ app.use(
       await currentPipelineService.runPipelineCycle();
       serverLogger.info("Prompt workflow completed after ingestion");
     }
-  })
+  }, () => statsService)
 );
 
 if (env.TRANSCRIPTS_DB_ENABLED) {
+  serverLogger.info("Transcript database mode enabled");
   const orm = await MikroORM.init(ormConfig);
+  serverLogger.info("Transcript database connected", {
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    database: env.DB_NAME
+  });
   await ensurePromptExecutionSubmittedTextColumn(orm);
   await orm.getSchemaGenerator().updateSchema();
   app.use("/api/transcripts", createTranscriptRouter(orm.em.fork()));
+  statsService = new StatsService(orm.em.fork());
 
   pipelineService = new PipelineService(orm.em.fork(), {
     sourceFilesDir: env.SOURCE_FILES_DIR,
     promptsDir: env.PROMPTS_DIR,
-    llmClient
+    llmClient,
+    promptSubmissionsDir: env.PROMPT_SUBMISSIONS_DIR
   });
 
   app.use("/api/pipeline", createPipelineRouter(pipelineService));
 } else {
+  serverLogger.warn("Transcript database mode disabled");
   app.get("/api/transcripts/context", (_req, res) => {
     res.status(503).json({
       message: "Transcript DB is disabled. Set TRANSCRIPTS_DB_ENABLED=true to enable /api/transcripts/context."
@@ -97,6 +108,12 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
   app.get("/api/pipeline/dashboard", (_req, res) => {
     res.status(503).json({
       message: "Pipeline DB is disabled. Set TRANSCRIPTS_DB_ENABLED=true to enable /api/pipeline endpoints."
+    });
+  });
+
+  app.get("/api/stats/:segment?", (_req, res) => {
+    res.status(503).json({
+      message: "Stats DB is disabled. Set TRANSCRIPTS_DB_ENABLED=true to enable /api/stats endpoints."
     });
   });
 }

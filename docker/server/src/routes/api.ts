@@ -3,11 +3,13 @@ import { z } from "zod";
 import type { AnalysisService } from "../services/analysisService.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 import type { LlmConnectivityStatus } from "../services/llmClient.js";
+import type { StatsService } from "../services/statsService.js";
 
 export const createApiRouter = (
   analysisService: AnalysisService,
   getLlmConnectivityStatus: () => LlmConnectivityStatus,
-  onIngestionComplete?: () => Promise<void>
+  onIngestionComplete?: () => Promise<void>,
+  getStatsService?: () => StatsService | null
 ): Router => {
   const router = Router();
 
@@ -57,6 +59,55 @@ export const createApiRouter = (
       })) ?? [];
 
     res.json(stats);
+  });
+
+  router.get("/stats/summary", async (_req, res, next) => {
+    try {
+      serverLogger.info("Stats summary requested");
+      const statsService = getStatsService?.();
+      if (!statsService) {
+        res.status(503).json({ message: "Stats DB is disabled. Enable TRANSCRIPTS_DB_ENABLED for database-backed stats." });
+        return;
+      }
+
+      const payload = await statsService.getSummary();
+      res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/stats/days", async (_req, res, next) => {
+    try {
+      serverLogger.info("Daily stats requested");
+      const statsService = getStatsService?.();
+      if (!statsService) {
+        res.status(503).json({ message: "Stats DB is disabled. Enable TRANSCRIPTS_DB_ENABLED for database-backed stats." });
+        return;
+      }
+
+      const payload = await statsService.getStatsByDay();
+      res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/stats/channels/hourly", async (req, res, next) => {
+    try {
+      const query = z.object({ days: z.coerce.number().int().min(1).max(30).optional() }).parse(req.query);
+      serverLogger.info("Hourly channel stats requested", { days: query.days ?? 7 });
+      const statsService = getStatsService?.();
+      if (!statsService) {
+        res.status(503).json({ message: "Stats DB is disabled. Enable TRANSCRIPTS_DB_ENABLED for database-backed stats." });
+        return;
+      }
+
+      const payload = await statsService.getUtterancesPerHourPerChannel(query.days ?? 7);
+      res.json(payload);
+    } catch (error) {
+      next(error);
+    }
   });
 
   router.get("/topics/:topicTitle", (req, res) => {
