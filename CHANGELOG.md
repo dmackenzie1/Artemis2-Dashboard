@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: restore missing dashboard chat typing/logger imports and reintroduce local chat message typing after merge fallout. Intent: Recover the Dashboard UI TypeScript build so operators can reliably load and use mission chat after conflicted merges.
 - feat: persist and surface per-prompt LLM submitted context alongside responses, replace dashboard stat tiles with a plain table, and remove the prompt workflow card grid in favor of an LLM query status table. Intent: Let operators verify exactly what text/context is being sent and returned for mission overview and 24-hour summaries while simplifying dashboard scanability.
 - feat: redesign mission chat into a true chat window with submit/thinking UX and add selectable RAG vs broad-sweep context modes. Intent: Give operators faster, clearer LLM interactions while making large-transcript query behavior explicit and controllable.
 - feat: auto-run ingestion and prompt workflow on backend startup, remove manual ingest UX, and surface prompt readiness placeholders on the dashboard with hour-bucket communication histograms. Intent: Ensure operators see progress immediately without manual rebuild actions while backend-generated mission outputs are still being prepared.
