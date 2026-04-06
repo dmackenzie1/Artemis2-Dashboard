@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: point the Overview "Recent Transcript Review / Latest TalkyBot Window" panel at `daily_summary`, constrain prompt output to the current latest-day section, and fall back to the newest cached day summary when pipeline output is unavailable. Intent: Ensure operators see the actual current daily summary in that panel instead of a rolling recent-changes digest.
 - feat: add dedicated 3 Hour, 6 Hour, and 12 Hour pages that call a new DB-backed time-window API, synthesize rolling-window transcript context with an LLM, and show explicit waiting-state feedback while results are generated. Intent: Let operators request near-now mission snapshots at different time scales with trustworthy database scope and clear in-progress UI status.
 - fix: refactor System Logs page styling to reuse shared timeline/panel primitives, remove redundant bespoke shell styles, and harden log text readability with larger type and stronger surfaces. Intent: Standardize page chrome with the rest of the dashboard while ensuring logs remain readable over mission imagery.
 - fix: darken the outer System Logs page shell background and add a stronger bordered panel treatment so the page no longer reads as transparent over mission imagery. Intent: Address operator feedback that the system logs page background remained too see-through for reliable use.
