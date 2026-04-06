@@ -53,20 +53,6 @@ const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<
 
   await orm.em.getConnection().execute(`
     alter table "prompt_executions"
-    add column if not exists "cache_key" varchar(64);
-  `);
-  await orm.em.getConnection().execute(`
-    update "prompt_executions"
-    set "cache_key" = ''
-    where "cache_key" is null;
-  `);
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
-    alter column "cache_key" set not null;
-  `);
-
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
     add column if not exists "cache_hit" boolean default false;
   `);
   await orm.em.getConnection().execute(`

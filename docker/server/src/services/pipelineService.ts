@@ -63,6 +63,7 @@ const dailySummaryTargetWords = {
 } as const;
 const dailySummaryChunkCharacterLimit = 220_000;
 const notableMomentsPerDay = 10;
+const missionStatsCacheTtlMs = 5 * 60 * 1000;
 
 type SourceContextDocument = {
   path: string;
@@ -98,10 +99,6 @@ export class PipelineService {
     await fs.writeFile(outputPath, submittedText, "utf8");
 
     return outputPath;
-  }
-
-  private createCacheKey(promptContent: string, submittedText: string): string {
-    return crypto.createHash("sha256").update(`${promptContent}\n---\n${submittedText}`).digest("hex");
   }
 
   private createPreview(text: string, maxChars: number, maxLines: number): string {
@@ -609,7 +606,7 @@ export class PipelineService {
       const execution: PromptExecution = em.create(PromptExecution, {
         prompt,
         componentId: prompt.key,
-        cacheKey: this.createCacheKey(prompt.content, missionSubmittedText),
+        cacheKey: "",
         cacheHit: false,
         startedAt,
         finishedAt: null,
@@ -628,35 +625,6 @@ export class PipelineService {
       });
 
       try {
-        const cachedExecution = await em.findOne(
-          PromptExecution,
-          {
-            componentId: prompt.key,
-            cacheKey: execution.cacheKey,
-            status: "success"
-          },
-          { orderBy: { startedAt: "desc" } }
-        );
-
-        if (cachedExecution) {
-          execution.status = "success";
-          execution.cacheHit = true;
-          execution.output = cachedExecution.output;
-          execution.finishedAt = dayjs().utc().toDate();
-          if (prompt.key === "daily_summary") {
-            latestDailySummaryOutput = execution.output;
-          }
-          serverLogger.info("Prompt response served from cache", {
-            promptKey: prompt.key,
-            componentId: execution.componentId,
-            cacheKey: execution.cacheKey,
-            outputLength: execution.output.length,
-            outputPreview: this.createPreview(execution.output, 220, 2)
-          });
-          await em.flush();
-          continue;
-        }
-
         const output =
           prompt.key === "daily_summary"
             ? await this.generateDailySummaryOutput(prompt, sourceContext)
@@ -679,7 +647,6 @@ export class PipelineService {
         serverLogger.info("Prompt response received", {
           promptKey: prompt.key,
           componentId: execution.componentId,
-          cacheKey: execution.cacheKey,
           cacheHit: execution.cacheHit,
           status: execution.status,
           outputLength: output.length,
@@ -693,7 +660,6 @@ export class PipelineService {
         serverLogger.error("Prompt response failed", {
           promptKey: prompt.key,
           componentId: execution.componentId,
-          cacheKey: execution.cacheKey,
           errorMessage: execution.errorMessage
         });
       }
@@ -746,7 +712,7 @@ export class PipelineService {
 
   async getMissionStatsView(): Promise<MissionStatsView> {
     const nowMs = Date.now();
-    if (this.missionStatsCache && nowMs - this.missionStatsCache.computedAtMs < 30_000) {
+    if (this.missionStatsCache && nowMs - this.missionStatsCache.computedAtMs < missionStatsCacheTtlMs) {
       return this.missionStatsCache.payload;
     }
 

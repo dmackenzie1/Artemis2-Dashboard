@@ -1,8 +1,10 @@
 import { EntityManager } from "@mikro-orm/postgresql";
 import { dayjs } from "../lib/dayjs.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
+import { ExpiringCache } from "./expiringCache.js";
 
 type EntityManagerProvider = () => EntityManager;
+const statsCacheTtlMs = 5 * 60 * 1000;
 
 export type MissionStatsSummary = {
   generatedAt: string;
@@ -31,9 +33,19 @@ export type MissionHourlyChannelEntry = {
 };
 
 export class StatsService {
+  private readonly summaryCache = new ExpiringCache<MissionStatsSummary>(statsCacheTtlMs);
+  private readonly dailyCache = new ExpiringCache<MissionStatsByDayEntry[]>(statsCacheTtlMs);
+  private readonly hourlyCache = new ExpiringCache<MissionHourlyChannelEntry[]>(statsCacheTtlMs);
+
   constructor(private readonly getEntityManager: EntityManagerProvider) {}
 
   async getSummary(): Promise<MissionStatsSummary> {
+    const cacheKey = "summary";
+    const cached = this.summaryCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const [summary] = await this.getEntityManager().getConnection().execute<
       {
         minDay: string | null;
@@ -54,7 +66,7 @@ export class StatsService {
       `
     );
 
-    return {
+    const payload: MissionStatsSummary = {
       generatedAt: dayjs().utc().toISOString(),
       days: {
         minDay: summary?.minDay ?? null,
@@ -66,9 +78,18 @@ export class StatsService {
         channels: Number(summary?.channels ?? 0)
       }
     };
+
+    this.summaryCache.set(cacheKey, payload);
+    return payload;
   }
 
   async getStatsByDay(): Promise<MissionStatsByDayEntry[]> {
+    const cacheKey = "days";
+    const cached = this.dailyCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const rows = await this.getEntityManager().getConnection().execute<
       { day: string; utterances: string; words: string; channels: string }[]
     >(
@@ -84,16 +105,25 @@ export class StatsService {
       `
     );
 
-    return rows.map((row) => ({
+    const payload = rows.map((row) => ({
       day: row.day,
       utterances: Number(row.utterances),
       words: Number(row.words),
       channels: Number(row.channels)
     }));
+
+    this.dailyCache.set(cacheKey, payload);
+    return payload;
   }
 
   async getUtterancesPerHourPerChannel(days = 7): Promise<MissionHourlyChannelEntry[]> {
     const safeDays = Math.min(Math.max(days, 1), 30);
+    const cacheKey = `hourly:${safeDays}`;
+    const cached = this.hourlyCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     serverLogger.info("Running hourly channel stats query", { requestedDays: days, safeDays });
     const rows = await this.getEntityManager().getConnection().execute<{ hour: string; channel: string; utterances: string }[]>(
       `
@@ -120,10 +150,13 @@ export class StatsService {
       `
     );
 
-    return rows.map((row) => ({
+    const payload = rows.map((row) => ({
       hour: row.hour,
       channel: row.channel,
       utterances: Number(row.utterances)
     }));
+
+    this.hourlyCache.set(cacheKey, payload);
+    return payload;
   }
 }
