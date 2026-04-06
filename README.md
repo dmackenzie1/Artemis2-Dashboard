@@ -70,6 +70,11 @@ npm run dev:client
 
 Open the Vite URL (typically `http://localhost:5173`).
 
+## Deployment notes
+
+- Local development remains the primary/default workflow for this repository.
+- For EC2 deployment/runbook details (AL2023, package bootstrap script, env variables, Docker Compose startup), see `docs/deployment.md`.
+
 ## Core commands
 
 ```bash
