@@ -7,6 +7,7 @@ Given one day of utterances and a user query:
 4) Include timestamp and channel for each quoted utterance.
 5) End with a 2-4 bullet day summary of what this day contributes to the query.
 
-Format your response as Markdown with sections:
-- "## Relevant Utterances"
-- "## Day Takeaways"
+Format your response as valid HTML fragments with sections:
+- "<h3>Relevant Utterances</h3>"
+- "<h3>Day Takeaways</h3>"
+Use <ul>/<li> for bullets and <p> for paragraphs. Do not use Markdown.
