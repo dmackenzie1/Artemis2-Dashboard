@@ -287,11 +287,15 @@ export class LlmClient {
     }
 
     try {
-      await this.generateText({
-        systemPrompt: "You are a connectivity check.",
-        userPrompt: 'Reply with exactly "ok".',
-        componentId: "system/connectivity-check"
+      const response = await fetch(this.apiUrl, {
+        method: "OPTIONS",
+        headers: {
+          ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}`, "x-api-key": this.apiKey } : {})
+        }
       });
+      if (!response.ok) {
+        throw new Error(`Connectivity probe failed: ${response.status} ${response.statusText}`);
+      }
 
       return {
         connected: true,

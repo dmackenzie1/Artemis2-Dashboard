@@ -48,7 +48,7 @@ export class StatsService {
           min(date(timestamp at time zone 'utc'))::text as "minDay",
           max(date(timestamp at time zone 'utc'))::text as "maxDay",
           count(*)::text as "utterances",
-          coalesce(sum(array_length(regexp_split_to_array(trim(text), E'\\s+'), 1)), 0)::text as "words",
+          coalesce(sum(word_count), 0)::text as "words",
           count(distinct nullif(trim(channel), ''))::text as "channels"
         from transcript_utterances
       `
@@ -76,7 +76,7 @@ export class StatsService {
         select
           date(timestamp at time zone 'utc')::text as "day",
           count(*)::text as "utterances",
-          coalesce(sum(array_length(regexp_split_to_array(trim(text), E'\\s+'), 1)), 0)::text as "words",
+          coalesce(sum(word_count), 0)::text as "words",
           count(distinct nullif(trim(channel), ''))::text as "channels"
         from transcript_utterances
         group by 1

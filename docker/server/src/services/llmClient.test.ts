@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -143,6 +143,31 @@ describe("LlmClient.generateText", () => {
     } finally {
       global.fetch = originalFetch;
       await rm(debugDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("LlmClient.checkConnectivity", () => {
+  it("uses a transport-level OPTIONS probe instead of generating model output", async () => {
+    const originalFetch = global.fetch;
+    const mockFetch = vi.fn(async () => new Response(null, { status: 204 }));
+
+    try {
+      global.fetch = mockFetch;
+      const client = new LlmClient("https://example.test/v1/chat/completions", "test-key", "model-test");
+
+      const connectivity = await client.checkConnectivity();
+
+      expect(connectivity.connected).toBe(true);
+      expect(mockFetch).toHaveBeenCalledWith("https://example.test/v1/chat/completions", {
+        method: "OPTIONS",
+        headers: {
+          Authorization: "Bearer test-key",
+          "x-api-key": "test-key"
+        }
+      });
+    } finally {
+      global.fetch = originalFetch;
     }
   });
 });
