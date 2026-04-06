@@ -20,7 +20,10 @@ export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ hist
     .sort((a, b) => a.hour.localeCompare(b.hour));
 
   const maxUtterances = Math.max(...hourlyTotals.map((entry) => entry.utterances), 0);
-  const yAxisTicks = [1, 0.75, 0.5, 0.25, 0].map((ratio) => Number((maxUtterances * ratio).toFixed(2)));
+  const yAxisTicks = [1, 0.75, 0.5, 0.25, 0].map((ratio, index) => ({
+    id: `tick-${index}`,
+    value: Math.round(maxUtterances * ratio)
+  }));
   const xTickInterval = hourlyTotals.length > 96 ? 12 : 6;
   const xAxisTicks = hourlyTotals
     .map((entry, index) => ({ ...entry, index }))
@@ -39,8 +42,8 @@ export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ hist
       <div className={styles["timeline-chart-shell"]}>
         <div className={styles["timeline-y-axis"]} aria-hidden>
           {yAxisTicks.map((tick) => (
-            <span key={tick} className={styles["timeline-y-tick-label"]}>
-              {tick}
+            <span key={tick.id} className={styles["timeline-y-tick-label"]}>
+              {tick.value.toLocaleString()}
             </span>
           ))}
         </div>
