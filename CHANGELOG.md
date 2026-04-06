@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: darken and solidify System Logs containers/items/textbox surfaces so entries stay legible without hover against the Earth background imagery. Intent: Address operator visibility issues where log text and cards appeared too transparent for reliable scanning.
 - feat: restyle the Notable Moments page with larger quote emphasis, day-divider headers, and a 3-up staggered card layout that feels more like a curated wall of highlights than rigid side-by-side tiles. Intent: Address operator feedback to make top utterances easier to scan while preserving day-based organization.
 - fix: remove redundant hourly timeline cards, rename highlight language to notable milestones, and include richer utterance reference metadata (id/time/source file) on Timeline entries. Intent: Focus the timeline page on high-signal moments with clearer provenance while eliminating duplicate hourly labeling noise.
 - fix: restore frontend chat API mode typing/defaults, add notable-moments fetch error logging, and align top-level setup docs with EMSS `make-dotenv` + `appcompose` workflows. Intent: Eliminate current TypeScript/test breakage while reducing silent client failures and keeping operator setup instructions accurate.
