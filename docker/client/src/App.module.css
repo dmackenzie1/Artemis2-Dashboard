@@ -103,6 +103,13 @@
   justify-self: auto;
 }
 
+.reconnect-button {
+  letter-spacing: 0.08em;
+  padding: 0.34rem 0.72rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+}
+
 @media (max-width: 920px) {
   .topbar {
     flex-direction: column;

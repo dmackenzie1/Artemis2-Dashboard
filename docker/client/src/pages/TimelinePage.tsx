@@ -209,7 +209,6 @@ export const TimelinePage: FC = () => {
   const [notableUtterances, setNotableUtterances] = useState<NotableUtterancesResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [highlightsOnly, setHighlightsOnly] = useState(false);
   const timelineRootRef = useRef<HTMLDivElement | null>(null);
   const { componentId, componentUid } = useComponentIdentity("timeline-page");
 
@@ -255,21 +254,7 @@ export const TimelinePage: FC = () => {
 
   const allItems = useMemo(() => buildTimelineItems(timelineDays, notableUtterances), [timelineDays, notableUtterances]);
 
-  const visibleItems = useMemo(
-    () =>
-      allItems.filter((item) => {
-        if (!highlightsOnly) {
-          return true;
-        }
-
-        if (item.type === "day-divider" || item.type === "time-marker") {
-          return true;
-        }
-
-        return item.type === "notable-event" || item.type === "utterance";
-      }),
-    [allItems, highlightsOnly]
-  );
+  const visibleItems = useMemo(() => allItems, [allItems]);
 
   const missionRangeLabel = useMemo(() => {
     if (timelineDays.length === 0) {
@@ -299,9 +284,6 @@ export const TimelinePage: FC = () => {
       </header>
 
       <section className={sharedStyles["timeline-controls"]}>
-        <button type="button" className={sharedStyles["timeline-control-button"]} onClick={() => setHighlightsOnly((value) => !value)}>
-          {highlightsOnly ? "Show Full Timeline" : "Notable Milestones Only"}
-        </button>
         <button type="button" className={sharedStyles["timeline-control-button"]} onClick={scrollToLatest}>
           Jump to Latest
         </button>
