@@ -7,6 +7,7 @@ import { ingestCsvDirectory } from "../lib/csvIngest.js";
 import { getPrompt } from "../lib/prompts.js";
 import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
+import { retrieveRankedUtterances } from "./transcriptRetrievalService.js";
 
 const { groupBy, uniq } = lodash;
 
@@ -284,66 +285,102 @@ export class AnalysisService {
       .slice(0, Math.min(Math.max(limit, 1), 50));
   }
 
+  searchUtterances(query: string, limit = 8): {
+    query: string;
+    queryTokens: string[];
+    totalUtterances: number;
+    resultCount: number;
+    utterances: ReturnType<typeof retrieveRankedUtterances>["ranked"];
+  } {
+    const retrieval = retrieveRankedUtterances(query, this.utterances, limit);
+
+    return {
+      query,
+      queryTokens: retrieval.queryTokens,
+      totalUtterances: this.utterances.length,
+      resultCount: retrieval.ranked.length,
+      utterances: retrieval.ranked
+    };
+  }
+
   async chat(
-    query: string
+    query: string,
+    mode: "rag" | "all" = "all"
   ): Promise<{
     answer: string;
-    evidence: TranscriptUtterance[];
-    strategy: { mode: "multi-day"; totalUtterances: number; contextUtterances: number; daysQueried: number };
+    evidence: Array<{
+      timestamp: string;
+      day: string;
+      channel: string;
+      text: string;
+      filename: string;
+      source: string;
+      score: number;
+    }>;
+    strategy: { mode: "rag" | "all"; totalUtterances: number; contextUtterances: number; daysQueried: number };
   }> {
     serverLogger.info("Chat prompt requested", {
-      queryLength: query.length
+      queryLength: query.length,
+      mode
     });
-    const utterancesByDay = groupBy(this.utterances, (item) => item.day);
-    const sortedDays = Object.keys(utterancesByDay).sort();
-    const dayQueryPrompt = await getPrompt(this.config.promptsDir, "query_console_day_extract.txt");
-    const aggregatePrompt = await getPrompt(this.config.promptsDir, "query_console_aggregate.txt");
-    const dayResults: Array<{ day: string; result: string; utteranceCount: number }> = [];
 
-    for (const day of sortedDays) {
-      const dayUtterances = utterancesByDay[day];
-      const dayResult = await this.config.llmClient.generateText({
-        systemPrompt: dayQueryPrompt,
-        userPrompt: JSON.stringify({
-          query,
-          day,
-          utteranceCount: dayUtterances.length,
-          utterances: dayUtterances
-        }),
-        componentId: `analysis/query-console/day/${day}`
-      });
-
-      dayResults.push({
-        day,
-        result: dayResult,
-        utteranceCount: dayUtterances.length
-      });
+    const totalUtterances = this.utterances.length;
+    if (totalUtterances === 0) {
+      return {
+        answer: "No transcript evidence is currently loaded. Please run ingestion before querying chat.",
+        evidence: [],
+        strategy: { mode, totalUtterances: 0, contextUtterances: 0, daysQueried: 0 }
+      };
     }
 
+    const ragRetrieval = retrieveRankedUtterances(query, this.utterances, 10);
+    const allContext = this.utterances.slice(-120).map((entry) => ({
+      timestamp: entry.timestamp,
+      day: entry.day,
+      channel: entry.channel,
+      text: entry.text,
+      filename: entry.filename,
+      source: entry.sourceFile,
+      score: 0
+    }));
+
+    const evidence = mode === "rag" ? ragRetrieval.ranked : allContext;
+    const evidenceForPrompt = evidence.slice(0, mode === "rag" ? 8 : 40);
+
+    const chatSystemPrompt = `You are an Artemis transcript analyst.
+Use only provided evidence.
+Cite timestamp and channel where possible.
+If evidence is weak or missing, say you are uncertain and describe what is missing.`;
     const answer = await this.config.llmClient.generateText({
-      systemPrompt: aggregatePrompt,
+      systemPrompt: chatSystemPrompt,
       userPrompt: JSON.stringify({
+        mode,
         query,
-        totalUtterances: this.utterances.length,
-        dayResults
+        queryTokens: ragRetrieval.queryTokens,
+        evidence: evidenceForPrompt
       }),
-      componentId: "analysis/query-console/aggregate"
+      componentId: `analysis/chat/${mode}`
     });
 
+    const daysQueried = new Set(evidenceForPrompt.map((entry) => entry.day)).size;
+
     serverLogger.info("Chat prompt received", {
-      daysQueried: sortedDays.length,
-      evidenceCount: this.utterances.length
+      mode,
+      totalUtterances,
+      contextUtterances: evidenceForPrompt.length,
+      daysQueried
     });
 
     return {
       answer,
-      evidence: this.utterances,
+      evidence: evidenceForPrompt,
       strategy: {
-        mode: "multi-day",
-        totalUtterances: this.utterances.length,
-        contextUtterances: this.utterances.length,
-        daysQueried: sortedDays.length
+        mode,
+        totalUtterances,
+        contextUtterances: evidenceForPrompt.length,
+        daysQueried
       }
     };
   }
+
 }

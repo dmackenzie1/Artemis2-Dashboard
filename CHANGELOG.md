@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+- fix: align Signal Chat evidence rendering to the dedicated ranked `/api/search/utterances` payload and tighten chat strategy typing to `rag|all` across client contracts. Intent: Ensure the new chat page always displays server-ranked evidence and avoid stale mode assumptions in frontend state.
+- feat: add a new Signal Chat route/page with server-side tokenizer-backed utterance retrieval, ranked evidence APIs, and mode-aware chat synthesis while leaving Overview Query Console interactions intact. Intent: Deliver a dedicated transcript RAG workspace without regressing the existing overview mission workflow.
 - feat: move the rolling transcript window to the top-left Overview pane with 3h/6h/12h/24h DB-backed controls, shift Mission Review Summary to the middle row, and add a per-day utterances/words metrics table. Intent: Prioritize what is new right now for operators while preserving quick day-level volume verification in one scan.
 - fix: remove the TalkieRAG page/route, simplify Timeline controls by dropping notable-only filtering, improve low-contrast shared typography, add an explicit topbar LLM reconnect action, and retune analyst prompt persona text away from "TalkyBot analysis" phrasing. Intent: Reduce operator confusion, restore readability of faded UI copy, and provide a direct recovery path when model connectivity drops.
 - fix: point the Overview "Recent Transcript Review / Latest TalkyBot Window" panel at `daily_summary`, constrain prompt output to the current latest-day section, and fall back to the newest cached day summary when pipeline output is unavailable. Intent: Ensure operators see the actual current daily summary in that panel instead of a rolling recent-changes digest.

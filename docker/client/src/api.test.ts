@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chat, fetchDashboard, fetchHealth, fetchStatsSummary, triggerIngest } from "./api";
+import { chat, fetchDashboard, fetchHealth, fetchStatsSummary, searchUtterances, triggerIngest } from "./api";
 
 const mockFetch = vi.fn<typeof fetch>();
 
@@ -32,7 +32,7 @@ describe("api helpers", () => {
     const payload = {
       answer: "ok",
       evidence: [],
-      strategy: { mode: "multi-day", totalUtterances: 50, contextUtterances: 50, daysQueried: 5 }
+      strategy: { mode: "all", totalUtterances: 50, contextUtterances: 50, daysQueried: 5 }
     };
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => payload } as Response);
 
@@ -40,7 +40,7 @@ describe("api helpers", () => {
     expect(mockFetch).toHaveBeenCalledWith("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: "status", mode: "rag" })
+      body: JSON.stringify({ query: "status", mode: "all" })
     });
   });
 
@@ -58,6 +58,31 @@ describe("api helpers", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: "status", mode: "all" })
     });
+  });
+
+
+  it("loads ranked utterance search payload", async () => {
+    const payload = {
+      query: "status",
+      queryTokens: ["status"],
+      totalUtterances: 25,
+      resultCount: 1,
+      utterances: [
+        {
+          timestamp: "2026-04-06T00:00:00Z",
+          day: "2026-04-06",
+          channel: "FLIGHT",
+          text: "status update",
+          filename: "day6.csv",
+          source: "day6.csv",
+          score: 0.9
+        }
+      ]
+    };
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => payload } as Response);
+
+    await expect(searchUtterances("status", 5)).resolves.toEqual(payload);
+    expect(mockFetch).toHaveBeenCalledWith("/api/search/utterances?q=status&limit=5");
   });
 
   it("loads health payload", async () => {
