@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: remove stale `ChatMode` typing from the frontend chat API helper signature so client TypeScript builds no longer fail after merge refactors to single-mode chat strategy handling. Intent: Unblock Docker/frontend production builds by aligning client API typings with the current server chat contract and dashboard call sites.
 - feat: add a dedicated System Logs route/page with refreshable prompt artifact listing and click-to-open file viewer backed by a standalone server-side system logs service/router. Intent: Let operators audit exact prompt submissions and model request/response artifacts without digging through container files.
 - feat: rename the dashboard search surface to Query Console, remove context-mode controls/empty-state helper text, move Ready/Working status control to the panel header, and switch backend query handling to a day-by-day extraction pass followed by aggregate synthesis prompts. Intent: Match operator-requested query UX simplification while enabling whole-window transcript coverage before final answer summarization.
 - fix: close the broken Timeline mobile media-query block in `styles.module.css` and add LLM transport-level fallback handling so startup ingestion does not fail hard when upstream fetch calls are temporarily unreachable. Intent: Restore successful frontend production builds and keep backend startup resilient during transient LLM gateway/network outages.
