@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: add `?admin=true` gated refresh controls that let admins trigger an immediate pipeline rerun and force-refresh dashboard queries, with failed-widget retry guidance during polling gaps. Intent: Give operators a fast recovery path when prompt-backed panels fail or time out instead of waiting for the next scheduled cycle.
 - fix: retune mission, daily, and last-24-hours prompt templates to request 500-1,000 word high-signal summaries with explicit timeline callouts, anomalies, open watch terms, and best utterances guidance. Intent: Align generated mission intelligence output with operator workflow expectations for both executive synthesis and high-fidelity daily review.
 - feat: reframe the dashboard as TalkyBot transcript review with retrospective prompt guidance, add direct TalkyBot links, and include a dated daily utterances/words snapshot chart in the metrics panel. Intent: Align operator-facing terminology and analysis behavior with delayed post-mission transcript review workflows instead of real-time mission intelligence usage.
 - fix: collapse the app shell to a single mission background image layer by removing extra gradient/scanline pseudo-element overlays. Intent: Resolve follow-up feedback that dashboard still appeared to stack multiple background images and keep visual treatment consistent across overview, daily, and timeline routes.
