@@ -35,12 +35,20 @@ export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
       footer={<small className={styles.subtle}>{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>}
     >
       {rows.length === 0 ? (
-        <PaneStateMessage message="Building daily snapshot…" tone="loading" />
+        <>
+          <PaneStateMessage message="Building daily snapshot…" tone="loading" />
+          <div className={styles["summary-skeleton-grid"]} aria-hidden="true">
+            <div className={styles["skeleton-row"]} />
+            <div className={styles["skeleton-row"]} />
+            <div className={styles["skeleton-row"]} />
+          </div>
+        </>
       ) : (
         <div className={styles["summary-feed"]} role="list">
           {rows.map((row, index) => (
             <p key={`${row}-${index}`} role="listitem" className={styles["summary-row"]}>
-              {row}
+              <span className={styles["summary-row-index"]}>{String(index + 1).padStart(2, "0")}</span>
+              <span>{row}</span>
             </p>
           ))}
         </div>
