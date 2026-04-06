@@ -25,6 +25,7 @@ export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ hist
   const xAxisTicks = hourlyTotals
     .map((entry, index) => ({ ...entry, index }))
     .filter(({ index }) => index === 0 || index === hourlyTotals.length - 1 || index % xTickInterval === 0);
+  const labelIndexes = new Set(xAxisTicks.map((tick) => tick.index));
 
   return (
     <DashboardPanel
@@ -78,9 +79,9 @@ export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ hist
           </div>
         </div>
       </div>
-      {histogram.length > 0 ? (
+      {hourlyTotals.length > 0 ? (
         <div className={styles["timeline-axis"]} aria-hidden="true">
-          {histogram.map((entry, index) => {
+          {hourlyTotals.map((entry, index) => {
             const hourSegment = entry.hour.includes("T") ? entry.hour.split("T")[1] : entry.hour.split(" ")[1];
             const hourLabel = hourSegment?.slice(0, 2) ?? entry.hour.slice(-2);
             const label = `${hourLabel}:00`;
