@@ -118,6 +118,26 @@ export type ChatResponse = {
   };
 };
 
+
+export type SystemLogEntry = {
+  id: string;
+  category: "prompt-submission" | "prompt-outgoing" | "prompt-incoming";
+  fileName: string;
+  relativePath: string;
+  sizeBytes: number;
+  modifiedAt: string;
+};
+
+export type SystemLogListResponse = {
+  generatedAt: string;
+  logs: SystemLogEntry[];
+};
+
+export type SystemLogFileResponse = {
+  entry: SystemLogEntry;
+  content: string;
+};
+
 export type TriggerPipelineRunResponse = {
   accepted: boolean;
   status: "already-running" | "started";
@@ -258,6 +278,26 @@ export const fetchNotableMoments = async (): Promise<NotableMomentsData | null> 
   }
 
   return (await response.json()) as NotableMomentsData;
+};
+
+
+
+export const fetchSystemLogs = async (): Promise<SystemLogListResponse> => {
+  const response = await fetch(`${base}/system-logs`);
+  if (!response.ok) {
+    throw new Error("Unable to load system logs");
+  }
+
+  return (await response.json()) as SystemLogListResponse;
+};
+
+export const fetchSystemLogFile = async (id: string): Promise<SystemLogFileResponse> => {
+  const response = await fetch(`${base}/system-logs/${encodeURIComponent(id)}`);
+  if (!response.ok) {
+    throw new Error("Unable to load system log file");
+  }
+
+  return (await response.json()) as SystemLogFileResponse;
 };
 
 export const chat = async (query: string, mode: ChatMode = "rag"): Promise<ChatResponse> => {

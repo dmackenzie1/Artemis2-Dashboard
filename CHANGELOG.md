@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: add a dedicated System Logs route/page with refreshable prompt artifact listing and click-to-open file viewer backed by a standalone server-side system logs service/router. Intent: Let operators audit exact prompt submissions and model request/response artifacts without digging through container files.
 - feat: rebuild the Timeline route into a vertically scrollable Artemis II chronology with central spine layout, day dividers, 6-hour markers, alternating mission cards, notable utterance highlights, and resilient loading/empty/error UI states. Intent: Give operators a long-form, high-signal mission history view that is easier to scan by day/time while preserving existing API routes.
 - feat: persist Postgres data in a named Docker volume, split LLM debug payload artifacts into host-mounted `.local/query-set` and `.local/query-receive` directories, and document production-readiness follow-ups for migrations/secrets/debug retention. Intent: Support production-style durability and operator-accessible prompt trace artifacts while clarifying remaining hardening steps before deployment.
 - feat: add `?admin=true` gated refresh controls that let admins trigger an immediate pipeline rerun and force-refresh dashboard queries, with failed-widget retry guidance during polling gaps. Intent: Give operators a fast recovery path when prompt-backed panels fail or time out instead of waiting for the next scheduled cycle.

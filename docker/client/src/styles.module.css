@@ -1324,6 +1324,8 @@ pre {
     margin-left: 20px;
     justify-self: start;
   }
+}
+
 .notable-moment-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1358,4 +1360,90 @@ pre {
   font-size: 0.66rem;
   color: var(--text-secondary);
   letter-spacing: 0.04em;
+}
+
+.system-logs-page {
+  display: grid;
+  gap: 0.8rem;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0.6rem 0.3rem 2rem;
+}
+
+.system-logs-controls {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.system-logs-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.7fr) minmax(0, 1.3fr);
+  gap: 0.7rem;
+}
+
+.system-logs-list,
+.system-logs-viewer {
+  border: 1px solid rgba(129, 198, 255, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(8, 19, 37, 0.68), rgba(5, 13, 27, 0.52));
+  box-shadow: inset 0 1px 0 rgba(140, 210, 255, 0.15), 0 0 24px rgba(50, 140, 220, 0.14);
+  padding: 0.7rem;
+}
+
+.system-logs-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0;
+  display: grid;
+  gap: 0.35rem;
+  max-height: 560px;
+  overflow: auto;
+}
+
+.system-logs-item {
+  width: 100%;
+  justify-self: stretch;
+  display: grid;
+  gap: 0.18rem;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+  border-radius: 10px;
+  border-color: rgba(131, 200, 255, 0.24);
+  background: rgba(12, 28, 52, 0.72);
+}
+
+.system-logs-item strong {
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.7rem;
+}
+
+.system-logs-item small {
+  color: var(--text-secondary);
+  font-size: 0.64rem;
+}
+
+.system-logs-item-selected {
+  border-color: rgba(154, 219, 255, 0.56);
+  box-shadow: 0 0 16px rgba(97, 194, 255, 0.26);
+}
+
+.system-logs-textbox {
+  width: 100%;
+  min-height: 620px;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  white-space: pre;
+}
+
+@media (max-width: 980px) {
+  .system-logs-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .system-logs-textbox {
+    min-height: 420px;
+  }
 }

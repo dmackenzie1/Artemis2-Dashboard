@@ -13,6 +13,8 @@ import { createPipelineRouter } from "./routes/pipeline.js";
 import { serializeUnknownError, serverLogger } from "./utils/logging/serverLogger.js";
 import { StatsService } from "./services/statsService.js";
 import { ingestTranscriptCsvDirectory } from "./services/transcriptIngestionService.js";
+import { SystemLogsService } from "./services/systemLogsService.js";
+import { createSystemLogsRouter } from "./routes/systemLogs.js";
 
 const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
   await orm.em.getConnection().execute(`
@@ -94,6 +96,10 @@ const analysisService = new AnalysisService({
   cacheFile: env.CACHE_FILE,
   llmClient
 });
+const systemLogsService = new SystemLogsService({
+  promptSubmissionsDir: env.PROMPT_SUBMISSIONS_DIR,
+  llmDebugPromptsDir: env.LLM_DEBUG_PROMPTS_DIR
+});
 
 await analysisService.loadFromDisk();
 let pipelineService: PipelineService | null = null;
@@ -115,6 +121,8 @@ const startPipelineSchedule = (): void => {
     });
   }, intervalMs);
 };
+
+app.use("/api/system-logs", createSystemLogsRouter(systemLogsService));
 
 app.use(
   "/api",
