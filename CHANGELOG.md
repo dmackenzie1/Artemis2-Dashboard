@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 - fix: keep the Overview Query Console Search action visible without scrolling, reduce query input height, and shift transcript-analysis prompt/output instructions to HTML-first rendering across chat and summary surfaces. Intent: Ensure operators can submit queries immediately in empty states while getting consistently formatted HTML responses instead of markdown-like text.
+- fix: refine disconnected-state recovery UX by showing reconnect progress phases (checking/reconnecting) and explicit "pipeline running" feedback when a run is already in flight. Intent: Help operators distinguish connectivity failures from active backend work so repeated reconnect clicks are less likely.
 - fix: render Signal Chat answers with shared structured HTML formatting instead of a plain markdown-like text block. Intent: Ensure LLM response content displays as readable headings/lists/paragraphs in the chat window UI.
 - fix: remove topbar 3-hour/6-hour/12-hour navigation, fold histogram hour-count coverage into Transcript Metrics, and strengthen Timeline/Chat/System Logs header contrast while trimming redundant histogram footer copy. Intent: Reduce duplicate window controls and improve readability where operators reported page headings and timeline chrome were too faded.
 - feat: enable local nginx TLS termination by mounting generated dev certificates, exposing HTTPS on port 8443, and redirecting HTTP traffic to the secure endpoint. Intent: Let operators validate dashboard behavior over HTTPS in Docker using the repo-provided local certificate script.
