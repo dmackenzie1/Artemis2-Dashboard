@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- docs: add an EC2 deployment runbook with AL2023 bootstrap script, environment-variable template, and local-first positioning linked from the top-level README. Intent: Preserve local development as the default while giving operators a repeatable production-host setup path for `a2.emss-mess.org`.
 - fix: align Signal Chat evidence rendering to the dedicated ranked `/api/search/utterances` payload and tighten chat strategy typing to `rag|all` across client contracts. Intent: Ensure the new chat page always displays server-ranked evidence and avoid stale mode assumptions in frontend state.
 - feat: add a new Signal Chat route/page with server-side tokenizer-backed utterance retrieval, ranked evidence APIs, and mode-aware chat synthesis while leaving Overview Query Console interactions intact. Intent: Deliver a dedicated transcript RAG workspace without regressing the existing overview mission workflow.
 - feat: add backend filesystem-triggered auto-ingestion for dropped/replaced source files with debounce and single-flight queueing, reusing existing transcript refresh and prompt pipeline execution paths. Intent: Let operators update input files in a running instance and have processing kick off automatically without manual endpoint calls.
