@@ -89,7 +89,7 @@ export const DashboardPage: FunctionComponent = () => {
     <div className={styles["dashboard-layout"]} data-component-id={componentId} data-component-uid={componentUid}>
       <section className={styles["dashboard-top-row"]} data-component-id="dashboard-top-row" data-component-uid={`${componentUid}-top`}>
         <RecentWindowPanel />
-        <StatsPanel stats={viewModel.stats} dailyTranscriptVolume={viewModel.dailyTranscriptVolume} />
+        <StatsPanel stats={viewModel.stats} timelineHours={hourlyHistogram.length} dailyTranscriptVolume={viewModel.dailyTranscriptVolume} />
       </section>
 
       <section className={styles["dashboard-mid-row"]} data-component-id="dashboard-mid-row" data-component-uid={`${componentUid}-mid`}>

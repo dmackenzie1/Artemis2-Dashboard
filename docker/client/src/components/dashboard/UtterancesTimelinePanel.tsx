@@ -1,6 +1,5 @@
 import type { FC } from "react";
 import type { MissionHourlyChannelEntry } from "../../api";
-import sharedStyles from "../../styles/shared.module.css";
 import styles from "./UtterancesTimelinePanel.module.css";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
@@ -35,9 +34,8 @@ export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ hist
       componentId="utterances-timeline-panel"
       className={styles["timeline-strip-panel"]}
       kicker="Transcript Timeline"
-      title="Hourly Transcript Activity"
+      title="Transcript Activity"
       headerAccessory={<StatusBadge label={hourlyTotals.length > 0 ? "ready" : "loading"} />}
-      footer={<small className={sharedStyles.subtle}>Coverage: {hourlyTotals.length} hourly buckets.</small>}
     >
       {hourlyTotals.length === 0 ? <PaneStateMessage message="Updating mission histogram…" tone="loading" /> : null}
       <div className={styles["timeline-chart-shell"]}>
