@@ -400,14 +400,22 @@ main {
   width: 100%;
   margin-top: 0.08rem;
   border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.stats-label-col {
+  width: 62%;
+}
+
+.stats-value-col {
+  width: 13ch;
 }
 
 .stats-table th,
 .stats-table td {
   text-align: left;
   font-size: 0.74rem;
-  padding: 0.42rem 0.12rem;
-  border-bottom: 1px solid rgba(140, 190, 240, 0.1);
+  padding: 0.36rem 0.12rem;
 }
 
 .stats-table th {
@@ -420,6 +428,9 @@ main {
   color: var(--text-primary);
   font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
   letter-spacing: 0.02em;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .timeline-strip-panel {
