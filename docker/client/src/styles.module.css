@@ -226,6 +226,30 @@ main {
   gap: 0.58rem;
 }
 
+.daily-day-nav {
+  position: sticky;
+  top: 3.9rem;
+  z-index: 12;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid rgba(130, 200, 255, 0.18);
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(7, 17, 32, 0.84), rgba(9, 22, 43, 0.72));
+  backdrop-filter: blur(8px);
+}
+
+.daily-day-nav-button {
+  justify-self: auto;
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .panel {
   position: relative;
   display: flex;
