@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { watch } from "node:fs";
 import { RequestContext } from "@mikro-orm/core";
 import { EntityManager, MikroORM } from "@mikro-orm/postgresql";
 import { env } from "./env.config.js";
@@ -108,6 +109,97 @@ let statsService: StatsService | null = null;
 let transcriptOrm: MikroORM | null = null;
 let pipelineIntervalStarted = false;
 let timeWindowSummaryService: TimeWindowSummaryService | null = null;
+const AUTO_INGEST_DEBOUNCE_MS = 3_000;
+let autoIngestTimer: NodeJS.Timeout | null = null;
+let autoIngestInProgress = false;
+let autoIngestQueued = false;
+let autoIngestLastReason = "startup";
+let autoIngestLastPath: string | null = null;
+const watchTargets = Array.from(new Set([env.DATA_DIR, env.SOURCE_FILES_DIR]));
+
+const runTranscriptAndPipelineRefresh = async (): Promise<void> => {
+  const em = transcriptOrm?.em.fork();
+  if (em) {
+    const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
+    serverLogger.info("Manual transcript ingestion completed", transcriptIngestion);
+  }
+
+  const currentPipelineService = pipelineService;
+  if (currentPipelineService) {
+    await currentPipelineService.runPipelineCycle();
+    serverLogger.info("Prompt workflow completed after ingestion");
+  }
+};
+
+const runAutoIngestion = async (): Promise<void> => {
+  if (autoIngestInProgress) {
+    autoIngestQueued = true;
+    return;
+  }
+
+  autoIngestInProgress = true;
+  const reason = autoIngestLastReason;
+  const sourcePath = autoIngestLastPath;
+
+  try {
+    serverLogger.info("Auto-ingestion triggered by filesystem change", {
+      reason,
+      sourcePath
+    });
+    const dashboard = await analysisService.ingestAndAnalyze();
+    await runTranscriptAndPipelineRefresh();
+    serverLogger.info("Auto-ingestion completed", {
+      reason,
+      sourcePath,
+      generatedAt: dashboard.generatedAt,
+      totalDays: dashboard.days.length
+    });
+  } catch (error) {
+    serverLogger.error("Auto-ingestion failed", {
+      reason,
+      sourcePath,
+      error: serializeUnknownError(error)
+    });
+  } finally {
+    autoIngestInProgress = false;
+    if (autoIngestQueued) {
+      autoIngestQueued = false;
+      void runAutoIngestion();
+    }
+  }
+};
+
+const scheduleAutoIngestion = (reason: string, sourcePath: string | null): void => {
+  autoIngestLastReason = reason;
+  autoIngestLastPath = sourcePath;
+
+  if (autoIngestTimer) {
+    clearTimeout(autoIngestTimer);
+  }
+
+  autoIngestTimer = setTimeout(() => {
+    autoIngestTimer = null;
+    void runAutoIngestion();
+  }, AUTO_INGEST_DEBOUNCE_MS);
+};
+
+const startFilesystemIngestionWatchers = (): void => {
+  for (const watchTarget of watchTargets) {
+    try {
+      watch(watchTarget, { persistent: false }, (eventType, fileName) => {
+        const changedPath = fileName ? `${watchTarget}/${fileName.toString()}` : watchTarget;
+        scheduleAutoIngestion(`fs:${eventType}`, changedPath);
+      });
+      serverLogger.info("Enabled filesystem watcher for auto-ingestion", { watchTarget });
+    } catch (error) {
+      serverLogger.warn("Failed to start filesystem watcher for auto-ingestion", {
+        watchTarget,
+        error: serializeUnknownError(error)
+      });
+    }
+  }
+};
+
 const startPipelineSchedule = (): void => {
   if (!pipelineService || !env.PIPELINE_AUTO_RUN || pipelineIntervalStarted) {
     return;
@@ -129,17 +221,7 @@ app.use("/api/system-logs", createSystemLogsRouter(systemLogsService));
 app.use(
   "/api",
   createApiRouter(analysisService, () => llmConnectivityStatus, async () => {
-    const em = transcriptOrm?.em.fork();
-    if (em) {
-      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
-      serverLogger.info("Manual transcript ingestion completed", transcriptIngestion);
-    }
-
-    const currentPipelineService = pipelineService;
-    if (currentPipelineService) {
-      await currentPipelineService.runPipelineCycle();
-      serverLogger.info("Prompt workflow completed after ingestion");
-    }
+    await runTranscriptAndPipelineRefresh();
   }, () => statsService, () => timeWindowSummaryService)
 );
 
@@ -230,6 +312,7 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
 app.listen(env.PORT, () => {
   void (async () => {
     await runStartupIngestion();
+    startFilesystemIngestionWatchers();
     serverLogger.info("Backend is ready", { port: env.PORT });
   })();
 });
