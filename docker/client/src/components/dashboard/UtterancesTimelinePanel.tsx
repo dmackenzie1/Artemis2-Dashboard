@@ -11,6 +11,7 @@ type UtterancesTimelinePanelProps = {
 
 export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ histogram }) => {
   const maxUtterances = Math.max(...histogram.map((entry) => entry.utterances), 1);
+  const labelIndexes = histogram.length > 0 ? new Set([0, Math.floor(histogram.length / 3), Math.floor((histogram.length * 2) / 3), histogram.length - 1]) : new Set<number>();
 
   return (
     <DashboardPanel
@@ -37,6 +38,22 @@ export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ hist
           );
         })}
       </div>
+      {histogram.length > 0 ? (
+        <div className={styles["timeline-axis"]} aria-hidden="true">
+          {histogram.map((entry, index) => {
+            const hourSegment = entry.hour.includes("T") ? entry.hour.split("T")[1] : entry.hour.split(" ")[1];
+            const hourLabel = hourSegment?.slice(0, 2) ?? entry.hour.slice(-2);
+            const label = `${hourLabel}:00`;
+            const shouldShow = labelIndexes.has(index);
+
+            return (
+              <span key={`${entry.hour}-axis`} className={styles["timeline-axis-label"]}>
+                {shouldShow ? label : ""}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
     </DashboardPanel>
   );
 };
