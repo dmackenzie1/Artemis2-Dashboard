@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: greatly expand Mission Timeline density by adding summary-derived highlight cards, more per-day milestones, notable-moment quote entries, and broader notable-utterance coverage windows. Intent: Ensure operators see substantially more mission-significant events, quotes, and narrative milestones without needing to leave the timeline view.
 - fix: publish nginx on host ports 80/443 while preserving 8080/8443 compatibility and proxy HTTP traffic directly instead of forcing HTTPS redirects. Intent: Ensure EC2-hosted containers are reachable on plain HTTP and HTTPS entrypoints while avoiding certificate-driven redirect failures during bring-up.
 - fix: keep the Overview Query Console Search action visible without scrolling, reduce query input height, and shift transcript-analysis prompt/output instructions to HTML-first rendering across chat and summary surfaces. Intent: Ensure operators can submit queries immediately in empty states while getting consistently formatted HTML responses instead of markdown-like text.
 - fix: refine disconnected-state recovery UX by showing reconnect progress phases (checking/reconnecting) and explicit "pipeline running" feedback when a run is already in flight. Intent: Help operators distinguish connectivity failures from active backend work so repeated reconnect clicks are less likely.

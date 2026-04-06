@@ -1,6 +1,13 @@
 import type { FC } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { fetchNotableUtterances, fetchTimeline, type NotableUtterancesResponse, type TimelineDayEntry } from "../api";
+import {
+  fetchNotableMoments,
+  fetchNotableUtterances,
+  fetchTimeline,
+  type NotableMoment,
+  type NotableUtterancesResponse,
+  type TimelineDayEntry
+} from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./TimelinePage.module.css";
@@ -24,7 +31,7 @@ type TimelineDisplayItem =
   | {
       id: string;
       timestamp: number;
-      type: "summary" | "notable-event" | "utterance";
+      type: "summary" | "notable-event" | "utterance" | "quote";
       title: string;
       timeLabel: string;
       body: string;
@@ -33,9 +40,16 @@ type TimelineDisplayItem =
     };
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-const MAX_TOPICS_PER_DAY = 5;
-const MAX_NOTABLE_UTTERANCES = 72;
-const MAX_NOTABLE_UTTERANCES_PER_DAY = 4;
+const MAX_TOPICS_PER_DAY = 8;
+const MAX_SUMMARY_HIGHLIGHTS_PER_DAY = 4;
+const MAX_NOTABLE_UTTERANCES = 160;
+const MAX_NOTABLE_UTTERANCES_PER_DAY = 8;
+const MAX_NOTABLE_MOMENTS_PER_DAY = 4;
+
+type NotableMomentsDay = {
+  day: string;
+  moments: NotableMoment[];
+};
 
 const formatDateLabel = (timestamp: number): string =>
   new Intl.DateTimeFormat("en-US", {
@@ -87,13 +101,52 @@ const toReadableQuote = (quote: string): string => {
   return `${compact.slice(0, 237)}...`;
 };
 
-const buildTimelineItems = (days: TimelineDayEntry[], notable: NotableUtterancesResponse | null): TimelineDisplayItem[] => {
+const toSummaryHighlights = (summary: string): string[] => {
+  const normalized = summary.replace(/\s+/g, " ").trim();
+  const sentenceChunks = normalized
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length >= 48);
+
+  if (sentenceChunks.length === 0) {
+    if (normalized.length === 0) {
+      return [];
+    }
+    return [toSummaryBody(normalized)];
+  }
+
+  return sentenceChunks.slice(0, MAX_SUMMARY_HIGHLIGHTS_PER_DAY);
+};
+
+const parseNotableMomentsDays = (rawDays: string[]): NotableMomentsDay[] =>
+  rawDays
+    .map((rawDay) => {
+      try {
+        const parsed = JSON.parse(rawDay) as NotableMomentsDay;
+        if (!parsed.day || !Array.isArray(parsed.moments)) {
+          return null;
+        }
+        return parsed;
+      } catch (_error) {
+        return null;
+      }
+    })
+    .filter((entry): entry is NotableMomentsDay => Boolean(entry));
+
+const buildTimelineItems = (
+  days: TimelineDayEntry[],
+  notable: NotableUtterancesResponse | null,
+  notableMomentsDays: NotableMomentsDay[]
+): TimelineDisplayItem[] => {
   if (days.length === 0) {
     return [];
   }
 
   const sortedDays = [...days].sort((left, right) => left.day.localeCompare(right.day));
   const contentItems: TimelineDisplayItem[] = [];
+  const notableMomentsByDay = new Map<string, NotableMoment[]>(
+    notableMomentsDays.map((dayEntry) => [dayEntry.day, dayEntry.moments.slice(0, MAX_NOTABLE_MOMENTS_PER_DAY)])
+  );
 
   sortedDays.forEach((dayEntry, dayIndex) => {
     const dayStart = toTimestamp(`${dayEntry.day}T00:00:00Z`);
@@ -109,8 +162,21 @@ const buildTimelineItems = (days: TimelineDayEntry[], notable: NotableUtterances
       meta: `${dayEntry.topics.length} tracked topic${dayEntry.topics.length === 1 ? "" : "s"}`
     });
 
+    toSummaryHighlights(dayEntry.summary).forEach((highlight, highlightIndex) => {
+      const highlightTimestamp = dayStart + (highlightIndex + 1) * 60 * 60 * 1000;
+      contentItems.push({
+        id: `summary-highlight-${dayEntry.day}-${highlightIndex}`,
+        timestamp: highlightTimestamp,
+        type: "notable-event",
+        title: `Summary Highlight • Mission Day ${dayIndex + 1}`,
+        timeLabel: formatDateLabel(highlightTimestamp),
+        body: highlight,
+        tags: ["summary", "highlights"]
+      });
+    });
+
     dayEntry.topics.slice(0, MAX_TOPICS_PER_DAY).forEach((topic, topicIndex) => {
-      const topicTimestamp = dayStart + (topicIndex + 1) * 80 * 60 * 1000;
+      const topicTimestamp = dayStart + (topicIndex + 1) * 110 * 60 * 1000;
       contentItems.push({
         id: `topic-${dayEntry.day}-${topic.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
         timestamp: topicTimestamp,
@@ -119,6 +185,22 @@ const buildTimelineItems = (days: TimelineDayEntry[], notable: NotableUtterances
         timeLabel: formatDateLabel(topicTimestamp),
         body: `Mission synthesis flagged this as a high-interest milestone for ${formatDayLabel(dayEntry.day)}.`,
         tags: ["milestone", "public-facing"]
+      });
+    });
+
+    const moments = notableMomentsByDay.get(dayEntry.day) ?? [];
+    moments.forEach((moment, momentIndex) => {
+      const parsedMomentTimestamp = moment.timestamp ? toTimestamp(moment.timestamp) : 0;
+      const momentTimestamp = parsedMomentTimestamp || dayStart + (momentIndex + 5) * 70 * 60 * 1000;
+      contentItems.push({
+        id: `notable-moment-${dayEntry.day}-${moment.rank}-${momentIndex}`,
+        timestamp: momentTimestamp,
+        type: "quote",
+        title: `Mission Quote • ${moment.title}`,
+        timeLabel: formatDateLabel(momentTimestamp),
+        body: `“${toReadableQuote(moment.quote)}”`,
+        tags: ["quote", "noteworthy", moment.channel ?? "unknown-channel"],
+        meta: `${moment.reason}${moment.sourcePath ? ` • ${moment.sourcePath}` : ""}`
       });
     });
   });
@@ -197,7 +279,8 @@ const buildTimelineItems = (days: TimelineDayEntry[], notable: NotableUtterances
       "time-marker": 1,
       summary: 2,
       "notable-event": 3,
-      utterance: 4
+      quote: 4,
+      utterance: 5
     };
 
     return rank[left.type] - rank[right.type];
@@ -207,6 +290,7 @@ const buildTimelineItems = (days: TimelineDayEntry[], notable: NotableUtterances
 export const TimelinePage: FC = () => {
   const [timelineDays, setTimelineDays] = useState<TimelineDayEntry[]>([]);
   const [notableUtterances, setNotableUtterances] = useState<NotableUtterancesResponse | null>(null);
+  const [notableMomentsDays, setNotableMomentsDays] = useState<NotableMomentsDay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const timelineRootRef = useRef<HTMLDivElement | null>(null);
@@ -220,9 +304,10 @@ export const TimelinePage: FC = () => {
       setError(null);
 
       try {
-        const [timelinePayload, notablePayload] = await Promise.all([
+        const [timelinePayload, notablePayload, notableMomentsPayload] = await Promise.all([
           fetchTimeline(),
-          fetchNotableUtterances(MAX_NOTABLE_UTTERANCES, 10)
+          fetchNotableUtterances(MAX_NOTABLE_UTTERANCES, 14),
+          fetchNotableMoments()
         ]);
 
         if (!active) {
@@ -231,6 +316,7 @@ export const TimelinePage: FC = () => {
 
         setTimelineDays(timelinePayload);
         setNotableUtterances(notablePayload);
+        setNotableMomentsDays(parseNotableMomentsDays(notableMomentsPayload?.days ?? []));
       } catch (loadError) {
         if (!active) {
           return;
@@ -252,7 +338,10 @@ export const TimelinePage: FC = () => {
     };
   }, []);
 
-  const allItems = useMemo(() => buildTimelineItems(timelineDays, notableUtterances), [timelineDays, notableUtterances]);
+  const allItems = useMemo(
+    () => buildTimelineItems(timelineDays, notableUtterances, notableMomentsDays),
+    [timelineDays, notableUtterances, notableMomentsDays]
+  );
 
   const visibleItems = useMemo(() => allItems, [allItems]);
 
