@@ -19,10 +19,10 @@ import { clientLogger } from "../../utils/logging/clientLogger";
 import { buildDashboardViewModel } from "./dashboardViewModel";
 
 const starterQueries = [
-  "summarize MER manager activity",
+  "summarize key developments from the daily page for the last 24 hours",
   "what changed in Orion ECLSS today?",
-  "which channels discussed timeline risk?",
-  "show mentions of comm dropouts"
+  "summarize timeline risks over the most recent flight day",
+  "show mentions of comm dropouts in the timeline context"
 ];
 
 const DASHBOARD_POLL_INTERVAL_MS = 5 * 60 * 1000;

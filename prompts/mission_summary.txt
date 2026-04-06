@@ -7,4 +7,6 @@ Synthesize those summaries into a mission-level executive brief with:
 - Cumulative mission impacts
 - Recommended operator watch items for the next 24 hours
 
+Write a substantial narrative of roughly 300-450 words.
+Return plain text with clear section headers, but do not use Markdown emphasis markers (no `*` around words).
 Do not restate every transcript detail; focus on synthesis across daily summaries.
