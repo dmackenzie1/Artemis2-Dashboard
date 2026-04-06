@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: darken and solidify System Logs containers/items/textbox surfaces so entries stay legible without hover against the Earth background imagery. Intent: Address operator visibility issues where log text and cards appeared too transparent for reliable scanning.
 - fix: restore frontend chat API mode typing/defaults, add notable-moments fetch error logging, and align top-level setup docs with EMSS `make-dotenv` + `appcompose` workflows. Intent: Eliminate current TypeScript/test breakage while reducing silent client failures and keeping operator setup instructions accurate.
 - fix: restore optional frontend chat mode argument wiring in the API helper so TalkieRAG page calls compile while preserving single-query backend compatibility. Intent: Unblock frontend TypeScript/Docker builds after a merge left `mode` referenced without an in-scope parameter.
 - fix: boost topbar/tab and panel contrast while tightening LLM health refresh cadence with focus-triggered checks so navigation remains readable and connectivity state is less likely to stay stale. Intent: Address operator feedback that primary page controls were too faded to scan and provide faster confirmation when model connectivity changes.
