@@ -2,6 +2,7 @@ import type { FC } from "react";
 import { useEffect, useState } from "react";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import styles from "../styles.module.css";
+import { renderStructuredText } from "../utils/formatting/renderStructuredText";
 
 export const TimelinePage: FC = () => {
   const [timeline, setTimeline] = useState<Array<{ day: string; summary: string; topics: string[] }>>([]);
@@ -18,8 +19,13 @@ export const TimelinePage: FC = () => {
       {timeline.map((entry) => (
         <section className={styles.panel} key={entry.day} data-component-id="timeline-day-panel" data-component-uid={`${componentUid}-${entry.day}`}>
           <h2>{entry.day}</h2>
-          <p>{entry.summary}</p>
-          <p>Topics: {entry.topics.join(", ")}</p>
+          <div className={styles["formatted-copy"]}>{renderStructuredText(entry.summary, styles["formatted-list"])}</div>
+          <h3>Topics</h3>
+          <ul className={styles["formatted-list"]}>
+            {entry.topics.map((topic) => (
+              <li key={topic}>{topic}</li>
+            ))}
+          </ul>
         </section>
       ))}
     </div>

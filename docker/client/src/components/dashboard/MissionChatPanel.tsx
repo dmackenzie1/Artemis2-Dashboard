@@ -27,16 +27,29 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
   onChatSubmit
 }) => {
   const { componentUid } = useComponentIdentity("mission-chat-panel");
-  const modeFieldId = `chat-mode-${componentUid}`;
 
   const modePicker = (
-    <label className={styles["chat-mode-picker"]} htmlFor={modeFieldId}>
-      Context Mode
-      <select id={modeFieldId} value={chatMode} onChange={(event) => onChatModeChange(event.target.value as ChatMode)}>
-        <option value="rag">Targeted Retrieval</option>
-        <option value="all">Broad Sweep</option>
-      </select>
-    </label>
+    <div className={styles["chat-mode-picker"]}>
+      <span>Context Mode</span>
+      <div className={styles["chat-mode-toggle"]} role="group" aria-label={`Chat context mode ${componentUid}`}>
+        <button
+          type="button"
+          className={`${styles["chat-mode-pill"]} ${chatMode === "rag" ? styles["chat-mode-pill-active"] : ""}`.trim()}
+          onClick={() => onChatModeChange("rag")}
+          aria-pressed={chatMode === "rag"}
+        >
+          Targeted Retrieval
+        </button>
+        <button
+          type="button"
+          className={`${styles["chat-mode-pill"]} ${chatMode === "all" ? styles["chat-mode-pill-active"] : ""}`.trim()}
+          onClick={() => onChatModeChange("all")}
+          aria-pressed={chatMode === "all"}
+        >
+          Broad Sweep
+        </button>
+      </div>
+    </div>
   );
 
   return (
