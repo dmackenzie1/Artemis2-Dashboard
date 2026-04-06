@@ -5,6 +5,7 @@ import { useComponentIdentity } from "../components/dashboard/primitives/useComp
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./SignalChatPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
+import { renderStructuredText } from "../utils/formatting/renderStructuredText";
 
 const DEFAULT_QUERY = "Summarize communication risks in the latest transcript windows.";
 
@@ -83,7 +84,11 @@ export const SignalChatPage: FunctionComponent = () => {
           <h3>Answer</h3>
           {!chatResponse && !isThinking ? <p className={sharedStyles.subtle}>No answer yet. Submit a query to begin.</p> : null}
           {isThinking ? <p className={sharedStyles.subtle}>Synthesizing response from ranked evidence…</p> : null}
-          {chatResponse ? <p className={styles.answer}>{chatResponse.answer}</p> : null}
+          {chatResponse ? (
+            <div className={`${sharedStyles["formatted-copy"]} ${styles.answer}`}>
+              {renderStructuredText(chatResponse.answer, sharedStyles["formatted-list"])}
+            </div>
+          ) : null}
           {chatResponse ? (
             <p className={styles.strategy}>
               mode={chatResponse.strategy.mode} • days={chatResponse.strategy.daysQueried} • context={chatResponse.strategy.contextUtterances}/
