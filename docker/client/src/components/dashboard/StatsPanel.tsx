@@ -7,9 +7,14 @@ import { StatusBadge } from "./primitives/StatusBadge";
 
 type StatsPanelProps = {
   stats: DashboardStat[];
+  dailyTranscriptVolume: Array<{
+    day: string;
+    utterances: number;
+    words: number;
+  }>;
 };
 
-export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats }) => {
+export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats, dailyTranscriptVolume }) => {
   const statusLabel = stats.length > 0 ? "ready" : "loading";
   const groupedStats = [
     {
@@ -30,8 +35,8 @@ export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats }) => {
     <DashboardPanel
       componentId="stats-panel"
       className={styles["stats-panel"]}
-      kicker="Snapshot"
-      title="Stats"
+      kicker="Snapshot Review"
+      title="Transcript Metrics"
       headerAccessory={<StatusBadge label={statusLabel} />}
     >
       {stats.length === 0 ? <PaneStateMessage message="Waiting for mission metrics…" tone="loading" /> : null}
@@ -62,6 +67,40 @@ export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats }) => {
               </table>
             </section>
           ))}
+          {dailyTranscriptVolume.length > 0 ? (
+            <section className={styles["stats-group"]}>
+              <p className={styles["stats-group-label"]}>Daily Transcript Volume</p>
+              <div className={styles["snapshot-chart-grid"]} role="img" aria-label="Utterances and words by day">
+                {dailyTranscriptVolume.map((entry) => (
+                  <div key={entry.day} className={styles["snapshot-chart-row"]}>
+                    <span className={styles["snapshot-chart-day"]}>{entry.day}</span>
+                    <div className={styles["snapshot-chart-bars"]}>
+                      <div className={styles["snapshot-chart-bar-wrap"]}>
+                        <span className={styles["snapshot-chart-bar-label"]}>U</span>
+                        <div
+                          className={styles["snapshot-chart-bar"]}
+                          style={{
+                            width: `${Math.max(4, Math.round((entry.utterances / Math.max(...dailyTranscriptVolume.map((item) => item.utterances), 1)) * 100))}%`
+                          }}
+                          title={`${entry.utterances.toLocaleString()} utterances`}
+                        />
+                      </div>
+                      <div className={styles["snapshot-chart-bar-wrap"]}>
+                        <span className={styles["snapshot-chart-bar-label"]}>W</span>
+                        <div
+                          className={`${styles["snapshot-chart-bar"]} ${styles["snapshot-chart-bar-secondary"]}`}
+                          style={{
+                            width: `${Math.max(4, Math.round((entry.words / Math.max(...dailyTranscriptVolume.map((item) => item.words), 1)) * 100))}%`
+                          }}
+                          title={`${entry.words.toLocaleString()} words`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
       )}
     </DashboardPanel>
