@@ -1,6 +1,7 @@
 import type { FunctionComponent } from "react";
 import type { DashboardStat } from "../../pages/dashboard/types";
-import styles from "../../styles.module.css";
+import sharedStyles from "../../styles/shared.module.css";
+import styles from "./StatsPanel.module.css";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
 import { StatusBadge } from "./primitives/StatusBadge";
@@ -42,9 +43,9 @@ export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats, dailyTra
       {stats.length === 0 ? <PaneStateMessage message="Waiting for mission metrics…" tone="loading" /> : null}
       {stats.length === 0 ? (
         <div className={styles["stats-skeleton-grid"]} aria-hidden="true">
-          <div className={styles["skeleton-row"]} />
-          <div className={styles["skeleton-row"]} />
-          <div className={styles["skeleton-row"]} />
+          <div className={sharedStyles["skeleton-row"]} />
+          <div className={sharedStyles["skeleton-row"]} />
+          <div className={sharedStyles["skeleton-row"]} />
         </div>
       ) : (
         <div className={styles["stats-groups"]}>

@@ -8,7 +8,7 @@ import { MissionOverviewPanel } from "../components/dashboard/MissionOverviewPan
 import { StatsPanel } from "../components/dashboard/StatsPanel";
 import { UtterancesTimelinePanel } from "../components/dashboard/UtterancesTimelinePanel";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
-import styles from "../styles.module.css";
+import styles from "./DashboardPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
 import { useDashboardController } from "./dashboard/useDashboardController";
 import { useLocation } from "react-router-dom";
