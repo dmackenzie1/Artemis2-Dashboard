@@ -1,5 +1,6 @@
 import type { FunctionComponent, FormEvent } from "react";
 import type { ChatMode } from "../../api";
+import styles from "../../styles.module.css";
 import type { ChatMessage } from "./types";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { LoadingIndicator } from "./primitives/LoadingIndicator";
@@ -29,7 +30,7 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
   const modeFieldId = `chat-mode-${componentUid}`;
 
   const modePicker = (
-    <label className="chat-mode-picker" htmlFor={modeFieldId}>
+    <label className={styles["chat-mode-picker"]} htmlFor={modeFieldId}>
       Context Mode
       <select id={modeFieldId} value={chatMode} onChange={(event) => onChatModeChange(event.target.value as ChatMode)}>
         <option value="rag">Targeted Retrieval</option>
@@ -41,18 +42,23 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
   return (
     <DashboardPanel
       componentId="mission-chat-panel"
-      className="mission-chat-panel"
+      className={styles["mission-chat-panel"]}
       kicker="Intelligence Interface"
       title="Mission Query Console"
       headerAccessory={modePicker}
       footer={<StatusBadge label={isThinking ? "querying" : "ready"} />}
     >
-      <div className="chat-window" role="log" aria-live="polite">
+      <div className={styles["chat-window"]} role="log" aria-live="polite">
         {chatMessages.length === 0 ? (
-          <p className="chat-empty">Ask about anomalies, channels, timeline changes, or mission readiness.</p>
+          <p className={styles["chat-empty"]}>Ask about anomalies, channels, timeline changes, or mission readiness.</p>
         ) : null}
         {chatMessages.map((message, index) => (
-          <article key={`${message.role}-${index}`} className={`chat-bubble ${message.role === "user" ? "chat-user" : "chat-assistant"}`}>
+          <article
+            key={`${message.role}-${index}`}
+            className={`${styles["chat-bubble"]} ${
+              message.role === "user" ? styles["chat-user"] : styles["chat-assistant"]
+            }`}
+          >
             <header>{message.role === "user" ? "Operator" : "Mission Analyst"}</header>
             <p>{message.text}</p>
             {message.strategy ? (
@@ -66,7 +72,7 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
         {isThinking ? <LoadingIndicator variant="console" message="Querying relevant utterances…" /> : null}
       </div>
 
-      <form onSubmit={(event) => void onChatSubmit(event)} className="chat-form chat-window-form">
+      <form onSubmit={(event) => void onChatSubmit(event)} className={`${styles["chat-form"]} ${styles["chat-window-form"]}`}>
         <textarea
           value={chatInput}
           onChange={(event) => onChatInputChange(event.target.value)}

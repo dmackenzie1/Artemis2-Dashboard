@@ -15,7 +15,7 @@ const createPipelineService = (): PipelineService => {
     generateText: async () => "stubbed-response"
   };
 
-  return new PipelineService(fakeEntityManager, {
+  return new PipelineService(() => fakeEntityManager, {
     sourceFilesDir: "/tmp/source-files",
     promptsDir: "/tmp/prompts",
     promptSubmissionsDir: "/tmp/prompt-submissions",

@@ -1,5 +1,6 @@
 import type { FC } from "react";
 import type { HealthData } from "../../api";
+import styles from "../../styles.module.css";
 import { StatusBadge } from "./primitives/StatusBadge";
 import { useComponentIdentity } from "./primitives/useComponentIdentity";
 
@@ -12,8 +13,8 @@ export const DashboardToolbar: FC<DashboardToolbarProps> = ({ health }) => {
   const { componentId, componentUid } = useComponentIdentity("dashboard-toolbar");
 
   return (
-    <div className="dashboard-toolbar" data-component-id={componentId} data-component-uid={componentUid}>
-      <span className="toolbar-label">Pipeline</span>
+    <div className={styles["dashboard-toolbar"]} data-component-id={componentId} data-component-uid={componentUid}>
+      <span className={styles["toolbar-label"]}>Pipeline</span>
       <StatusBadge label={isConnected ? "connected" : "disconnected"} />
     </div>
   );

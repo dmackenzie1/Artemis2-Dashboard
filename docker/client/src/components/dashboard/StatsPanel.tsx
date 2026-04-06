@@ -1,5 +1,6 @@
 import type { FunctionComponent } from "react";
 import type { DashboardStat } from "../../pages/dashboard/types";
+import styles from "../../styles.module.css";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
 import { StatusBadge } from "./primitives/StatusBadge";
@@ -14,7 +15,7 @@ export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats }) => {
   return (
     <DashboardPanel
       componentId="stats-panel"
-      className="stats-panel"
+      className={styles["stats-panel"]}
       kicker="Snapshot"
       title="Stats"
       headerAccessory={<StatusBadge label={statusLabel} />}
@@ -22,7 +23,7 @@ export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats }) => {
       {stats.length === 0 ? (
         <PaneStateMessage message="Waiting for mission metrics…" tone="loading" />
       ) : (
-        <table className="stats-table">
+        <table className={styles["stats-table"]}>
           <tbody>
             {stats.map((stat) => (
               <tr key={stat.label}>

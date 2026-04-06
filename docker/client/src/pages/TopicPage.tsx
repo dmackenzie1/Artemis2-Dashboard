@@ -2,6 +2,7 @@ import type { FC } from "react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
+import styles from "../styles.module.css";
 
 type TopicDetails = {
   title: string;
@@ -33,7 +34,7 @@ export const TopicPage: FC = () => {
   }
 
   return (
-    <article className="panel" data-component-id={componentId} data-component-uid={componentUid}>
+    <article className={styles.panel} data-component-id={componentId} data-component-uid={componentUid}>
       <h2>{topic.title}</h2>
       <p>{topic.description}</p>
       <p>First seen day: {topic.day.day}</p>

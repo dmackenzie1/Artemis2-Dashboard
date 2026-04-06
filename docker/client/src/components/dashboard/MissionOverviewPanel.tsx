@@ -1,4 +1,5 @@
 import type { FunctionComponent } from "react";
+import styles from "../../styles.module.css";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
 import { StatusBadge } from "./primitives/StatusBadge";
@@ -33,17 +34,17 @@ export const MissionOverviewPanel: FunctionComponent<MissionOverviewPanelProps> 
   return (
     <DashboardPanel
       componentId="mission-overview-panel"
-      className="mission-summary-panel"
+      className={styles["mission-summary-panel"]}
       kicker="Mission Intelligence"
       title="Mission Summary"
       headerAccessory={<StatusBadge label={statusLabel} />}
-      footer={<small className="subtle">{lastRunAt ? `Run: ${lastRunAt}` : "Awaiting first run"}</small>}
+      footer={<small className={styles.subtle}>{lastRunAt ? `Run: ${lastRunAt}` : "Awaiting first run"}</small>}
     >
-      <p className="panel-lead">{parsed.lead}</p>
+      <p className={styles["panel-lead"]}>{parsed.lead}</p>
       {parsed.bullets.length > 0 ? (
         <>
-          <p className="panel-meta-label">Key Points</p>
-          <ul className="panel-bullets">
+          <p className={styles["panel-meta-label"]}>Key Points</p>
+          <ul className={styles["panel-bullets"]}>
             {parsed.bullets.map((bullet, index) => (
               <li key={`${bullet}-${index}`}>{bullet}</li>
             ))}

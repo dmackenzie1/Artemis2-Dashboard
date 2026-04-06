@@ -2,15 +2,14 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { EntityManager } from "@mikro-orm/postgresql";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc.js";
+import { dayjs } from "../lib/dayjs.js";
 import { PromptDefinition } from "../entities/PromptDefinition.js";
 import { PromptExecution } from "../entities/PromptExecution.js";
 import { SourceDocument } from "../entities/SourceDocument.js";
 import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 
-dayjs.extend(utc);
+type EntityManagerProvider = () => EntityManager;
 
 type PipelineConfig = {
   sourceFilesDir: string;
@@ -85,7 +84,7 @@ export class PipelineService {
   private missionStatsCache: { computedAtMs: number; payload: MissionStatsView } | null = null;
 
   constructor(
-    private readonly em: EntityManager,
+    private readonly getEntityManager: EntityManagerProvider,
     private readonly config: PipelineConfig
   ) {}
 
@@ -373,6 +372,7 @@ export class PipelineService {
   }
 
   async syncSourceDocuments(): Promise<number> {
+    const em = this.getEntityManager();
     const entries = await fs.readdir(this.config.sourceFilesDir, { withFileTypes: true });
     const files = entries.filter((entry) => entry.isFile()).map((entry) => entry.name).sort();
     const now = dayjs().utc().toDate();
@@ -384,10 +384,10 @@ export class PipelineService {
       const stat = await fs.stat(fullPath);
       const content = await fs.readFile(fullPath, "utf8");
       const checksum = crypto.createHash("sha256").update(content).digest("hex");
-      const existing = await this.em.findOne(SourceDocument, { relativePath });
+      const existing = await em.findOne(SourceDocument, { relativePath });
 
       if (!existing) {
-        const created = this.em.create(SourceDocument, {
+        const created = em.create(SourceDocument, {
           relativePath,
           checksum,
           content,
@@ -395,7 +395,7 @@ export class PipelineService {
           ingestedAt: now
         });
 
-        this.em.persist(created);
+        em.persist(created);
         changedCount += 1;
         continue;
       }
@@ -409,11 +409,12 @@ export class PipelineService {
       }
     }
 
-    await this.em.flush();
+    await em.flush();
     return changedCount;
   }
 
   async syncPromptDefinitions(): Promise<void> {
+    const em = this.getEntityManager();
     const entries = await fs.readdir(this.config.promptsDir, { withFileTypes: true });
     const promptFiles = entries
       .filter((entry) => entry.isFile() && promptFilePattern.test(entry.name))
@@ -425,16 +426,16 @@ export class PipelineService {
     for (const fileName of promptFiles) {
       const promptText = await fs.readFile(path.join(this.config.promptsDir, fileName), "utf8");
       const key = fileName.replace(/\.txt$/i, "");
-      const existing = await this.em.findOne(PromptDefinition, { fileName });
+      const existing = await em.findOne(PromptDefinition, { fileName });
 
       if (!existing) {
-        const created = this.em.create(PromptDefinition, {
+        const created = em.create(PromptDefinition, {
           key,
           fileName,
           content: promptText,
           updatedAt: now
         });
-        this.em.persist(created);
+        em.persist(created);
         continue;
       }
 
@@ -445,7 +446,7 @@ export class PipelineService {
       }
     }
 
-    await this.em.flush();
+    await em.flush();
   }
 
   async runPipelineCycle(): Promise<void> {
@@ -465,9 +466,10 @@ export class PipelineService {
   }
 
   async executePromptsSequentially(): Promise<void> {
-    const allPrompts = await this.em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
+    const em = this.getEntityManager();
+    const allPrompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
     const prompts = this.buildPromptQueue(allPrompts);
-    const sourceDocs = await this.em.find(SourceDocument, {}, { orderBy: { relativePath: "asc" } });
+    const sourceDocs = await em.find(SourceDocument, {}, { orderBy: { relativePath: "asc" } });
 
     const sourceContext: SourceContextDocument[] = sourceDocs.map((doc) => ({
       path: doc.relativePath,
@@ -491,7 +493,7 @@ export class PipelineService {
               2
             )
           : submittedText;
-      const execution: PromptExecution = this.em.create(PromptExecution, {
+      const execution: PromptExecution = em.create(PromptExecution, {
         prompt,
         componentId: prompt.key,
         cacheKey: this.createCacheKey(prompt.content, missionSubmittedText),
@@ -503,8 +505,8 @@ export class PipelineService {
         output: "",
         errorMessage: null
       });
-      this.em.persist(execution);
-      await this.em.flush();
+      em.persist(execution);
+      await em.flush();
       const promptSubmissionPath = await this.persistPromptSubmission(prompt.key, missionSubmittedText);
       serverLogger.info("Prompt execution started", {
         promptKey: prompt.key,
@@ -513,7 +515,7 @@ export class PipelineService {
       });
 
       try {
-        const cachedExecution = await this.em.findOne(
+        const cachedExecution = await em.findOne(
           PromptExecution,
           {
             componentId: prompt.key,
@@ -538,7 +540,7 @@ export class PipelineService {
             outputLength: execution.output.length,
             outputPreview: this.createPreview(execution.output, 220, 2)
           });
-          await this.em.flush();
+          await em.flush();
           continue;
         }
 
@@ -581,16 +583,17 @@ export class PipelineService {
         });
       }
 
-      await this.em.flush();
+      await em.flush();
     }
   }
 
   async getDashboardView(): Promise<{ generatedAt: string; prompts: PromptDashboardEntry[] }> {
-    const prompts = await this.em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
+    const em = this.getEntityManager();
+    const prompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
     const rows: PromptDashboardEntry[] = [];
 
     for (const prompt of prompts) {
-      const latestExecution = await this.em.findOne(
+      const latestExecution = await em.findOne(
         PromptExecution,
         { prompt: prompt.id },
         { orderBy: { startedAt: "desc" } }
@@ -632,7 +635,8 @@ export class PipelineService {
       return this.missionStatsCache.payload;
     }
 
-    const [{ minTimestamp, maxTimestamp, utterances, words }] = await this.em.getConnection().execute<{
+    const em = this.getEntityManager();
+    const [{ minTimestamp, maxTimestamp, utterances, words }] = await em.getConnection().execute<{
       minTimestamp: string | null;
       maxTimestamp: string | null;
       utterances: string;
@@ -648,14 +652,14 @@ export class PipelineService {
       `
     );
 
-    const [{ dataDays }] = await this.em.getConnection().execute<{ dataDays: string }[]>(
+    const [{ dataDays }] = await em.getConnection().execute<{ dataDays: string }[]>(
       `
         select count(distinct date(timestamp at time zone 'utc'))::text as "dataDays"
         from transcript_utterances
       `
     );
 
-    const utterancesPerHourRaw = await this.em.getConnection().execute<{ hour: string; utterances: string }[]>(
+    const utterancesPerHourRaw = await em.getConnection().execute<{ hour: string; utterances: string }[]>(
       `
         with bounds as (
           select

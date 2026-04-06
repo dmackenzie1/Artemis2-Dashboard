@@ -1,15 +1,12 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc.js";
+import { dayjs } from "../lib/dayjs.js";
 import lodash from "lodash";
 import type { DashboardCache, DayInsights, NotableUtterance, TranscriptUtterance } from "../types.js";
 import { ingestCsvDirectory } from "../lib/csvIngest.js";
 import { getPrompt } from "../lib/prompts.js";
 import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
-
-dayjs.extend(utc);
 
 const { groupBy, uniq } = lodash;
 

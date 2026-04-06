@@ -8,6 +8,7 @@ import { MissionOverviewPanel } from "../components/dashboard/MissionOverviewPan
 import { StatsPanel } from "../components/dashboard/StatsPanel";
 import { UtterancesTimelinePanel } from "../components/dashboard/UtterancesTimelinePanel";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
+import styles from "../styles.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
 import { useDashboardController } from "./dashboard/useDashboardController";
 
@@ -64,8 +65,8 @@ export const DashboardPage: FunctionComponent = () => {
   }, [hourlyByChannel]);
 
   return (
-    <div className="dashboard-layout" data-component-id={componentId} data-component-uid={componentUid}>
-      <section className="dashboard-top-row" data-component-id="dashboard-top-row" data-component-uid={`${componentUid}-top`}>
+    <div className={styles["dashboard-layout"]} data-component-id={componentId} data-component-uid={componentUid}>
+      <section className={styles["dashboard-top-row"]} data-component-id="dashboard-top-row" data-component-uid={`${componentUid}-top`}>
         <MissionOverviewPanel
           statusLabel={viewModel.missionSummary.statusLabel}
           summaryText={viewModel.missionSummary.text}
@@ -74,7 +75,7 @@ export const DashboardPage: FunctionComponent = () => {
         <StatsPanel stats={viewModel.stats} />
       </section>
 
-      <section className="dashboard-mid-row" data-component-id="dashboard-mid-row" data-component-uid={`${componentUid}-mid`}>
+      <section className={styles["dashboard-mid-row"]} data-component-id="dashboard-mid-row" data-component-uid={`${componentUid}-mid`}>
         <DailySummaryPanel
           statusLabel={viewModel.dailySummary.statusLabel}
           summaryText={viewModel.dailySummary.text}
@@ -91,7 +92,7 @@ export const DashboardPage: FunctionComponent = () => {
         />
       </section>
 
-      <section className="dashboard-bottom-row" data-component-id="dashboard-bottom-row" data-component-uid={`${componentUid}-bottom`}>
+      <section className={styles["dashboard-bottom-row"]} data-component-id="dashboard-bottom-row" data-component-uid={`${componentUid}-bottom`}>
         <UtterancesTimelinePanel histogram={hourlyHistogram} />
       </section>
     </div>

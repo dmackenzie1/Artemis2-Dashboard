@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: scope MikroORM EntityManager usage per request/background cycle via RequestContext-backed providers, migrate frontend class wiring to CSS Modules, and centralize UTC dayjs bootstrap into a shared utility. Intent: Prevent cross-request identity-map state bleed while aligning UI styling with EMSS conventions and removing repeated dayjs plugin setup.
 - fix: tag all analysis/chat/connectivity LLM calls with explicit component IDs so server logs and debug prompt artifacts never fall back to `unknown-component`. Intent: Make prompt/response traceability deterministic for operators diagnosing mission-query behavior and LLM routing.
 - fix: prefer canonical full-day transcript summary files over matching `_partial` variants when composing `daily_summary` day groups, and add detailed grouping/chunk logs for traceability. Intent: Keep day-level prompt manifests accurate and easier to debug when operators validate daily-summary source selection.
 - fix: add consistent `data-component-id` and per-instance `data-component-uid` markers across dashboard/page primitives, and replace the static mission chat mode field id with an instance-safe UID-backed id. Intent: Ensure every rendered mission UI component can self-identify reliably for automation, telemetry, and targeted debugging without id collisions.

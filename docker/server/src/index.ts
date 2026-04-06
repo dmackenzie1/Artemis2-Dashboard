@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { RequestContext } from "@mikro-orm/core";
 import { EntityManager, MikroORM } from "@mikro-orm/postgresql";
 import { env } from "./env.config.js";
 import { LlmClient } from "./services/llmClient.js";
@@ -97,7 +98,7 @@ const analysisService = new AnalysisService({
 await analysisService.loadFromDisk();
 let pipelineService: PipelineService | null = null;
 let statsService: StatsService | null = null;
-let ingestionEntityManager: EntityManager | null = null;
+let transcriptOrm: MikroORM | null = null;
 let pipelineIntervalStarted = false;
 const startPipelineSchedule = (): void => {
   if (!pipelineService || !env.PIPELINE_AUTO_RUN || pipelineIntervalStarted) {
@@ -118,7 +119,7 @@ const startPipelineSchedule = (): void => {
 app.use(
   "/api",
   createApiRouter(analysisService, () => llmConnectivityStatus, async () => {
-    const em = ingestionEntityManager;
+    const em = transcriptOrm?.em.fork();
     if (em) {
       const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
       serverLogger.info("Manual transcript ingestion completed", transcriptIngestion);
@@ -135,6 +136,7 @@ app.use(
 if (env.TRANSCRIPTS_DB_ENABLED) {
   serverLogger.info("Transcript database mode enabled");
   const orm = await MikroORM.init(ormConfig);
+  transcriptOrm = orm;
   serverLogger.info("Transcript database connected", {
     host: env.DB_HOST,
     port: env.DB_PORT,
@@ -142,11 +144,12 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
   });
   await orm.getSchemaGenerator().updateSchema();
   await ensurePromptExecutionSubmittedTextColumn(orm);
-  ingestionEntityManager = orm.em.fork();
-  app.use("/api/transcripts", createTranscriptRouter(orm.em.fork()));
-  statsService = new StatsService(orm.em.fork());
+  app.use((req, res, next) => RequestContext.create(orm.em, next));
+  const getEntityManager = (): EntityManager => (RequestContext.getEntityManager() as EntityManager | undefined) ?? orm.em.fork();
+  app.use("/api/transcripts", createTranscriptRouter(getEntityManager));
+  statsService = new StatsService(getEntityManager);
 
-  pipelineService = new PipelineService(orm.em.fork(), {
+  pipelineService = new PipelineService(getEntityManager, {
     sourceFilesDir: env.SOURCE_FILES_DIR,
     promptsDir: env.PROMPTS_DIR,
     llmClient,
@@ -179,7 +182,7 @@ const runStartupIngestion = async (): Promise<void> => {
   serverLogger.info("Startup ingestion scheduled");
 
   try {
-    const em = ingestionEntityManager;
+    const em = transcriptOrm?.em.fork();
     if (em) {
       const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
       serverLogger.info("Startup transcript ingestion completed", transcriptIngestion);
