@@ -49,6 +49,17 @@ npm install
 
 4. Open `http://localhost:8080`.
 
+### Optional local HTTPS (dev SSL)
+
+If you want TLS termination at nginx in local Docker runs:
+
+```bash
+./scripts/make-dev-ssl-cert.sh
+./appcompose dev up -d --force-recreate nginx
+```
+
+Then open `https://localhost:8443` (HTTP on `http://localhost:8080` redirects to HTTPS).
+
 ## Local Node development (without Docker)
 
 ```bash
