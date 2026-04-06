@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   chat,
   fetchDashboard,
@@ -26,9 +26,11 @@ export type DashboardController = {
   chatMode: ChatMode;
   isThinking: boolean;
   chatMessages: ChatMessage[];
+  hasLoadFailure: boolean;
   onChatInputChange: (value: string) => void;
   onChatModeChange: (value: ChatMode) => void;
   onChatSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  refreshDashboard: () => Promise<void>;
 };
 
 export const useDashboardController = (): DashboardController => {
@@ -39,24 +41,27 @@ export const useDashboardController = (): DashboardController => {
   const [chatMode, setChatMode] = useState<ChatMode>("rag");
   const [isThinking, setIsThinking] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [hasLoadFailure, setHasLoadFailure] = useState(false);
+
+  const loadData = useCallback(async (): Promise<void> => {
+    try {
+      const [dashboardPayload, pipelinePayload, statsSummaryPayload] = await Promise.all([
+        fetchDashboard(),
+        fetchPipelineDashboard(),
+        fetchStatsSummary()
+      ]);
+
+      setData(dashboardPayload);
+      setPipeline(pipelinePayload);
+      setStatsSummary(statsSummaryPayload);
+      setHasLoadFailure(false);
+    } catch (error) {
+      setHasLoadFailure(true);
+      clientLogger.error("Dashboard polling failed", { error });
+    }
+  }, []);
 
   useEffect(() => {
-    const loadData = async (): Promise<void> => {
-      try {
-        const [dashboardPayload, pipelinePayload, statsSummaryPayload] = await Promise.all([
-          fetchDashboard(),
-          fetchPipelineDashboard(),
-          fetchStatsSummary()
-        ]);
-
-        setData(dashboardPayload);
-        setPipeline(pipelinePayload);
-        setStatsSummary(statsSummaryPayload);
-      } catch (error) {
-        clientLogger.error("Dashboard polling failed", { error });
-      }
-    };
-
     void loadData();
     const pollHandle = window.setInterval(() => {
       void loadData();
@@ -65,7 +70,7 @@ export const useDashboardController = (): DashboardController => {
     return () => {
       window.clearInterval(pollHandle);
     };
-  }, []);
+  }, [loadData]);
 
   const onChatSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -109,8 +114,10 @@ export const useDashboardController = (): DashboardController => {
     chatMode,
     isThinking,
     chatMessages,
+    hasLoadFailure,
     onChatInputChange: setChatInput,
     onChatModeChange: setChatMode,
-    onChatSubmit
+    onChatSubmit,
+    refreshDashboard: loadData
   };
 };
