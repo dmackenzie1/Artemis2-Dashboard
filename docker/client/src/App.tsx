@@ -1,7 +1,7 @@
 import type { FC } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Route, Routes } from "react-router-dom";
-import { fetchHealth } from "./api";
+import { NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { fetchHealth, triggerPipelineRun } from "./api";
 import type { HealthData } from "./api";
 import { StatusBadge } from "./components/dashboard/primitives/StatusBadge";
 import { useComponentIdentity } from "./components/dashboard/primitives/useComponentIdentity";
@@ -10,12 +10,15 @@ import { DailyPage } from "./pages/DailyPage";
 import styles from "./styles.module.css";
 import { TimelinePage } from "./pages/TimelinePage";
 import { TopicPage } from "./pages/TopicPage";
+import { NotableMomentsPage } from "./pages/NotableMomentsPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 
 const HEALTH_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 export const App: FC = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
+  const [isAdminRefreshRunning, setIsAdminRefreshRunning] = useState(false);
+  const location = useLocation();
   const { componentId, componentUid } = useComponentIdentity("app-shell");
 
   useEffect(() => {
@@ -39,6 +42,27 @@ export const App: FC = () => {
   }, []);
 
   const connected = useMemo(() => (!health ? true : health.llm.connected), [health]);
+  const adminMode = useMemo(() => {
+    const adminQueryValue = new URLSearchParams(location.search).get("admin");
+    return adminQueryValue === "true";
+  }, [location.search]);
+
+  const onAdminRefreshClick = async (): Promise<void> => {
+    if (isAdminRefreshRunning) {
+      return;
+    }
+
+    setIsAdminRefreshRunning(true);
+    try {
+      const result = await triggerPipelineRun();
+      clientLogger.info("Admin-triggered pipeline refresh requested", { status: result.status, accepted: result.accepted });
+      window.dispatchEvent(new Event("dashboard-admin-refresh-requested"));
+    } catch (error) {
+      clientLogger.error("Admin-triggered pipeline refresh failed", { error });
+    } finally {
+      setIsAdminRefreshRunning(false);
+    }
+  };
 
   return (
     <div className={styles["app-shell"]} data-component-id={componentId} data-component-uid={componentUid}>
@@ -53,12 +77,26 @@ export const App: FC = () => {
           <NavLink to="/">Overview</NavLink>
           <NavLink to="/daily">Daily</NavLink>
           <NavLink to="/timeline">Timeline</NavLink>
+          <NavLink to="/notable">Notable</NavLink>
           <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer">
             TalkyBot
           </a>
           <div className={styles["topbar-status"]} title={connected ? "LLM connected" : "LLM disconnected"}>
             <StatusBadge label={connected ? "connected" : "disconnected"} />
           </div>
+          {adminMode ? (
+            <button
+              type="button"
+              className={styles["admin-refresh-button"]}
+              onClick={() => {
+                void onAdminRefreshClick();
+              }}
+              disabled={isAdminRefreshRunning}
+              title="Admin: rerun pipeline and refresh this page's queries"
+            >
+              ↻
+            </button>
+          ) : null}
         </nav>
       </header>
 
@@ -67,6 +105,7 @@ export const App: FC = () => {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/daily" element={<DailyPage />} />
           <Route path="/timeline" element={<TimelinePage />} />
+          <Route path="/notable" element={<NotableMomentsPage />} />
           <Route path="/topics/:title" element={<TopicPage />} />
         </Routes>
       </main>

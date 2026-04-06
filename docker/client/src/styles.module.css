@@ -170,6 +170,17 @@ body::after {
   margin-left: 0.18rem;
 }
 
+.admin-refresh-button {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 0.92rem;
+  line-height: 1;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  justify-self: auto;
+}
+
 main {
   padding: 0.58rem;
 }
@@ -179,6 +190,13 @@ main {
   gap: 0.58rem;
   height: calc(100vh - 78px);
   grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) minmax(160px, 0.8fr);
+}
+
+.dashboard-admin-hint {
+  margin-top: 0.25rem;
+  font-size: 0.68rem;
+  color: var(--warn);
+  letter-spacing: 0.02em;
 }
 
 .dashboard-top-row,
@@ -1001,4 +1019,40 @@ pre {
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text-micro);
+}
+
+.notable-moment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.45rem;
+}
+
+.notable-moment-card {
+  border: 1px solid rgba(130, 200, 255, 0.14);
+  border-radius: 10px;
+  padding: 0.5rem 0.58rem;
+  background: linear-gradient(180deg, rgba(10, 24, 44, 0.5), rgba(8, 16, 32, 0.44));
+}
+
+.notable-moment-rank {
+  margin: 0;
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-micro);
+}
+
+.notable-moment-quote {
+  margin: 0.35rem 0;
+  padding: 0.38rem 0.5rem;
+  border-left: 2px solid rgba(120, 206, 255, 0.56);
+  background: rgba(14, 31, 56, 0.42);
+  color: rgba(225, 235, 248, 0.92);
+}
+
+.notable-moment-meta {
+  margin: 0;
+  font-size: 0.66rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
 }
