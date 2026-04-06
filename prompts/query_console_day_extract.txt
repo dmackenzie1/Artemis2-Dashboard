@@ -5,7 +5,8 @@ Given one day of utterances and a user query:
 2) If relevance is broad or ambiguous, include borderline utterances that might matter.
 3) Preserve original wording from transcript text when citing utterances.
 4) Include timestamp and channel for each quoted utterance.
-5) End with a 2-4 bullet day summary of what this day contributes to the query.
+5) Mark which utterances are most notable/memorable for telling the day-level story.
+6) End with a 2-4 bullet day summary of what this day contributes to the query.
 
 Format your response as valid HTML fragments with sections:
 - "<h3>Relevant Utterances</h3>"

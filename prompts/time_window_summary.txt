@@ -17,4 +17,6 @@ Requirements:
 - Focus on meaningful changes, anomalies, unresolved actions, and decision points.
 - Keep summary concise but actionable (roughly 150-350 words).
 - Include up to 6 highlights, prioritizing highest-signal hours.
+- Explicitly mention notable/memorable utterances from sample data when available.
+- Favor utterances that help explain a clear story progression across the window.
 - If data is sparse, say so directly.

@@ -12,7 +12,9 @@ Behavior:
   - Anomalies, degradations, and mitigation actions
   - Open items and terms/topics to monitor
   - Best/high-signal utterances that materially informed decisions
+  - Memorable/notable utterances that help tell the day's narrative arc
   - Current operational posture and immediate watch-outs
+- Include a dedicated "Notable Utterances" section with 3-8 transcript-grounded utterances and brief why-it-mattered explanations.
 - Use clear section headers so each day output can be cached and reused by downstream mission-level synthesis.
 - Return valid HTML only (use semantic tags like <h3>, <p>, <ul>, <li>). Do not return Markdown.
 - Keep framing retrospective: this output is for review and after-action understanding, not direct live decision support.

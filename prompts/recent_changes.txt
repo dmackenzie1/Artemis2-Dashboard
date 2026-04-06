@@ -5,7 +5,9 @@ Write a high-fidelity summary between 500 and 1,000 words as valid HTML only, wi
 - Timeline deltas and hourly callouts for notable shifts
 - Anomalies or risk changes and their operational impact
 - Open terms/topics to monitor next
-- Best/high-signal utterances from the window
+- Best/high-signal utterances from the window (include a dedicated notable utterances subsection)
+- Memorable or story-defining utterances that explain why the window changed
 - Concrete operator watch-outs for the next cycle
 
 Use semantic HTML tags like <h3>, <p>, <ul>, and <li>. Do not use Markdown.
+Where available, attach timestamp/channel references to highlighted utterances.

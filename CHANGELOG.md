@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: retune query and summary prompt templates to always surface notable/memorable utterances alongside narrative synthesis across chat, daily, mission, and rolling-window outputs. Intent: Ensure operators keep high-level summaries while consistently seeing transcript-grounded lines that tell the mission story.
 - feat: greatly expand Mission Timeline density by adding summary-derived highlight cards, more per-day milestones, notable-moment quote entries, and broader notable-utterance coverage windows. Intent: Ensure operators see substantially more mission-significant events, quotes, and narrative milestones without needing to leave the timeline view.
 - fix: publish nginx on host ports 80/443 while preserving 8080/8443 compatibility and proxy HTTP traffic directly instead of forcing HTTPS redirects. Intent: Ensure EC2-hosted containers are reachable on plain HTTP and HTTPS entrypoints while avoiding certificate-driven redirect failures during bring-up.
 - fix: keep the Overview Query Console Search action visible without scrolling, reduce query input height, and shift transcript-analysis prompt/output instructions to HTML-first rendering across chat and summary surfaces. Intent: Ensure operators can submit queries immediately in empty states while getting consistently formatted HTML responses instead of markdown-like text.
