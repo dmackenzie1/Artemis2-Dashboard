@@ -1059,6 +1059,21 @@ pre {
   color: var(--text-micro);
 }
 
+
+.windowed-hour-entry {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(130, 200, 255, 0.12);
+}
+
+.windowed-hour-label {
+  margin: 0 0 0.24rem;
+  font-size: 0.63rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(165, 214, 250, 0.88);
+}
+
 .timeline-page {
   display: grid;
   gap: 0.9rem;
