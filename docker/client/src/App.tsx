@@ -20,6 +20,7 @@ const HEALTH_POLL_INTERVAL_MS = 60 * 1000;
 export const App: FC = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [isRefreshingHealth, setIsRefreshingHealth] = useState(false);
+  const [reconnectState, setReconnectState] = useState<"idle" | "checking" | "reconnecting" | "pipeline-running">("idle");
   const [isAdminRefreshRunning, setIsAdminRefreshRunning] = useState(false);
   const location = useLocation();
   const { componentId, componentUid } = useComponentIdentity("app-shell");
@@ -52,10 +53,31 @@ export const App: FC = () => {
   }, []);
 
   const connected = useMemo(() => (!health ? true : health.llm.connected), [health]);
+  const reconnectButtonLabel = useMemo(() => {
+    if (reconnectState === "checking") {
+      return "Checking…";
+    }
+
+    if (reconnectState === "reconnecting") {
+      return "Reconnecting…";
+    }
+
+    if (reconnectState === "pipeline-running") {
+      return "Pipeline running…";
+    }
+
+    return "Reconnect LLM";
+  }, [reconnectState]);
   const adminMode = useMemo(() => {
     const adminQueryValue = new URLSearchParams(location.search).get("admin");
     return adminQueryValue === "true";
   }, [location.search]);
+
+  useEffect(() => {
+    if (connected && reconnectState === "pipeline-running") {
+      setReconnectState("idle");
+    }
+  }, [connected, reconnectState]);
 
   const onAdminRefreshClick = async (): Promise<void> => {
     if (isAdminRefreshRunning) {
@@ -80,16 +102,23 @@ export const App: FC = () => {
     }
 
     setIsRefreshingHealth(true);
+    setReconnectState("checking");
     try {
       const latestHealth = await refreshHealth();
       if (latestHealth?.llm.connected) {
+        setReconnectState("idle");
         return;
       }
 
-      await triggerPipelineRun();
+      setReconnectState("reconnecting");
+      const result = await triggerPipelineRun();
+      if (result.status === "already-running") {
+        setReconnectState("pipeline-running");
+      }
       await refreshHealth();
     } catch (error) {
       clientLogger.error("LLM reconnect request failed", { error });
+      setReconnectState("idle");
     } finally {
       setIsRefreshingHealth(false);
     }
@@ -125,9 +154,13 @@ export const App: FC = () => {
                 void onReconnectClick();
               }}
               disabled={isRefreshingHealth}
-              title="Retry LLM health check and trigger pipeline refresh"
+              title={
+                reconnectState === "pipeline-running"
+                  ? "Pipeline run is already in progress; click to recheck LLM health."
+                  : "Retry LLM health check and trigger pipeline refresh"
+              }
             >
-              {isRefreshingHealth ? "Reconnecting…" : "Reconnect LLM"}
+              {reconnectButtonLabel}
             </button>
           ) : null}
           {adminMode ? (
