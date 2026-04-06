@@ -6,52 +6,7 @@ import sharedStyles from "../styles/shared.module.css";
 import styles from "./TalkieRagPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
 
-type LookupResult = {
-  id: string;
-  score: number;
-  timestamp: string;
-  channel: string;
-  text: string;
-  filename: string;
-};
-
-const tokenize = (value: string): string[] =>
-  value
-    .toLowerCase()
-    .split(/[^a-z0-9]+/u)
-    .filter((token) => token.length >= 3);
-
-const buildLookupResults = (query: string, payload: ChatResponse, maxResults: number): LookupResult[] => {
-  const queryTokens = new Set(tokenize(query));
-  if (queryTokens.size === 0) {
-    return payload.evidence.slice(0, maxResults).map((entry, index) => ({
-      id: `${entry.timestamp}-${entry.channel}-${index}`,
-      score: 0,
-      timestamp: entry.timestamp,
-      channel: entry.channel,
-      text: entry.text,
-      filename: entry.filename
-    }));
-  }
-
-  return payload.evidence
-    .map((entry, index) => {
-      const entryTokens = new Set(tokenize(entry.text));
-      const overlap = [...queryTokens].filter((token) => entryTokens.has(token)).length;
-      const normalizedScore = overlap / queryTokens.size;
-      return {
-        id: `${entry.timestamp}-${entry.channel}-${index}`,
-        score: Number(normalizedScore.toFixed(3)),
-        timestamp: entry.timestamp,
-        channel: entry.channel,
-        text: entry.text,
-        filename: entry.filename
-      };
-    })
-    .filter((entry) => entry.score > 0)
-    .sort((left, right) => right.score - left.score)
-    .slice(0, maxResults);
-};
+type LookupResult = ChatResponse["evidence"][number] & { id: string };
 
 export const TalkieRagPage: FC = () => {
   const { componentId, componentUid } = useComponentIdentity("talkierag-page");
@@ -84,7 +39,12 @@ export const TalkieRagPage: FC = () => {
       setStrategySummary(
         `${payload.strategy.mode} · ${payload.strategy.contextUtterances}/${payload.strategy.totalUtterances} utterances · ${payload.strategy.daysQueried} days`
       );
-      setLookupResults(buildLookupResults(trimmed, payload, 20));
+      setLookupResults(
+        payload.evidence.slice(0, 20).map((entry, index) => ({
+          ...entry,
+          id: `${entry.timestamp}-${entry.channel}-${index}`
+        }))
+      );
     } catch (submitError) {
       clientLogger.error("TalkieRAG request failed", { error: submitError });
       setError("TalkieRAG query failed. Verify backend connectivity and try again.");

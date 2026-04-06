@@ -32,7 +32,7 @@ describe("api helpers", () => {
     const payload = {
       answer: "ok",
       evidence: [],
-      strategy: { mode: "multi-day", totalUtterances: 50, contextUtterances: 50, daysQueried: 5 }
+      strategy: { mode: "rag", totalUtterances: 50, contextUtterances: 50, daysQueried: 5 }
     };
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => payload } as Response);
 

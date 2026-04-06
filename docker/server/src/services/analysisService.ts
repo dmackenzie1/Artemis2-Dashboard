@@ -2,21 +2,16 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { dayjs } from "../lib/dayjs.js";
 import lodash from "lodash";
-import type { DashboardCache, DayInsights, NotableUtterance, TranscriptUtterance } from "../types.js";
+import type { ChatEvidence, ChatMode, DashboardCache, DayInsights, NotableUtterance, TranscriptUtterance } from "../types.js";
 import { ingestCsvDirectory } from "../lib/csvIngest.js";
 import { getPrompt } from "../lib/prompts.js";
+import { tokenizeQuery, tokenizeUtterance } from "../lib/tokenizer.js";
 import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 
 const { groupBy, uniq } = lodash;
 
 const notableSignalPattern = /\b(abort|risk|issue|anomaly|dropout|dropouts|fail|failure|fault|leak|warning|urgent|off-nominal|degraded|concern)\b/i;
-
-const tokenize = (value: string): string[] =>
-  value
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length >= 4);
 
 const parseHourlyHighlights = (rawResponse: string): Record<string, string> => {
   const trimmed = rawResponse.trim();
@@ -67,8 +62,39 @@ export class AnalysisService {
   private utterances: TranscriptUtterance[] = [];
   private cache: DashboardCache | null = null;
   private isIngesting = false;
+  private tokenIndex = new Map<string, number[]>();
+  private utteranceTokenCache = new Map<string, string[]>();
 
   constructor(private readonly config: ServiceConfig) {}
+
+  private buildSearchIndex(): void {
+    const nextIndex = new Map<string, number[]>();
+    const nextTokenCache = new Map<string, string[]>();
+
+    this.utterances.forEach((entry, index) => {
+      const tokens = tokenizeUtterance(entry.text);
+      nextTokenCache.set(entry.id, tokens);
+
+      tokens.forEach((token) => {
+        const bucket = nextIndex.get(token);
+        if (bucket) {
+          bucket.push(index);
+          return;
+        }
+
+        nextIndex.set(token, [index]);
+      });
+    });
+
+    this.tokenIndex = nextIndex;
+    this.utteranceTokenCache = nextTokenCache;
+  }
+
+  private ensureSearchIndex(): void {
+    if (this.utterances.length > 0 && this.utteranceTokenCache.size !== this.utterances.length) {
+      this.buildSearchIndex();
+    }
+  }
 
   async loadFromDisk(): Promise<void> {
     try {
@@ -103,6 +129,8 @@ export class AnalysisService {
           serverLogger.info("CSV ingestion completed", { totalFiles, totalRowsAccepted, totalRowsSkipped });
         }
       });
+      this.buildSearchIndex();
+
       const byDay = groupBy(this.utterances, (item) => item.day);
       const dayKeys = Object.keys(byDay).sort();
       const days: DayInsights[] = [];
@@ -212,6 +240,55 @@ export class AnalysisService {
     return this.cache;
   }
 
+  searchUtterances(query: string, limit = 120): ChatEvidence[] {
+    this.ensureSearchIndex();
+
+    if (this.utterances.length === 0) {
+      return [];
+    }
+
+    const queryTokens = tokenizeQuery(query);
+    if (queryTokens.length === 0) {
+      return this.utterances.slice(-Math.min(limit, this.utterances.length)).map((entry) => ({ ...entry, score: 0 }));
+    }
+
+    const candidateIndexes = new Set<number>();
+    queryTokens.forEach((token) => {
+      const indexes = this.tokenIndex.get(token) ?? [];
+      indexes.forEach((index) => candidateIndexes.add(index));
+    });
+
+    const ranked: ChatEvidence[] = [];
+    const querySet = new Set(queryTokens);
+
+    [...candidateIndexes].forEach((index) => {
+      const entry = this.utterances[index];
+      if (!entry) {
+        return;
+      }
+
+      const entryTokens = this.utteranceTokenCache.get(entry.id) ?? [];
+      const overlap = entryTokens.filter((token) => querySet.has(token)).length;
+      if (overlap === 0) {
+        return;
+      }
+
+      const queryCoverage = overlap / queryTokens.length;
+      const entryCoverage = overlap / Math.max(entryTokens.length, 1);
+      const phraseBonus = entry.text.toLowerCase().includes(query.toLowerCase()) ? 0.2 : 0;
+      const score = Number((queryCoverage * 0.75 + entryCoverage * 0.25 + phraseBonus).toFixed(4));
+
+      ranked.push({
+        ...entry,
+        score
+      });
+    });
+
+    return ranked
+      .sort((left, right) => right.score - left.score || right.timestamp.localeCompare(left.timestamp))
+      .slice(0, Math.min(Math.max(limit, 1), 500));
+  }
+
   getTopNotableUtterances(limit = 10, days = 7): NotableUtterance[] {
     if (this.utterances.length === 0) {
       return [];
@@ -235,14 +312,14 @@ export class AnalysisService {
     const tokenFrequency = new Map<string, number>();
 
     for (const entry of scoped) {
-      const uniqueTokens = new Set(tokenize(entry.text));
+      const uniqueTokens = new Set(tokenizeUtterance(entry.text));
       for (const token of uniqueTokens) {
         tokenFrequency.set(token, (tokenFrequency.get(token) ?? 0) + 1);
       }
     }
 
     const ranked = scoped.map((entry) => {
-      const uniqueTokens = [...new Set(tokenize(entry.text))];
+      const uniqueTokens = [...new Set(tokenizeUtterance(entry.text))];
       const rarityScore = uniqueTokens.reduce((total, token) => total + 1 / Math.max(tokenFrequency.get(token) ?? 1, 1), 0);
       const normalizedRarity = rarityScore / Math.max(uniqueTokens.length, 1);
       const wordCount = entry.text.trim().split(/\s+/).filter(Boolean).length;
@@ -285,64 +362,50 @@ export class AnalysisService {
   }
 
   async chat(
-    query: string
+    query: string,
+    mode: ChatMode = "rag"
   ): Promise<{
     answer: string;
-    evidence: TranscriptUtterance[];
-    strategy: { mode: "multi-day"; totalUtterances: number; contextUtterances: number; daysQueried: number };
+    evidence: ChatEvidence[];
+    strategy: { mode: "rag" | "all"; totalUtterances: number; contextUtterances: number; daysQueried: number };
   }> {
     serverLogger.info("Chat prompt requested", {
-      queryLength: query.length
+      queryLength: query.length,
+      mode
     });
-    const utterancesByDay = groupBy(this.utterances, (item) => item.day);
-    const sortedDays = Object.keys(utterancesByDay).sort();
-    const dayQueryPrompt = await getPrompt(this.config.promptsDir, "query_console_day_extract.txt");
-    const aggregatePrompt = await getPrompt(this.config.promptsDir, "query_console_aggregate.txt");
-    const dayResults: Array<{ day: string; result: string; utteranceCount: number }> = [];
 
-    for (const day of sortedDays) {
-      const dayUtterances = utterancesByDay[day];
-      const dayResult = await this.config.llmClient.generateText({
-        systemPrompt: dayQueryPrompt,
-        userPrompt: JSON.stringify({
-          query,
-          day,
-          utteranceCount: dayUtterances.length,
-          utterances: dayUtterances
-        }),
-        componentId: `analysis/query-console/day/${day}`
-      });
-
-      dayResults.push({
-        day,
-        result: dayResult,
-        utteranceCount: dayUtterances.length
-      });
-    }
+    const totalUtterances = this.utterances.length;
+    const evidence = mode === "all" ? this.utterances.slice(-400).map((entry) => ({ ...entry, score: 0 })) : this.searchUtterances(query, 200);
 
     const answer = await this.config.llmClient.generateText({
-      systemPrompt: aggregatePrompt,
+      systemPrompt: await getPrompt(this.config.promptsDir, "chat_system.txt"),
       userPrompt: JSON.stringify({
         query,
-        totalUtterances: this.utterances.length,
-        dayResults
+        mode,
+        totalUtterances,
+        evidenceCount: evidence.length,
+        evidence
       }),
-      componentId: "analysis/query-console/aggregate"
+      componentId: `analysis/chat/${mode}`
     });
 
+    const daysQueried = new Set(evidence.map((entry) => entry.day)).size;
+
     serverLogger.info("Chat prompt received", {
-      daysQueried: sortedDays.length,
-      evidenceCount: this.utterances.length
+      mode,
+      daysQueried,
+      evidenceCount: evidence.length,
+      totalUtterances
     });
 
     return {
       answer,
-      evidence: this.utterances,
+      evidence,
       strategy: {
-        mode: "multi-day",
-        totalUtterances: this.utterances.length,
-        contextUtterances: this.utterances.length,
-        daysQueried: sortedDays.length
+        mode,
+        totalUtterances,
+        contextUtterances: evidence.length,
+        daysQueried
       }
     };
   }

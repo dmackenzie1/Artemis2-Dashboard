@@ -108,9 +108,9 @@ export type HealthData = {
 
 export type ChatResponse = {
   answer: string;
-  evidence: Array<{ timestamp: string; channel: string; text: string; filename: string }>;
+  evidence: Array<{ timestamp: string; day: string; channel: string; text: string; filename: string; score: number }>;
   strategy: {
-    mode: "multi-day" | "rag" | "all";
+    mode: "rag" | "all";
     totalUtterances: number;
     contextUtterances: number;
     daysQueried: number;

@@ -12,6 +12,12 @@ export type TranscriptUtterance = {
   sourceFile: string;
 };
 
+export type ChatMode = "rag" | "all";
+
+export type ChatEvidence = TranscriptUtterance & {
+  score: number;
+};
+
 export type NotableUtterance = {
   id: string;
   timestamp: string;

@@ -15,11 +15,13 @@
     "@mikro-orm/cli": "^6.6.12",
     "@mikro-orm/core": "^6.6.12",
     "@mikro-orm/postgresql": "^6.6.12",
+    "@types/natural": "^5.1.5",
     "cors": "^2.8.5",
     "csv-parse": "^6.2.1",
     "dayjs": "^1.11.13",
     "express": "^5.1.0",
     "lodash": "^4.17.21",
+    "natural": "^8.1.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
