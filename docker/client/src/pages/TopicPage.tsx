@@ -2,7 +2,7 @@ import type { FC } from "react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
-import styles from "../styles.module.css";
+import styles from "../styles.shared.module.css";
 
 type TopicDetails = {
   title: string;

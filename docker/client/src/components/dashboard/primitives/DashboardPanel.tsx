@@ -1,5 +1,5 @@
 import type { FunctionComponent, ReactNode } from "react";
-import styles from "../../../styles.module.css";
+import styles from "../../../styles.shared.module.css";
 import { useComponentIdentity } from "./useComponentIdentity";
 
 type DashboardPanelProps = {

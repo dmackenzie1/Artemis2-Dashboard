@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- refactor: split the monolithic client CSS module into per-page/per-component CSS modules plus a shared stylesheet for reused primitives/tokens, and remove now-unused duplicate style blocks. Intent: Make UI styling easier to maintain and safer to change by localizing ownership while preserving a consistent shared mission-control visual system.
 - feat: add sticky Day shortcut buttons on the Daily page that jump directly to each rendered day section while preserving existing summary, anomalies, and hourly highlight content blocks. Intent: Let operators navigate long multi-day daily-summary views quickly without repeated manual scrolling.
 - fix: scope `recent_changes` prompt submissions to the latest two day groups (rolling 24-hour window + prior baseline) instead of sending every source document in the corpus. Intent: Prevent context-window overflow failures in Recent Transcript Review while keeping output focused on the intended last-day delta.
 - fix: update the Overview Query Console to use the shared green Ready status badge, keep a single 5-row input box with Search action, and add a visible empty chat-results placeholder plus stronger bottom input separation. Intent: Make query entry and readiness state immediately recognizable when the console has no prior messages.

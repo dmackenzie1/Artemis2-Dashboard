@@ -1,0 +1,46 @@
+.daily-day-nav {
+  position: sticky;
+  top: 3.9rem;
+  z-index: 12;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid rgba(130, 200, 255, 0.18);
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(7, 17, 32, 0.84), rgba(9, 22, 43, 0.72));
+  backdrop-filter: blur(8px);
+}
+
+.daily-day-nav-button {
+  justify-self: auto;
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+
+.hourly-highlight-grid {
+  margin-top: 0.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.45rem;
+}
+
+.hourly-highlight-card {
+  border: 1px solid rgba(130, 200, 255, 0.14);
+  border-radius: 10px;
+  padding: 0.5rem 0.58rem;
+  background: linear-gradient(180deg, rgba(10, 24, 44, 0.5), rgba(8, 16, 32, 0.44));
+}
+
+.hourly-highlight-hour {
+  margin: 0 0 0.32rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-micro);
+}

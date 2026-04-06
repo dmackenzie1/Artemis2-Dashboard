@@ -2,7 +2,8 @@ import type { FC, FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { chat, type ChatMode, type ChatResponse } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
-import styles from "../styles.module.css";
+import sharedStyles from "../styles.shared.module.css";
+import styles from "./TalkieRagPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
 
 type LookupResult = {
@@ -94,10 +95,10 @@ export const TalkieRagPage: FC = () => {
 
   return (
     <section className={styles["talkierag-page"]} data-component-id={componentId} data-component-uid={componentUid}>
-      <header className={styles["timeline-header"]}>
-        <p className={styles["timeline-kicker"]}>Semantic Console</p>
+      <header className={sharedStyles["timeline-header"]}>
+        <p className={sharedStyles["timeline-kicker"]}>Semantic Console</p>
         <h2>TalkieRAG</h2>
-        <p className={styles["timeline-subtitle"]}>
+        <p className={sharedStyles["timeline-subtitle"]}>
           Full-page retrieval workflow: run lookup against transcript evidence, then synthesize an answer using the current chat API.
         </p>
       </header>
@@ -123,20 +124,20 @@ export const TalkieRagPage: FC = () => {
         </div>
       </form>
 
-      {error ? <p className={styles["timeline-error"]}>{error}</p> : null}
+      {error ? <p className={sharedStyles["timeline-error"]}>{error}</p> : null}
 
       <section className={styles["talkierag-layout"]}>
-        <article className={styles.panel}>
+        <article className={sharedStyles.panel}>
           <h3>Answer</h3>
-          {strategySummary ? <p className={styles.subtle}>Strategy: {strategySummary}</p> : null}
-          <div className={styles["formatted-copy"]}>
+          {strategySummary ? <p className={sharedStyles.subtle}>Strategy: {strategySummary}</p> : null}
+          <div className={sharedStyles["formatted-copy"]}>
             <p>{answer ?? (isRunning ? "Running query..." : "Run a TalkieRAG query to generate an answer.")}</p>
           </div>
         </article>
 
-        <article className={styles.panel}>
+        <article className={sharedStyles.panel}>
           <h3>Retrieved Evidence</h3>
-          <p className={styles.subtle}>{resultCountLabel}</p>
+          <p className={sharedStyles.subtle}>{resultCountLabel}</p>
           <ul className={styles["talkierag-results"]}>
             {lookupResults.map((entry) => (
               <li key={entry.id} className={styles["talkierag-result-card"]}>
@@ -153,7 +154,7 @@ export const TalkieRagPage: FC = () => {
             ))}
           </ul>
           {!isRunning && lookupResults.length === 0 ? (
-            <p className={styles.subtle}>No matching snippets yet. Try a narrower query (channel, subsystem, issue type, or timeframe).</p>
+            <p className={sharedStyles.subtle}>No matching snippets yet. Try a narrower query (channel, subsystem, issue type, or timeframe).</p>
           ) : null}
         </article>
       </section>

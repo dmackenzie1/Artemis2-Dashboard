@@ -2,7 +2,8 @@ import type { FC } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchNotableUtterances, fetchTimeline, type NotableUtterancesResponse, type TimelineDayEntry } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
-import styles from "../styles.module.css";
+import sharedStyles from "../styles.shared.module.css";
+import styles from "./TimelinePage.module.css";
 import { renderStructuredText } from "../utils/formatting/renderStructuredText";
 import { clientLogger } from "../utils/logging/clientLogger";
 
@@ -265,11 +266,11 @@ export const TimelinePage: FC = () => {
 
   return (
     <section className={styles["timeline-page"]} data-component-id={componentId} data-component-uid={componentUid}>
-      <header className={styles["timeline-header"]}>
-        <p className={styles["timeline-kicker"]}>Artemis II Mission Intelligence</p>
+      <header className={sharedStyles["timeline-header"]}>
+        <p className={sharedStyles["timeline-kicker"]}>Artemis II Mission Intelligence</p>
         <h2>Mission Timeline</h2>
-        <p className={styles["timeline-subtitle"]}>Chronological mission history with day breaks, major milestones, notable communications, and transcript references.</p>
-        <p className={styles["timeline-range"]}>{missionRangeLabel}</p>
+        <p className={sharedStyles["timeline-subtitle"]}>Chronological mission history with day breaks, major milestones, notable communications, and transcript references.</p>
+        <p className={sharedStyles["timeline-range"]}>{missionRangeLabel}</p>
       </header>
 
       <section className={styles["timeline-controls"]}>
@@ -294,7 +295,7 @@ export const TimelinePage: FC = () => {
         </section>
       ) : null}
 
-      {!isLoading && error ? <p className={styles["timeline-error"]}>{error}</p> : null}
+      {!isLoading && error ? <p className={sharedStyles["timeline-error"]}>{error}</p> : null}
 
       {!isLoading && !error && visibleItems.length === 0 ? (
         <p className={styles["timeline-empty"]}>No timeline data available yet. Trigger ingestion from Overview, then return here.</p>
@@ -333,7 +334,7 @@ export const TimelinePage: FC = () => {
                   <section className={`${styles["timeline-event-card"]} ${styles[`timeline-event-${item.type}`]}`}>
                     <p className={styles["timeline-event-time"]}>{item.timeLabel}</p>
                     <h3>{item.title}</h3>
-                    <div className={styles["formatted-copy"]}>{renderStructuredText(item.body, styles["formatted-list"])}</div>
+                    <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(item.body, sharedStyles["formatted-list"])}</div>
                     {item.meta ? <p className={styles["timeline-event-meta"]}>{item.meta}</p> : null}
                     {item.tags.length > 0 ? (
                       <div className={styles["timeline-tag-row"]}>

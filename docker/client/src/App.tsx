@@ -7,7 +7,7 @@ import { StatusBadge } from "./components/dashboard/primitives/StatusBadge";
 import { useComponentIdentity } from "./components/dashboard/primitives/useComponentIdentity";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DailyPage } from "./pages/DailyPage";
-import styles from "./styles.module.css";
+import styles from "./App.module.css";
 import { TimelinePage } from "./pages/TimelinePage";
 import { TopicPage } from "./pages/TopicPage";
 import { NotableMomentsPage } from "./pages/NotableMomentsPage";

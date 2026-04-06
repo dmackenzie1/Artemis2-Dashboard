@@ -1,5 +1,5 @@
 import type { FunctionComponent } from "react";
-import styles from "../../styles.module.css";
+import styles from "../../styles.shared.module.css";
 import { renderStructuredText } from "../../utils/formatting/renderStructuredText";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
