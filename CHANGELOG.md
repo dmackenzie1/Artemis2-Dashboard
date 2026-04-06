@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: stabilize Mission Hourly Stats y-axis labels with index-based tick identity and integer-formatted tick values so 0 remains anchored at the bottom and peak values stay at the top. Intent: Eliminate duplicated/misordered y-axis labels that made the histogram scale read incorrectly during live updates.
 - fix: replace LLM connectivity prompt polling with an HTTP OPTIONS probe, mark stale running prompt executions as failed at pipeline start, switch mission/stat word totals to stored `word_count`, run `/api/pipeline/run` asynchronously with HTTP 202, and remove duplicate dashboard health polling from the controller. Intent: Cut avoidable model spend and query cost while making pipeline/run UX resilient to long jobs and crash-recovery edge cases.
 - fix: recalculate Mission Hourly Stats y-axis ticks from the true hourly peak, clamp bar scaling to that peak with a 0 baseline, and switch x-axis tick labels/title to UTC `mm/dd`. Intent: Correct misleading timeline scale cues so operators can reliably read hourly intensity and day coverage at a glance.
 - fix: route Last 24 Hours to `recent_changes`, render Mission Summary/Last 24 Hours as full scrollable rich-text blocks, and tighten mission/recent-change prompt length guidance for stable daily/timeline-focused outputs. Intent: Resolve operator-reported daily/timeline query quality issues and prevent critical summary text from being truncated in the dashboard panes.
