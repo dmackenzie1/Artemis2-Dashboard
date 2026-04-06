@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: define mission timeline x-axis label indexes from rendered hourly buckets and align bottom axis iteration with aggregated totals to restore successful frontend TypeScript builds. Intent: Unblock Docker/frontend builds by removing an undefined label-index reference introduced during timeline refactoring.
 - fix: fallback dashboard mission overview rendering to `/api/dashboard` mission summary content when `mission_summary` pipeline prompt state is missing, while still preferring pipeline output when available. Intent: Ensure operators see completed mission summaries immediately even if pipeline dashboard rows are unavailable or delayed.
 - feat: condense the communications histogram into "Mission Hourly Stats" with hourly aggregation, visible x/y axis ticks, and highlighted newest bars. Intent: Improve at-a-glance operator readability by making timeline scale/recency explicit in the mission activity chart.
 - feat: generate per-day hourly highlights with a single structured LLM query, render daily/timeline summaries as formatted rich text blocks, and standardize pending pane copy to "Waiting for results…" for Last 24 Hours loading states. Intent: Improve mission readability and reduce hourly prompt fan-out while keeping operator-facing status feedback consistent across overview and daily workflows.
