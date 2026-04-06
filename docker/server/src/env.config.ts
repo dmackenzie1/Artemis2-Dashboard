@@ -20,7 +20,10 @@ const EnvSchema = z.object({
   PROMPT_SUBMISSIONS_DIR: z.string().default("/app/data/prompt-submissions"),
   LLM_DEBUG_PROMPTS_DIR: z.string().default("/tmp/llm-prompts"),
   PIPELINE_INTERVAL_HOURS: z.coerce.number().positive().default(6),
-  PIPELINE_AUTO_RUN: z.coerce.boolean().default(true)
+  PIPELINE_AUTO_RUN: z.coerce.boolean().default(true),
+  REDIS_URL: z.string().default("redis://redis:6379"),
+  REDIS_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 60),
+  REDIS_CACHE_ENABLED: z.coerce.boolean().default(true)
 });
 
 export const env = EnvSchema.parse(process.env);

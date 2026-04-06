@@ -172,6 +172,94 @@ describe("LlmClient.generateText", () => {
       global.fetch = originalFetch;
     }
   });
+
+  it("serves repeated non-chat requests from cache when configured", async () => {
+    const originalFetch = global.fetch;
+    const mockFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "cached-output"
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    const cachedValues = new Map<string, string>();
+    const cache = {
+      get: vi.fn(async (key: string) => cachedValues.get(key) ?? null),
+      set: vi.fn(async (key: string, value: string) => {
+        cachedValues.set(key, value);
+      })
+    };
+
+    try {
+      global.fetch = mockFetch as unknown as typeof fetch;
+      const client = new LlmClient("https://example.test/v1/chat/completions", "test-key", "model-test", undefined, 12000, cache, 3600);
+
+      const first = await client.generateText({
+        systemPrompt: "Summarize in one line.",
+        userPrompt: "same request"
+      });
+      const second = await client.generateText({
+        systemPrompt: "Summarize in one line.",
+        userPrompt: "same request"
+      });
+
+      expect(first).toBe("cached-output");
+      expect(second).toBe("cached-output");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(cache.set).toHaveBeenCalledTimes(1);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("bypasses cache when cacheEnabled is false", async () => {
+    const originalFetch = global.fetch;
+    const mockFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "chat-output"
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    const cache = {
+      get: vi.fn(async () => null),
+      set: vi.fn(async () => undefined)
+    };
+
+    try {
+      global.fetch = mockFetch as unknown as typeof fetch;
+      const client = new LlmClient("https://example.test/v1/chat/completions", "test-key", "model-test", undefined, 12000, cache, 3600);
+
+      await client.generateText({
+        systemPrompt: "System",
+        userPrompt: "chat request",
+        cacheEnabled: false
+      });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(cache.get).not.toHaveBeenCalled();
+      expect(cache.set).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
 });
 
 describe("LlmClient.checkConnectivity", () => {

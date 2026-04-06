@@ -17,6 +17,7 @@ import { ingestTranscriptCsvDirectory } from "./services/transcriptIngestionServ
 import { SystemLogsService } from "./services/systemLogsService.js";
 import { createSystemLogsRouter } from "./routes/systemLogs.js";
 import { TimeWindowSummaryService } from "./services/timeWindowSummaryService.js";
+import { RedisLlmCache } from "./services/redisLlmCache.js";
 
 const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
   await orm.em.getConnection().execute(`
@@ -83,12 +84,26 @@ const app = express();
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json({ limit: "4mb" }));
 
+const redisLlmCache = env.REDIS_CACHE_ENABLED ? new RedisLlmCache(env.REDIS_URL) : null;
+if (redisLlmCache) {
+  try {
+    await redisLlmCache.connect();
+  } catch (error) {
+    serverLogger.warn("Redis cache unavailable; continuing without LLM Redis cache", {
+      redisUrl: env.REDIS_URL,
+      error: serializeUnknownError(error)
+    });
+  }
+}
+
 const llmClient = new LlmClient(
   env.ANTHROPIC_BASE_URL,
   env.ANTHROPIC_API_KEY,
   env.ANTHROPIC_MODEL,
   env.LLM_DEBUG_PROMPTS_DIR,
-  env.LLM_MAX_TOKENS
+  env.LLM_MAX_TOKENS,
+  redisLlmCache ?? undefined,
+  env.REDIS_CACHE_TTL_SECONDS
 );
 let llmConnectivityStatus = await llmClient.checkConnectivity();
 
@@ -216,6 +231,20 @@ const startPipelineSchedule = (): void => {
   }, intervalMs);
 };
 
+const shutdown = async (): Promise<void> => {
+  if (redisLlmCache) {
+    await redisLlmCache.disconnect();
+  }
+};
+
+process.on("SIGINT", () => {
+  void shutdown().finally(() => process.exit(0));
+});
+
+process.on("SIGTERM", () => {
+  void shutdown().finally(() => process.exit(0));
+});
+
 app.use("/api/system-logs", createSystemLogsRouter(systemLogsService));
 
 app.use(
@@ -294,7 +323,6 @@ const runStartupIngestion = async (): Promise<void> => {
     serverLogger.error("Startup ingestion failed", { error: serializeUnknownError(error) });
   }
 };
-
 setInterval(() => {
   llmClient.checkConnectivity().then((status) => {
     llmConnectivityStatus = status;

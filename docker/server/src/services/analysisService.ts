@@ -360,7 +360,8 @@ Return valid HTML fragments only using tags such as <h3>, <p>, <ul>, and <li>. D
         queryTokens: ragRetrieval.queryTokens,
         evidence: evidenceForPrompt
       }),
-      componentId: `analysis/chat/${mode}`
+      componentId: `analysis/chat/${mode}`,
+      cacheEnabled: false
     });
 
     const daysQueried = new Set(evidenceForPrompt.map((entry) => entry.day)).size;
