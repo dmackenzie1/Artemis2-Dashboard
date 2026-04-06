@@ -28,10 +28,10 @@ TalkyBot source system: https://talkybot.fit.nasa.gov/
 
 ## Quick start (Docker)
 
-1. Copy env file:
+1. Generate local env file from `env.config.ts`:
 
 ```bash
-cp .env.example .env
+npx @emss/make-dotenv
 ```
 
 2. (Optional) install dependencies for local lint/test:
@@ -43,7 +43,8 @@ npm install
 3. Start stack:
 
 ```bash
-docker compose up --build
+./appcompose dev build
+./appcompose dev up -d
 ```
 
 4. Open `http://localhost:8080`.

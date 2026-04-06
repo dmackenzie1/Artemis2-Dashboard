@@ -51,7 +51,6 @@ export type MissionHourlyChannelEntry = {
   utterances: number;
 };
 
-
 export type TimelineDayEntry = {
   day: string;
   summary: string;
@@ -99,7 +98,6 @@ export type ChatResponse = {
 };
 
 export type ChatMode = "rag" | "all";
-
 
 export type SystemLogEntry = {
   id: string;
@@ -207,8 +205,6 @@ export const fetchStatsHourlyByChannel = async (days = 7): Promise<MissionHourly
   return (await response.json()) as MissionHourlyChannelEntry[];
 };
 
-
-
 export const fetchTimeline = async (): Promise<TimelineDayEntry[]> => {
   const response = await fetch(`${base}/timeline`);
   if (!response.ok) {
@@ -247,8 +243,6 @@ export const fetchNotableMoments = async (): Promise<NotableMomentsData | null> 
   return (await response.json()) as NotableMomentsData;
 };
 
-
-
 export const fetchSystemLogs = async (): Promise<SystemLogListResponse> => {
   const response = await fetch(`${base}/system-logs`);
   if (!response.ok) {
@@ -267,7 +261,7 @@ export const fetchSystemLogFile = async (id: string): Promise<SystemLogFileRespo
   return (await response.json()) as SystemLogFileResponse;
 };
 
-export const chat = async (query: string): Promise<ChatResponse> => {
+export const chat = async (query: string, mode: ChatMode = "rag"): Promise<ChatResponse> => {
   const response = await fetch(`${base}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
