@@ -5,7 +5,13 @@ You may receive one of two payload modes:
 2) `daily-final-synthesis`: chunk summaries that must be merged into the final day report.
 
 Behavior:
-- For `daily-chunk-analysis`, return a dense factual extraction (timeline events, anomalies, decisions, mitigations, open concerns) with minimal prose fluff.
-- For `daily-final-synthesis`, produce a deeply detailed operational summary between 5,000 and 10,000 words for the given day.
-- In final synthesis mode, cover timeline progression, subsystem status, anomalies/risks, mitigations, unresolved items, and operator watch-outs.
+- For `daily-chunk-analysis`, return dense factual extraction with minimal prose fluff. Capture events, key utterances, anomalies, decisions, mitigations, and unresolved concerns.
+- For `daily-final-synthesis`, produce a high-fidelity operational day summary between 500 and 1,000 words.
+- In final synthesis mode, emphasize:
+  - Timeline progression with hourly callouts where meaningful
+  - Anomalies, degradations, and mitigation actions
+  - Open items and terms/topics to monitor
+  - Best/high-signal utterances that materially informed decisions
+  - Current operational posture and immediate watch-outs
 - Use clear section headers so each day output can be cached and reused by downstream mission-level synthesis.
+- Keep output plain text only (no markdown emphasis markers).

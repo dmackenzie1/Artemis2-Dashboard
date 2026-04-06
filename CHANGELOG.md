@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: retune mission, daily, and last-24-hours prompt templates to request 500-1,000 word high-signal summaries with explicit timeline callouts, anomalies, open watch terms, and best utterances guidance. Intent: Align generated mission intelligence output with operator workflow expectations for both executive synthesis and high-fidelity daily review.
 - fix: collapse the app shell to a single mission background image layer by removing extra gradient/scanline pseudo-element overlays. Intent: Resolve follow-up feedback that dashboard still appeared to stack multiple background images and keep visual treatment consistent across overview, daily, and timeline routes.
 - fix: remove dashboard panel backdrop blur so Overview background clarity matches Daily and Timeline pages. Intent: Address operator feedback that the dashboard looked blurry compared with other mission views while preserving the shared layered background treatment.
 - fix: stabilize Mission Hourly Stats y-axis labels with index-based tick identity and integer-formatted tick values so 0 remains anchored at the bottom and peak values stay at the top. Intent: Eliminate duplicated/misordered y-axis labels that made the histogram scale read incorrectly during live updates.
