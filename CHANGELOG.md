@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+- fix: collapse the app shell to a single mission background image layer by removing extra gradient/scanline pseudo-element overlays. Intent: Resolve follow-up feedback that dashboard still appeared to stack multiple background images and keep visual treatment consistent across overview, daily, and timeline routes.
+- fix: remove dashboard panel backdrop blur so Overview background clarity matches Daily and Timeline pages. Intent: Address operator feedback that the dashboard looked blurry compared with other mission views while preserving the shared layered background treatment.
 - fix: align Stats panel value columns with fixed-width table columns, right-aligned tabular numerics, and remove per-row divider lines for cleaner scanability. Intent: Address operator feedback so metric values line up consistently across sections and are faster to compare at a glance.
 - fix: replace LLM connectivity prompt polling with an HTTP OPTIONS probe, mark stale running prompt executions as failed at pipeline start, switch mission/stat word totals to stored `word_count`, run `/api/pipeline/run` asynchronously with HTTP 202, and remove duplicate dashboard health polling from the controller. Intent: Cut avoidable model spend and query cost while making pipeline/run UX resilient to long jobs and crash-recovery edge cases.
 - fix: recalculate Mission Hourly Stats y-axis ticks from the true hourly peak, clamp bar scaling to that peak with a 0 baseline, and switch x-axis tick labels/title to UTC `mm/dd`. Intent: Correct misleading timeline scale cues so operators can reliably read hourly intensity and day coverage at a glance.
