@@ -4,8 +4,10 @@ import { dayjs } from "../lib/dayjs.js";
 import type { LlmClient } from "./llmClient.js";
 import { getPrompt } from "../lib/prompts.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
+import { ExpiringCache } from "./expiringCache.js";
 
 type EntityManagerProvider = () => EntityManager;
+const rollingWindowCacheTtlMs = 3 * 60 * 1000;
 
 type TimeWindowUtteranceRow = {
   timestamp: string;
@@ -56,6 +58,8 @@ const extractJsonObject = (raw: string): string | null => {
 };
 
 export class TimeWindowSummaryService {
+  private readonly cache = new ExpiringCache<TimeWindowSummary>(rollingWindowCacheTtlMs);
+
   constructor(
     private readonly getEntityManager: EntityManagerProvider,
     private readonly llmClient: LlmClient,
@@ -64,6 +68,12 @@ export class TimeWindowSummaryService {
 
   async generate(hours: number): Promise<TimeWindowSummary> {
     const safeHours = Math.min(Math.max(Math.floor(hours), 1), 24);
+    const cacheKey = `hours:${safeHours}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const windowEnd = dayjs().utc();
     const windowStart = windowEnd.subtract(safeHours, "hour");
 
@@ -90,7 +100,7 @@ export class TimeWindowSummaryService {
     };
 
     if (rows.length === 0) {
-      return {
+      const emptyPayload: TimeWindowSummary = {
         generatedAt: windowEnd.toISOString(),
         window: {
           hours: safeHours,
@@ -101,6 +111,8 @@ export class TimeWindowSummaryService {
         summary: `No transcript utterances were found in the last ${safeHours} hours.`,
         highlights: []
       };
+      this.cache.set(cacheKey, emptyPayload);
+      return emptyPayload;
     }
 
     const byHour = rows.reduce<Map<string, TimeWindowUtteranceRow[]>>((grouped, row) => {
@@ -151,7 +163,7 @@ export class TimeWindowSummaryService {
       serverLogger.warn("Time-window summary output did not include parseable JSON; using fallback", {
         hours: safeHours
       });
-      return {
+      const fallbackPayload: TimeWindowSummary = {
         generatedAt: dayjs().utc().toISOString(),
         window: {
           hours: safeHours,
@@ -162,6 +174,8 @@ export class TimeWindowSummaryService {
         summary: llmRaw,
         highlights: context.map((entry) => ({ hour: entry.hour, summary: "No structured highlight generated." }))
       };
+      this.cache.set(cacheKey, fallbackPayload);
+      return fallbackPayload;
     }
 
     let parsedJson: unknown;
@@ -172,7 +186,7 @@ export class TimeWindowSummaryService {
         hours: safeHours,
         error
       });
-      return {
+      const fallbackPayload: TimeWindowSummary = {
         generatedAt: dayjs().utc().toISOString(),
         window: {
           hours: safeHours,
@@ -183,6 +197,8 @@ export class TimeWindowSummaryService {
         summary: llmRaw,
         highlights: []
       };
+      this.cache.set(cacheKey, fallbackPayload);
+      return fallbackPayload;
     }
 
     const parsed = llmOutputSchema.safeParse(parsedJson);
@@ -191,7 +207,7 @@ export class TimeWindowSummaryService {
         hours: safeHours,
         issues: parsed.error.issues
       });
-      return {
+      const fallbackPayload: TimeWindowSummary = {
         generatedAt: dayjs().utc().toISOString(),
         window: {
           hours: safeHours,
@@ -202,9 +218,11 @@ export class TimeWindowSummaryService {
         summary: llmRaw,
         highlights: []
       };
+      this.cache.set(cacheKey, fallbackPayload);
+      return fallbackPayload;
     }
 
-    return {
+    const payload: TimeWindowSummary = {
       generatedAt: dayjs().utc().toISOString(),
       window: {
         hours: safeHours,
@@ -215,5 +233,7 @@ export class TimeWindowSummaryService {
       summary: parsed.data.summary,
       highlights: parsed.data.highlights
     };
+    this.cache.set(cacheKey, payload);
+    return payload;
   }
 }

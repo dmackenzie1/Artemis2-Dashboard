@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- refactor: remove PromptExecution database cache lookups from the prompt pipeline and add short-lived in-memory caching for stable stats/time-window/mission-metrics views (3-5 minute TTLs). Intent: Cache read-heavy outputs that are effectively stable over a few minutes while eliminating the older DB prompt-response cache path.
 - chore: perform a deep production-grade full-stack review across backend/frontend/nginx/postgres and publish prioritized risk findings with remediation guidance. Intent: Give maintainers an actionable, production-focused reliability/security hardening plan before additional feature work.
 - feat: add Redis-backed LLM API response caching with a 60-minute TTL for repeated non-chat prompts, wire the backend to a new Redis service, and explicitly bypass cache for chat-mode calls. Intent: Cut duplicate model calls for identical analysis requests while preserving live conversational behavior for operator chat workflows.
 - feat: add a topbar coffee-cup easter egg toggle that mounts/unmounts EMSSpressoBot with animated movement, chatter bubbles, and optional `window.emsspressobot` controls. Intent: Let operators summon or dismiss a lightweight morale-boosting bot without affecting core dashboard workflows.
