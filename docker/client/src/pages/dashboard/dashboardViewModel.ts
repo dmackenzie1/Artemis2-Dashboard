@@ -6,6 +6,27 @@ import type {
 import { getPromptDisplay } from "../../components/dashboard/promptDisplay";
 import type { DashboardPromptView, DashboardStat, DashboardViewModel } from "./types";
 
+const extractLatestDaySummary = (summaryText: string, latestDay: string | undefined): string => {
+  if (!latestDay) {
+    return summaryText;
+  }
+
+  const escapedLatestDay = latestDay.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const headingPattern = new RegExp(`^##\\s+${escapedLatestDay}\\s*$`, "m");
+  const headingMatch = headingPattern.exec(summaryText);
+
+  if (!headingMatch) {
+    return summaryText;
+  }
+
+  const sectionStart = headingMatch.index;
+  const remainingText = summaryText.slice(sectionStart + headingMatch[0].length);
+  const nextHeadingMatch = /^##\s+/m.exec(remainingText);
+  const sectionEnd = nextHeadingMatch ? sectionStart + headingMatch[0].length + nextHeadingMatch.index : summaryText.length;
+
+  return summaryText.slice(sectionStart, sectionEnd).trim();
+};
+
 const toPromptView = (
   prompt: PipelineDashboardData["prompts"][number] | undefined,
   defaultMessage: string
@@ -48,9 +69,9 @@ export const buildDashboardViewModel = (
 ): DashboardViewModel => {
   const latestDay = data?.days[data.days.length - 1]?.day;
   const missionPrompt = pipeline?.prompts.find((entry) => entry.key === "mission_summary");
-  const dailyPrompt = pipeline?.prompts.find((entry) => entry.key === "recent_changes");
+  const dailyPrompt = pipeline?.prompts.find((entry) => entry.key === "daily_summary");
   const missionSummaryFallback = data?.missionSummary?.trim();
-  const recentChangesFallback = data?.recentChanges?.trim();
+  const latestDaySummaryFallback = data?.days[data.days.length - 1]?.summary?.trim();
 
   const missionSummary = missionPrompt
     ? toPromptView(missionPrompt, "Building mission overview...")
@@ -65,15 +86,19 @@ export const buildDashboardViewModel = (
           text: "Building mission overview...",
           lastRunAt: null
         };
+  const dailySummaryFromPrompt = dailyPrompt ? toPromptView(dailyPrompt, "Not ready yet.") : null;
 
   return {
     latestDay,
     missionSummary,
-    dailySummary: dailyPrompt
-      ? toPromptView(dailyPrompt, "Not ready yet.")
+    dailySummary: dailySummaryFromPrompt
+      ? {
+          ...dailySummaryFromPrompt,
+          text: extractLatestDaySummary(dailySummaryFromPrompt.text, latestDay)
+        }
       : {
-          statusLabel: recentChangesFallback ? "ready" : "not ready",
-          text: recentChangesFallback ?? "Not ready yet.",
+          statusLabel: latestDaySummaryFallback ? "ready" : "not ready",
+          text: latestDaySummaryFallback ?? "Not ready yet.",
           lastRunAt: data?.generatedAt ?? null
         },
     stats: toStats(statsSummary),

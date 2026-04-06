@@ -59,4 +59,77 @@ describe("buildDashboardViewModel", () => {
     expect(viewModel.missionSummary.text).toBe("Pipeline output");
     expect(viewModel.missionSummary.lastRunAt).toBe("2026-04-06T00:10:00Z");
   });
+
+  it("shows only the latest day section when daily summary prompt output includes multiple days", () => {
+    const dashboardData = {
+      ...createDashboardData("Mission summary from ingestion cache"),
+      days: [
+        {
+          day: "2026-04-05",
+          summary: "day 5 summary",
+          hourly: {},
+          topics: [],
+          stats: { utteranceCount: 1, wordCount: 10, channelCount: 1, hourlyUtterances: {} }
+        },
+        {
+          day: "2026-04-06",
+          summary: "day 6 summary",
+          hourly: {},
+          topics: [],
+          stats: { utteranceCount: 2, wordCount: 20, channelCount: 1, hourlyUtterances: {} }
+        }
+      ]
+    };
+
+    const pipeline = createPipeline([
+      {
+        id: 2,
+        key: "daily_summary",
+        componentId: "daily_summary",
+        fileName: "daily_summary.txt",
+        promptUpdatedAt: "2026-04-05T00:00:00Z",
+        lastRunAt: "2026-04-06T00:20:00Z",
+        status: "success",
+        cacheHit: false,
+        submittedPreview: null,
+        outputPreview: "## 2026-04-06",
+        submittedText: null,
+        output: "## 2026-04-05\n\nOlder day summary\n\n## 2026-04-06\n\nCurrent day summary",
+        errorMessage: null
+      }
+    ]);
+
+    const viewModel = buildDashboardViewModel(dashboardData, pipeline, null);
+
+    expect(viewModel.dailySummary.statusLabel).toBe("ready");
+    expect(viewModel.dailySummary.text).toBe("## 2026-04-06\n\nCurrent day summary");
+  });
+
+  it("falls back to the latest ingested day summary when daily prompt output is unavailable", () => {
+    const dashboardData = {
+      ...createDashboardData("Mission summary from ingestion cache"),
+      recentChanges: "older changes text",
+      days: [
+        {
+          day: "2026-04-05",
+          summary: "day 5 summary",
+          hourly: {},
+          topics: [],
+          stats: { utteranceCount: 1, wordCount: 10, channelCount: 1, hourlyUtterances: {} }
+        },
+        {
+          day: "2026-04-06",
+          summary: "latest day summary from dashboard cache",
+          hourly: {},
+          topics: [],
+          stats: { utteranceCount: 2, wordCount: 20, channelCount: 1, hourlyUtterances: {} }
+        }
+      ]
+    };
+
+    const viewModel = buildDashboardViewModel(dashboardData, null, null);
+
+    expect(viewModel.dailySummary.statusLabel).toBe("ready");
+    expect(viewModel.dailySummary.text).toBe("latest day summary from dashboard cache");
+  });
 });

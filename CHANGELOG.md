@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: point the Overview "Recent Transcript Review / Latest TalkyBot Window" panel at `daily_summary`, constrain prompt output to the current latest-day section, and fall back to the newest cached day summary when pipeline output is unavailable. Intent: Ensure operators see the actual current daily summary in that panel instead of a rolling recent-changes digest.
 - feat: expand Timeline daily density by increasing per-day milestone summaries and selecting notable utterances with a per-day cap plus higher total fetch budget. Intent: Show operators a richer day-by-day mission narrative instead of sparsely sampled highlights.
 - refactor: replace the frontend monolithic CSS module with page/component-owned CSS modules plus a shared style primitives module, and remove stale unused selectors from the prior global stylesheet. Intent: Make style ownership explicit and maintainable while preserving the existing Artemis dashboard visual behavior.
 - feat: add dedicated 3 Hour, 6 Hour, and 12 Hour pages that call a new DB-backed time-window API, synthesize rolling-window transcript context with an LLM, and show explicit waiting-state feedback while results are generated. Intent: Let operators request near-now mission snapshots at different time scales with trustworthy database scope and clear in-progress UI status.
