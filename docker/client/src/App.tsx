@@ -43,7 +43,12 @@ export const App: FC = () => {
   return (
     <div className={styles["app-shell"]} data-component-id={componentId} data-component-uid={componentUid}>
       <header className={styles.topbar}>
-        <h1>Artemis 2 Mission Intelligence</h1>
+        <div className={styles["topbar-title"]}>
+          <span className={styles["topbar-emblem"]} aria-hidden="true">
+            A2
+          </span>
+          <h1>Artemis 2 Mission Intelligence</h1>
+        </div>
         <nav className={styles["topbar-nav"]}>
           <NavLink to="/">Overview</NavLink>
           <NavLink to="/daily">Daily</NavLink>

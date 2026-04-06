@@ -10,7 +10,6 @@ import { serverLogger } from "../utils/logging/serverLogger.js";
 
 const { groupBy, uniq } = lodash;
 
-
 const notableSignalPattern = /\b(abort|risk|issue|anomaly|dropout|dropouts|fail|failure|fault|leak|warning|urgent|off-nominal|degraded|concern)\b/i;
 
 const tokenize = (value: string): string[] =>
@@ -18,6 +17,44 @@ const tokenize = (value: string): string[] =>
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((token) => token.length >= 4);
+
+const parseHourlyHighlights = (rawResponse: string): Record<string, string> => {
+  const trimmed = rawResponse.trim();
+  if (!trimmed) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    const entries = Object.entries(parsed)
+      .filter(([hour, summary]) => typeof hour === "string" && typeof summary === "string")
+      .map(([hour, summary]) => [hour.trim(), summary.trim()] as const)
+      .filter(([hour, summary]) => hour.length > 0 && summary.length > 0)
+      .sort(([left], [right]) => left.localeCompare(right));
+
+    return Object.fromEntries(entries);
+  } catch {
+    const extracted = trimmed.match(/\{[\s\S]*\}/u)?.[0];
+    if (!extracted) {
+      return {};
+    }
+
+    try {
+      const parsed = JSON.parse(extracted) as Record<string, string>;
+      return Object.fromEntries(
+        Object.entries(parsed)
+          .filter(([hour, summary]) => typeof hour === "string" && typeof summary === "string")
+          .sort(([left], [right]) => left.localeCompare(right))
+      );
+    } catch {
+      return {};
+    }
+  }
+};
 
 export type ChatMode = "rag" | "all";
 
@@ -57,94 +94,117 @@ export class AnalysisService {
     try {
       serverLogger.info("Starting CSV ingestion", { dataDir: this.config.dataDir });
 
-    this.utterances = await ingestCsvDirectory(this.config.dataDir, {
-      onDirectoryRead: ({ directoryPath, totalFiles }) => {
-        serverLogger.info("CSV directory scanned", { directoryPath, totalFiles });
-      },
-      onFileIngested: ({ file, rowsParsed, rowsAccepted, rowsSkipped }) => {
-        serverLogger.info("CSV file ingested", { file, rowsParsed, rowsAccepted, rowsSkipped });
-      },
-      onIngestComplete: ({ totalFiles, totalRowsAccepted, totalRowsSkipped }) => {
-        serverLogger.info("CSV ingestion completed", { totalFiles, totalRowsAccepted, totalRowsSkipped });
-      }
-    });
-    const byDay = groupBy(this.utterances, (item) => item.day);
-    const dayKeys = Object.keys(byDay).sort();
-    const days: DayInsights[] = [];
-
-    for (const day of dayKeys) {
-      const entries = byDay[day];
-      const byHour = groupBy(entries, (item) => item.hour);
-      const hourly: Record<string, string> = {};
-      const hourlyUtterances: Record<string, number> = {};
-
-      for (const hour of Object.keys(byHour).sort()) {
-        hourlyUtterances[hour] = byHour[hour].length;
-        hourly[hour] = "Hourly summary generation is disabled.";
-      }
-
-      const dailyPrompt = await getPrompt(this.config.promptsDir, "daily_summary.txt");
-      serverLogger.info("Prompting daily summary", { day, sampleSize: Math.min(entries.length, 120) });
-      const dailySummary = await this.config.llmClient.generateText({
-        systemPrompt: dailyPrompt,
-        userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) }),
-        componentId: `analysis/daily_summary/${day}`
-      });
-      serverLogger.info("Prompt received for daily summary", { day });
-
-      const topicsPrompt = await getPrompt(this.config.promptsDir, "top_topics.txt");
-      serverLogger.info("Prompting top topics", { day, sampleSize: Math.min(entries.length, 120) });
-      const topicsRaw = await this.config.llmClient.generateText({
-        systemPrompt: topicsPrompt,
-        userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) }),
-        componentId: `analysis/top_topics/${day}`
-      });
-      serverLogger.info("Prompt received for top topics", { day });
-
-      days.push({
-        day,
-        summary: dailySummary,
-        hourly,
-        topics: this.config.llmClient.parseTopics(topicsRaw),
-        stats: {
-          utteranceCount: entries.length,
-          wordCount: entries.reduce((count, item) => count + item.text.split(/\s+/).length, 0),
-          channelCount: uniq(entries.map((item) => item.channel)).length,
-          hourlyUtterances
+      this.utterances = await ingestCsvDirectory(this.config.dataDir, {
+        onDirectoryRead: ({ directoryPath, totalFiles }) => {
+          serverLogger.info("CSV directory scanned", { directoryPath, totalFiles });
+        },
+        onFileIngested: ({ file, rowsParsed, rowsAccepted, rowsSkipped }) => {
+          serverLogger.info("CSV file ingested", { file, rowsParsed, rowsAccepted, rowsSkipped });
+        },
+        onIngestComplete: ({ totalFiles, totalRowsAccepted, totalRowsSkipped }) => {
+          serverLogger.info("CSV ingestion completed", { totalFiles, totalRowsAccepted, totalRowsSkipped });
         }
       });
-    }
+      const byDay = groupBy(this.utterances, (item) => item.day);
+      const dayKeys = Object.keys(byDay).sort();
+      const days: DayInsights[] = [];
 
-    serverLogger.info("Prompting mission overview summary", { totalDays: days.length });
-    const missionSummary = await this.config.llmClient.generateText({
-      systemPrompt: await getPrompt(this.config.promptsDir, "mission_summary.txt"),
-      userPrompt: JSON.stringify({ days: days.map((day) => ({ day: day.day, summary: day.summary })) }),
-      componentId: "analysis/mission_summary"
-    });
-    serverLogger.info("Prompt received for mission overview summary");
+      for (const day of dayKeys) {
+        const entries = byDay[day];
+        const byHour = groupBy(entries, (item) => item.hour);
+        const hourlyUtterances: Record<string, number> = {};
 
-    serverLogger.info("Prompting recent changes summary", { scopedDays: Math.min(days.length, 2) });
-    const recentChanges = await this.config.llmClient.generateText({
-      systemPrompt: await getPrompt(this.config.promptsDir, "recent_changes.txt"),
-      userPrompt: JSON.stringify({ latestDays: days.slice(-2) }),
-      componentId: "analysis/recent_changes"
-    });
-    serverLogger.info("Prompt received for recent changes summary");
+        for (const hour of Object.keys(byHour).sort()) {
+          hourlyUtterances[hour] = byHour[hour].length;
+        }
 
-    this.cache = { generatedAt: dayjs().utc().toISOString(), missionSummary, recentChanges, days };
+        const dailyPrompt = await getPrompt(this.config.promptsDir, "daily_summary.txt");
+        serverLogger.info("Prompting daily summary", { day, sampleSize: Math.min(entries.length, 120) });
+        const dailySummary = await this.config.llmClient.generateText({
+          systemPrompt: dailyPrompt,
+          userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) }),
+          componentId: `analysis/daily_summary/${day}`
+        });
+        serverLogger.info("Prompt received for daily summary", { day });
 
-    serverLogger.info("Analysis cache generated", {
-      generatedAt: this.cache.generatedAt,
-      totalDays: days.length,
-      cacheFile: this.config.cacheFile
-    });
+        const hourlyPrompt = await getPrompt(this.config.promptsDir, "hourly_summary.txt");
+        serverLogger.info("Prompting hourly highlights", { day, hours: Object.keys(byHour).length });
+        const hourlyRaw = await this.config.llmClient.generateText({
+          systemPrompt: hourlyPrompt,
+          userPrompt: JSON.stringify({
+            day,
+            hours: Object.keys(byHour)
+              .sort()
+              .map((hour) => ({
+                hour,
+                utteranceCount: byHour[hour].length,
+                sample: byHour[hour].slice(0, 8)
+              }))
+          }),
+          componentId: `analysis/hourly_summary/${day}`
+        });
+        serverLogger.info("Prompt received for hourly highlights", { day });
 
-    await fs.mkdir(path.dirname(this.config.cacheFile), { recursive: true });
-    await fs.writeFile(this.config.cacheFile, JSON.stringify(this.cache, null, 2), "utf8");
+        const parsedHourly = parseHourlyHighlights(hourlyRaw);
+        const hourly = Object.fromEntries(
+          Object.keys(byHour)
+            .sort()
+            .map((hour) => [hour, parsedHourly[hour] ?? "No highlight generated for this hour."])
+        );
 
-    serverLogger.info("Analysis cache persisted", { cacheFile: this.config.cacheFile });
+        const topicsPrompt = await getPrompt(this.config.promptsDir, "top_topics.txt");
+        serverLogger.info("Prompting top topics", { day, sampleSize: Math.min(entries.length, 120) });
+        const topicsRaw = await this.config.llmClient.generateText({
+          systemPrompt: topicsPrompt,
+          userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) }),
+          componentId: `analysis/top_topics/${day}`
+        });
+        serverLogger.info("Prompt received for top topics", { day });
 
-    return this.cache;
+        days.push({
+          day,
+          summary: dailySummary,
+          hourly,
+          topics: this.config.llmClient.parseTopics(topicsRaw),
+          stats: {
+            utteranceCount: entries.length,
+            wordCount: entries.reduce((count, item) => count + item.text.split(/\s+/).length, 0),
+            channelCount: uniq(entries.map((item) => item.channel)).length,
+            hourlyUtterances
+          }
+        });
+      }
+
+      serverLogger.info("Prompting mission overview summary", { totalDays: days.length });
+      const missionSummary = await this.config.llmClient.generateText({
+        systemPrompt: await getPrompt(this.config.promptsDir, "mission_summary.txt"),
+        userPrompt: JSON.stringify({ days: days.map((day) => ({ day: day.day, summary: day.summary })) }),
+        componentId: "analysis/mission_summary"
+      });
+      serverLogger.info("Prompt received for mission overview summary");
+
+      serverLogger.info("Prompting recent changes summary", { scopedDays: Math.min(days.length, 2) });
+      const recentChanges = await this.config.llmClient.generateText({
+        systemPrompt: await getPrompt(this.config.promptsDir, "recent_changes.txt"),
+        userPrompt: JSON.stringify({ latestDays: days.slice(-2) }),
+        componentId: "analysis/recent_changes"
+      });
+      serverLogger.info("Prompt received for recent changes summary");
+
+      this.cache = { generatedAt: dayjs().utc().toISOString(), missionSummary, recentChanges, days };
+
+      serverLogger.info("Analysis cache generated", {
+        generatedAt: this.cache.generatedAt,
+        totalDays: days.length,
+        cacheFile: this.config.cacheFile
+      });
+
+      await fs.mkdir(path.dirname(this.config.cacheFile), { recursive: true });
+      await fs.writeFile(this.config.cacheFile, JSON.stringify(this.cache, null, 2), "utf8");
+
+      serverLogger.info("Analysis cache persisted", { cacheFile: this.config.cacheFile });
+
+      return this.cache;
     } finally {
       this.isIngesting = false;
     }

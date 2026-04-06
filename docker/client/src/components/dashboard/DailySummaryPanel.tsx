@@ -18,12 +18,17 @@ const summarizeLines = (text: string): string[] => {
     .slice(0, 5);
 };
 
+const isWaitingState = (statusLabel: string): boolean => {
+  return ["building", "querying", "not ready"].includes(statusLabel);
+};
+
 export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
   statusLabel,
   summaryText,
   latestDay
 }) => {
   const rows = summarizeLines(summaryText);
+  const shouldShowWaiting = isWaitingState(statusLabel) || rows.length === 0;
 
   return (
     <DashboardPanel
@@ -34,13 +39,14 @@ export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
       headerAccessory={<StatusBadge label={statusLabel} />}
       footer={<small className={styles.subtle}>{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>}
     >
-      {rows.length === 0 ? (
-        <PaneStateMessage message="Building daily snapshot…" tone="loading" />
+      {shouldShowWaiting ? (
+        <PaneStateMessage message="Waiting for results…" tone="loading" />
       ) : (
         <div className={styles["summary-feed"]} role="list">
           {rows.map((row, index) => (
             <p key={`${row}-${index}`} role="listitem" className={styles["summary-row"]}>
-              {row}
+              <span className={styles["summary-row-index"]}>{String(index + 1).padStart(2, "0")}</span>
+              <span>{row}</span>
             </p>
           ))}
         </div>
