@@ -32,8 +32,9 @@ type TimelineDisplayItem =
     };
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-const MAX_TOPICS_PER_DAY = 3;
-const MAX_NOTABLE_UTTERANCES = 28;
+const MAX_TOPICS_PER_DAY = 5;
+const MAX_NOTABLE_UTTERANCES = 72;
+const MAX_NOTABLE_UTTERANCES_PER_DAY = 4;
 
 const formatDateLabel = (timestamp: number): string =>
   new Intl.DateTimeFormat("en-US", {
@@ -58,6 +59,14 @@ const toTimestamp = (input: string): number => {
   const parsed = Date.parse(input);
   return Number.isNaN(parsed) ? 0 : parsed;
 };
+
+const toUtcDayKey = (timestamp: number): string =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(timestamp);
 
 const toSummaryBody = (summary: string): string => {
   const compact = summary.replace(/\s+/g, " ").trim();
@@ -113,9 +122,22 @@ const buildTimelineItems = (days: TimelineDayEntry[], notable: NotableUtterances
     });
   });
 
-  (notable?.utterances ?? []).slice(0, MAX_NOTABLE_UTTERANCES).forEach((entry) => {
+  const utterancesPerDay = new Map<string, number>();
+  let selectedUtterances = 0;
+
+  (notable?.utterances ?? []).forEach((entry) => {
+    if (selectedUtterances >= MAX_NOTABLE_UTTERANCES) {
+      return;
+    }
+
     const timestamp = toTimestamp(entry.timestamp);
     if (!timestamp) {
+      return;
+    }
+
+    const utcDayKey = toUtcDayKey(timestamp);
+    const dayCount = utterancesPerDay.get(utcDayKey) ?? 0;
+    if (dayCount >= MAX_NOTABLE_UTTERANCES_PER_DAY) {
       return;
     }
 
@@ -129,6 +151,9 @@ const buildTimelineItems = (days: TimelineDayEntry[], notable: NotableUtterances
       tags: entry.reasons.slice(0, 2),
       meta: `Ref ${entry.id} • ${formatDateLabel(timestamp)} UTC • ${entry.filename} • Score ${entry.score.toFixed(2)}`
     });
+
+    utterancesPerDay.set(utcDayKey, dayCount + 1);
+    selectedUtterances += 1;
   });
 
   const sortedContent = contentItems.sort((left, right) => left.timestamp - right.timestamp);
