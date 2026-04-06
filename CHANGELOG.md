@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- chore: perform a comprehensive repo hygiene pass by removing confirmed unused frontend artifacts and adding authoritative top-level/client/server documentation maps with file-level architecture guides. Intent: Give maintainers and future agents a trustworthy onboarding/reference baseline while reducing drift from stale, unreferenced code paths.
 - feat: add a dedicated TalkieRAG topbar route/page with full-page query submission, retrieval-style evidence ranking, and answer synthesis via the existing chat API while preserving existing dashboard search behavior. Intent: Provide a larger operator-focused RAG workflow surface without disrupting the current Overview Query Console experience.
 - fix: remove stale `ChatMode` typing from the frontend chat API helper signature so client TypeScript builds no longer fail after merge refactors to single-mode chat strategy handling. Intent: Unblock Docker/frontend production builds by aligning client API typings with the current server chat contract and dashboard call sites.
 - feat: add a dedicated System Logs route/page with refreshable prompt artifact listing and click-to-open file viewer backed by a standalone server-side system logs service/router. Intent: Let operators audit exact prompt submissions and model request/response artifacts without digging through container files.
