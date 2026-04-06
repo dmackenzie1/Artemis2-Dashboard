@@ -1330,6 +1330,8 @@ pre {
     margin-left: 20px;
     justify-self: start;
   }
+}
+
 .notable-moment-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
