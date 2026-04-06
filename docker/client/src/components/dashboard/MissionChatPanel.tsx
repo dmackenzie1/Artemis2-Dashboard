@@ -3,6 +3,7 @@ import styles from "../../styles.module.css";
 import type { ChatMessage } from "./types";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { LoadingIndicator } from "./primitives/LoadingIndicator";
+import { StatusBadge } from "./primitives/StatusBadge";
 import { useComponentIdentity } from "./primitives/useComponentIdentity";
 
 type MissionChatPanelProps = {
@@ -20,7 +21,7 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
   onChatInputChange,
   onChatSubmit
 }) => {
-  const { componentUid } = useComponentIdentity("mission-chat-panel");
+  useComponentIdentity("mission-chat-panel");
 
   return (
     <DashboardPanel
@@ -29,17 +30,13 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
       kicker="Intelligence Interface"
       title="Query Console"
       headerAccessory={
-        <button
-          type="button"
-          className={styles["query-console-ready-button"]}
-          aria-label={`Query console status ${componentUid}`}
-          disabled
-        >
-          {isThinking ? "Working" : "Ready"}
-        </button>
+        <StatusBadge label={isThinking ? "Working" : "Ready"} />
       }
     >
       <div className={styles["chat-window"]} role="log" aria-live="polite">
+        {!isThinking && chatMessages.length === 0 ? (
+          <p className={styles["chat-empty"]}>No chat results yet. Submit a query to populate this window.</p>
+        ) : null}
         {chatMessages.map((message, index) => (
           <article
             key={`${message.role}-${index}`}
@@ -64,7 +61,7 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
         <textarea
           value={chatInput}
           onChange={(event) => onChatInputChange(event.target.value)}
-          rows={3}
+          rows={5}
           placeholder="Ask a question about the transcripts."
         />
         <button type="submit" disabled={isThinking || !chatInput.trim()}>
