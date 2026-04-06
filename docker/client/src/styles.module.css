@@ -424,6 +424,32 @@ main {
   margin-bottom: 0.45rem;
 }
 
+.timeline-chart-shell {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.45rem;
+}
+
+.timeline-y-axis {
+  display: grid;
+  grid-template-rows: repeat(5, 1fr);
+  align-items: end;
+  padding: 0.45rem 0 1.8rem;
+}
+
+.timeline-y-tick-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  color: rgba(195, 220, 245, 0.78);
+  line-height: 1;
+}
+
+.timeline-plot-area {
+  display: grid;
+  gap: 0.28rem;
+}
+
 .timeline-chart {
   margin-top: 0.32rem;
   height: 132px;
@@ -480,12 +506,39 @@ main {
   pointer-events: none;
 }
 
+.timeline-x-axis {
+  position: relative;
+  height: 1.25rem;
+  margin: 0 0.12rem;
+}
+
+.timeline-x-tick-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 0.62rem;
+  color: rgba(190, 216, 242, 0.74);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .timeline-bar {
   width: 100%;
   min-height: 1px;
   border-radius: 2px 2px 0 0;
   background: linear-gradient(180deg, rgba(150, 220, 255, 0.78), rgba(90, 190, 255, 0.46));
   box-shadow: 0 0 10px rgba(100, 200, 255, 0.2);
+  transition: filter 140ms ease, box-shadow 140ms ease;
+}
+
+.timeline-bar-highlight {
+  background: linear-gradient(180deg, rgba(182, 240, 255, 0.95), rgba(91, 221, 255, 0.72));
+  box-shadow: 0 0 16px rgba(122, 228, 255, 0.45);
+}
+
+.timeline-bar:hover {
+  filter: brightness(1.2);
+  box-shadow: 0 0 18px rgba(130, 222, 255, 0.52);
 }
 
 .mission-chat-panel h2 {

@@ -10,33 +10,73 @@ type UtterancesTimelinePanelProps = {
 };
 
 export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ histogram }) => {
-  const maxUtterances = Math.max(...histogram.map((entry) => entry.utterances), 1);
-  const labelIndexes = histogram.length > 0 ? new Set([0, Math.floor(histogram.length / 3), Math.floor((histogram.length * 2) / 3), histogram.length - 1]) : new Set<number>();
+  const hourlyTotals = Array.from(
+    histogram.reduce((acc, entry) => {
+      acc.set(entry.hour, (acc.get(entry.hour) ?? 0) + entry.utterances);
+      return acc;
+    }, new Map<string, number>())
+  )
+    .map(([hour, utterances]) => ({ hour, utterances }))
+    .sort((a, b) => a.hour.localeCompare(b.hour));
+
+  const maxUtterances = Math.max(...hourlyTotals.map((entry) => entry.utterances), 1);
+  const yAxisTicks = [1, 0.75, 0.5, 0.25, 0].map((ratio) => Math.round(maxUtterances * ratio));
+  const xTickInterval = hourlyTotals.length > 96 ? 12 : 6;
+  const xAxisTicks = hourlyTotals
+    .map((entry, index) => ({ ...entry, index }))
+    .filter(({ index }) => index === 0 || index === hourlyTotals.length - 1 || index % xTickInterval === 0);
 
   return (
     <DashboardPanel
       componentId="utterances-timeline-panel"
       className={styles["timeline-strip-panel"]}
-      kicker="Communications Activity"
-      title="Mission Activity Signature"
-      headerAccessory={<StatusBadge label={histogram.length > 0 ? "ready" : "loading"} />}
-      footer={<small className={styles.subtle}>Coverage: {histogram.length} hourly buckets.</small>}
+      kicker="Mission Timeline"
+      title="Mission Hourly Stats"
+      headerAccessory={<StatusBadge label={hourlyTotals.length > 0 ? "ready" : "loading"} />}
+      footer={<small className={styles.subtle}>Coverage: {hourlyTotals.length} hourly buckets.</small>}
     >
-      <small className={`${styles.subtle} ${styles["timeline-subtext"]}`}>Utterances per hour across all channels</small>
-      {histogram.length === 0 ? <PaneStateMessage message="Updating mission histogram…" tone="loading" /> : null}
-      <div className={styles["timeline-chart"]} role="img" aria-label="Utterances per hour for the mission timeline">
-        {histogram.map((entry) => {
-          const barHeight = Math.max((entry.utterances / maxUtterances) * 100, entry.utterances > 0 ? 4 : 0);
+      {hourlyTotals.length === 0 ? <PaneStateMessage message="Updating mission histogram…" tone="loading" /> : null}
+      <div className={styles["timeline-chart-shell"]}>
+        <div className={styles["timeline-y-axis"]} aria-hidden>
+          {yAxisTicks.map((tick) => (
+            <span key={tick} className={styles["timeline-y-tick-label"]}>
+              {tick}
+            </span>
+          ))}
+        </div>
+        <div className={styles["timeline-plot-area"]}>
+          <div className={styles["timeline-chart"]} role="img" aria-label="Utterances per hour for the mission timeline">
+            {hourlyTotals.map((entry, index) => {
+              const barHeight = Math.max((entry.utterances / maxUtterances) * 100, entry.utterances > 0 ? 4 : 0);
+              const highlightBar = index >= hourlyTotals.length - Math.min(12, hourlyTotals.length);
 
-          return (
-            <div
-              key={entry.hour}
-              className={styles["timeline-bar"]}
-              style={{ height: `${barHeight}%` }}
-              title={`${entry.hour}: ${entry.utterances} utterances`}
-            />
-          );
-        })}
+              return (
+                <div
+                  key={entry.hour}
+                  className={`${styles["timeline-bar"]} ${highlightBar ? styles["timeline-bar-highlight"] : ""}`}
+                  style={{ height: `${barHeight}%` }}
+                  title={`${entry.hour}: ${entry.utterances} utterances`}
+                />
+              );
+            })}
+          </div>
+          <div className={styles["timeline-x-axis"]} aria-hidden>
+            {xAxisTicks.map((tick) => (
+              <span
+                key={tick.hour}
+                className={styles["timeline-x-tick-label"]}
+                style={{ left: `${(tick.index / Math.max(hourlyTotals.length - 1, 1)) * 100}%` }}
+              >
+                {new Date(tick.hour).toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: false,
+                  timeZone: "UTC"
+                })}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
       {histogram.length > 0 ? (
         <div className={styles["timeline-axis"]} aria-hidden="true">
