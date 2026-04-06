@@ -2,9 +2,9 @@ import type { FunctionComponent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchStatsHourlyByChannel } from "../api";
 import type { MissionHourlyChannelEntry } from "../api";
-import { DailySummaryPanel } from "../components/dashboard/DailySummaryPanel";
 import { MissionChatPanel } from "../components/dashboard/MissionChatPanel";
 import { MissionOverviewPanel } from "../components/dashboard/MissionOverviewPanel";
+import { RecentWindowPanel } from "../components/dashboard/RecentWindowPanel";
 import { StatsPanel } from "../components/dashboard/StatsPanel";
 import { UtterancesTimelinePanel } from "../components/dashboard/UtterancesTimelinePanel";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
@@ -88,19 +88,15 @@ export const DashboardPage: FunctionComponent = () => {
   return (
     <div className={styles["dashboard-layout"]} data-component-id={componentId} data-component-uid={componentUid}>
       <section className={styles["dashboard-top-row"]} data-component-id="dashboard-top-row" data-component-uid={`${componentUid}-top`}>
-        <MissionOverviewPanel
-          statusLabel={viewModel.missionSummary.statusLabel}
-          summaryText={viewModel.missionSummary.text}
-          lastRunAt={viewModel.missionSummary.lastRunAt}
-        />
+        <RecentWindowPanel />
         <StatsPanel stats={viewModel.stats} dailyTranscriptVolume={viewModel.dailyTranscriptVolume} />
       </section>
 
       <section className={styles["dashboard-mid-row"]} data-component-id="dashboard-mid-row" data-component-uid={`${componentUid}-mid`}>
-        <DailySummaryPanel
-          statusLabel={viewModel.dailySummary.statusLabel}
-          summaryText={viewModel.dailySummary.text}
-          latestDay={viewModel.latestDay}
+        <MissionOverviewPanel
+          statusLabel={viewModel.missionSummary.statusLabel}
+          summaryText={viewModel.missionSummary.text}
+          lastRunAt={viewModel.missionSummary.lastRunAt}
         />
         <MissionChatPanel
           chatInput={chatInput}

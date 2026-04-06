@@ -15,6 +15,10 @@ type StatsPanelProps = {
   }>;
 };
 
+const formatMetricValue = (value: number): string => {
+  return value.toLocaleString();
+};
+
 export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats, dailyTranscriptVolume }) => {
   const statusLabel = stats.length > 0 ? "ready" : "loading";
   const groupedStats = [
@@ -71,35 +75,29 @@ export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats, dailyTra
           {dailyTranscriptVolume.length > 0 ? (
             <section className={styles["stats-group"]}>
               <p className={styles["stats-group-label"]}>Daily Transcript Volume</p>
-              <div className={styles["snapshot-chart-grid"]} role="img" aria-label="Utterances and words by day">
-                {dailyTranscriptVolume.map((entry) => (
-                  <div key={entry.day} className={styles["snapshot-chart-row"]}>
-                    <span className={styles["snapshot-chart-day"]}>{entry.day}</span>
-                    <div className={styles["snapshot-chart-bars"]}>
-                      <div className={styles["snapshot-chart-bar-wrap"]}>
-                        <span className={styles["snapshot-chart-bar-label"]}>U</span>
-                        <div
-                          className={styles["snapshot-chart-bar"]}
-                          style={{
-                            width: `${Math.max(4, Math.round((entry.utterances / Math.max(...dailyTranscriptVolume.map((item) => item.utterances), 1)) * 100))}%`
-                          }}
-                          title={`${entry.utterances.toLocaleString()} utterances`}
-                        />
-                      </div>
-                      <div className={styles["snapshot-chart-bar-wrap"]}>
-                        <span className={styles["snapshot-chart-bar-label"]}>W</span>
-                        <div
-                          className={`${styles["snapshot-chart-bar"]} ${styles["snapshot-chart-bar-secondary"]}`}
-                          style={{
-                            width: `${Math.max(4, Math.round((entry.words / Math.max(...dailyTranscriptVolume.map((item) => item.words), 1)) * 100))}%`
-                          }}
-                          title={`${entry.words.toLocaleString()} words`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <table className={styles["daily-volume-table"]}>
+                <colgroup>
+                  <col className={styles["snapshot-day-col"]} />
+                  <col className={styles["snapshot-value-col"]} />
+                  <col className={styles["snapshot-value-col"]} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th scope="col">Day</th>
+                    <th scope="col">Utterances</th>
+                    <th scope="col">Words</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dailyTranscriptVolume.map((entry) => (
+                    <tr key={entry.day}>
+                      <th scope="row">{entry.day}</th>
+                      <td>{formatMetricValue(entry.utterances)}</td>
+                      <td>{formatMetricValue(entry.words)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </section>
           ) : null}
         </div>

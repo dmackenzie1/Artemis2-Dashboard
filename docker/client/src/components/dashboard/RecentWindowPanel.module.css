@@ -1,0 +1,49 @@
+.recent-window-panel {
+  min-height: 0;
+}
+
+.window-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.24rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.window-button {
+  border: 1px solid rgba(122, 206, 255, 0.26);
+  border-radius: 999px;
+  background: rgba(8, 24, 41, 0.52);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.62rem;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  padding: 0.2rem 0.45rem;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.16rem;
+}
+
+.window-button:hover {
+  border-color: rgba(143, 221, 255, 0.42);
+  color: var(--text-primary);
+}
+
+.window-button-active {
+  border-color: rgba(109, 222, 255, 0.86);
+  color: var(--text-primary);
+  background: linear-gradient(180deg, rgba(20, 47, 78, 0.76), rgba(10, 30, 53, 0.58));
+  box-shadow: 0 0 10px rgba(86, 190, 255, 0.2);
+}
+
+.window-button-icon {
+  opacity: 0.86;
+}
+
+.summary-scroll-copy {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.2rem;
+}
