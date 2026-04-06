@@ -47,6 +47,10 @@ export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats }) => {
             <section key={group.title} className={styles["stats-group"]}>
               <p className={styles["stats-group-label"]}>{group.title}</p>
               <table className={styles["stats-table"]}>
+                <colgroup>
+                  <col className={styles["stats-label-col"]} />
+                  <col className={styles["stats-value-col"]} />
+                </colgroup>
                 <tbody>
                   {group.entries.map((stat) => (
                     <tr key={stat.label}>
