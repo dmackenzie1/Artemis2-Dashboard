@@ -61,20 +61,16 @@ body::after {
 
 body::before {
   z-index: 0;
-  background-image: radial-gradient(126% 96% at 52% -12%, rgba(104, 198, 255, 0.22), transparent 52%),
-    linear-gradient(180deg, rgba(1, 5, 16, 0.16) 0%, rgba(2, 7, 20, 0.58) 66%, rgba(2, 6, 18, 0.82) 100%),
-    url("./assets/backgrounds/background.png");
+  background-image: url("./assets/backgrounds/background.png");
   background-size: cover;
   background-position: center 26%;
-  opacity: 0.96;
+  opacity: 0.9;
 }
 
 body::after {
   z-index: 1;
-  background-image: radial-gradient(150% 74% at 50% 124%, rgba(30, 88, 166, 0.34), transparent 56%),
-    linear-gradient(180deg, rgba(26, 71, 134, 0.08) 0%, rgba(3, 8, 20, 0.08) 28%, rgba(2, 6, 18, 0.58)),
-    repeating-linear-gradient(90deg, rgba(116, 180, 255, 0.045) 0, rgba(116, 180, 255, 0.045) 1px, transparent 1px, transparent 88px);
-  opacity: 0.64;
+  background-image: none;
+  opacity: 0;
 }
 
 #root {
@@ -240,7 +236,7 @@ main {
 }
 
 .space-panel {
-  backdrop-filter: blur(12px);
+  backdrop-filter: none;
 }
 
 .dashboard-panel-header {
