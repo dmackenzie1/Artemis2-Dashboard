@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./TopicPage.module.css";
+import { clientLogger } from "../utils/logging/clientLogger";
 
 type TopicDetails = {
   title: string;
@@ -21,9 +22,30 @@ export const TopicPage: FC = () => {
   const { componentId, componentUid } = useComponentIdentity("topic-page");
 
   useEffect(() => {
-    void fetch(`/api/topics/${title}`)
-      .then((response) => response.json())
-      .then((payload) => setTopic(payload as TopicDetails));
+    let isMounted = true;
+    setTopic(null);
+
+    const loadTopic = async (): Promise<void> => {
+      try {
+        const response = await fetch(`/api/topics/${encodeURIComponent(title)}`);
+        if (!response.ok) {
+          throw new Error(`Unable to load topic: ${response.status}`);
+        }
+
+        const payload = (await response.json()) as TopicDetails;
+        if (isMounted) {
+          setTopic(payload);
+        }
+      } catch (error) {
+        clientLogger.error("Failed to load topic details", { error, title });
+      }
+    };
+
+    void loadTopic();
+
+    return () => {
+      isMounted = false;
+    };
   }, [title]);
 
   if (!topic) {
