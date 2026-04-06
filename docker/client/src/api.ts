@@ -51,7 +51,6 @@ export type MissionHourlyChannelEntry = {
   utterances: number;
 };
 
-
 export type TimelineDayEntry = {
   day: string;
   summary: string;
@@ -99,7 +98,6 @@ export type ChatResponse = {
 };
 
 export type ChatMode = "rag" | "all";
-
 
 export type SystemLogEntry = {
   id: string;
@@ -207,8 +205,6 @@ export const fetchStatsHourlyByChannel = async (days = 7): Promise<MissionHourly
   return (await response.json()) as MissionHourlyChannelEntry[];
 };
 
-
-
 export const fetchTimeline = async (): Promise<TimelineDayEntry[]> => {
   const response = await fetch(`${base}/timeline`);
   if (!response.ok) {
@@ -246,8 +242,6 @@ export const fetchNotableMoments = async (): Promise<NotableMomentsData | null> 
 
   return (await response.json()) as NotableMomentsData;
 };
-
-
 
 export const fetchSystemLogs = async (): Promise<SystemLogListResponse> => {
   const response = await fetch(`${base}/system-logs`);

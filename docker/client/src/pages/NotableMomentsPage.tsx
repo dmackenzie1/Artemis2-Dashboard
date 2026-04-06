@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchNotableMoments, type NotableMoment, type NotableMomentsData } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import styles from "../styles.module.css";
+import { clientLogger } from "../utils/logging/clientLogger";
 
 type NotableMomentsDay = {
   day: string;
@@ -27,7 +28,11 @@ export const NotableMomentsPage: FunctionComponent = () => {
   const { componentId, componentUid } = useComponentIdentity("notable-moments-page");
 
   useEffect(() => {
-    void fetchNotableMoments().then((payload) => setData(payload));
+    void fetchNotableMoments()
+      .then((payload) => setData(payload))
+      .catch((error: unknown) => {
+        clientLogger.error("Failed to load notable moments", { error });
+      });
   }, []);
 
   const days = useMemo(() => {

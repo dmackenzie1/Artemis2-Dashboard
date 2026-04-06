@@ -44,6 +44,22 @@ describe("api helpers", () => {
     });
   });
 
+  it("allows overriding chat mode", async () => {
+    const payload = {
+      answer: "ok",
+      evidence: [],
+      strategy: { mode: "all", totalUtterances: 50, contextUtterances: 50, daysQueried: 5 }
+    };
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => payload } as Response);
+
+    await expect(chat("status", "all")).resolves.toEqual(payload);
+    expect(mockFetch).toHaveBeenCalledWith("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "status", mode: "all" })
+    });
+  });
+
   it("loads health payload", async () => {
     const payload = {
       ok: true,
