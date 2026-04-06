@@ -29,11 +29,24 @@ export const NotableMomentsPage: FunctionComponent = () => {
   const { componentId, componentUid } = useComponentIdentity("notable-moments-page");
 
   useEffect(() => {
-    void fetchNotableMoments()
-      .then((payload) => setData(payload))
-      .catch((error: unknown) => {
+    let isMounted = true;
+
+    const loadNotableMoments = async (): Promise<void> => {
+      try {
+        const payload = await fetchNotableMoments();
+        if (isMounted) {
+          setData(payload);
+        }
+      } catch (error: unknown) {
         clientLogger.error("Failed to load notable moments", { error });
-      });
+      }
+    };
+
+    void loadNotableMoments();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const days = useMemo(() => {
