@@ -11,3 +11,7 @@ TB-Artemis-Summaries/
 
 backend/data/cache.json
 screenshot.png
+.local/query-set/*
+.local/query-receive/*
+!.local/query-set/.gitkeep
+!.local/query-receive/.gitkeep

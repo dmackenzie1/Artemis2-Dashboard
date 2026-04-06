@@ -127,15 +127,21 @@ describe("LlmClient.generateText", () => {
       });
 
       const files = await readdir(debugDir);
-      const debugPayloadFiles = files.filter((fileName) => fileName.endsWith(".json"));
+      const querySetDir = path.join(debugDir, "query-set");
+      const queryReceiveDir = path.join(debugDir, "query-receive");
+      const querySetFiles = await readdir(querySetDir);
+      const queryReceiveFiles = await readdir(queryReceiveDir);
+      const debugPayloadFiles = [...querySetFiles, ...queryReceiveFiles];
       expect(files).toContain("README-TODO-DELETE-ME.txt");
+      expect(files).toContain("query-set");
+      expect(files).toContain("query-receive");
       expect(debugPayloadFiles.length).toBe(2);
-      expect(debugPayloadFiles.some((fileName) => fileName.includes("outgoing_mission_chat_request_1"))).toBe(true);
-      expect(debugPayloadFiles.some((fileName) => fileName.includes("incoming_mission_chat_request_1"))).toBe(true);
+      expect(querySetFiles.some((fileName) => fileName.includes("outgoing_mission_chat_request_1"))).toBe(true);
+      expect(queryReceiveFiles.some((fileName) => fileName.includes("incoming_mission_chat_request_1"))).toBe(true);
 
       const outgoingPath = path.join(
-        debugDir,
-        debugPayloadFiles.find((fileName) => fileName.includes("outgoing")) ?? ""
+        querySetDir,
+        querySetFiles.find((fileName) => fileName.includes("outgoing")) ?? ""
       );
       const outgoingPayload = JSON.parse(await readFile(outgoingPath, "utf8")) as { systemPrompt: string; userPrompt: string };
       expect(outgoingPayload.systemPrompt).toBe("Debug system prompt");
