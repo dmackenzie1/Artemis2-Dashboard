@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { fetchHealth, triggerPipelineRun } from "./api";
 import type { HealthData } from "./api";
@@ -14,6 +14,8 @@ import { NotableMomentsPage } from "./pages/NotableMomentsPage";
 import { SystemLogsPage } from "./pages/SystemLogsPage";
 import { SignalChatPage } from "./pages/SignalChatPage";
 import { clientLogger } from "./utils/logging/clientLogger";
+import type { EmsspressobotController } from "./utils/emsspressobot";
+import { installEmsspressobot } from "./utils/emsspressobot";
 
 const HEALTH_POLL_INTERVAL_MS = 60 * 1000;
 
@@ -22,6 +24,8 @@ export const App: FC = () => {
   const [isRefreshingHealth, setIsRefreshingHealth] = useState(false);
   const [reconnectState, setReconnectState] = useState<"idle" | "checking" | "reconnecting" | "pipeline-running">("idle");
   const [isAdminRefreshRunning, setIsAdminRefreshRunning] = useState(false);
+  const [isEspressoBotVisible, setIsEspressoBotVisible] = useState(false);
+  const emsspressobotRef = useRef<EmsspressobotController | null>(null);
   const location = useLocation();
   const { componentId, componentUid } = useComponentIdentity("app-shell");
 
@@ -78,6 +82,21 @@ export const App: FC = () => {
       setReconnectState("idle");
     }
   }, [connected, reconnectState]);
+
+  useEffect(() => {
+    if (isEspressoBotVisible) {
+      emsspressobotRef.current = installEmsspressobot();
+      return () => {
+        emsspressobotRef.current?.remove();
+        emsspressobotRef.current = null;
+      };
+    }
+
+    emsspressobotRef.current?.remove();
+    emsspressobotRef.current = null;
+
+    return undefined;
+  }, [isEspressoBotVisible]);
 
   const onAdminRefreshClick = async (): Promise<void> => {
     if (isAdminRefreshRunning) {
@@ -163,6 +182,17 @@ export const App: FC = () => {
               {reconnectButtonLabel}
             </button>
           ) : null}
+          <button
+            type="button"
+            className={styles["espresso-toggle-button"]}
+            aria-pressed={isEspressoBotVisible}
+            onClick={() => {
+              setIsEspressoBotVisible((visible) => !visible);
+            }}
+            title={isEspressoBotVisible ? "Hide EMSSpressoBot" : "Show EMSSpressoBot"}
+          >
+            ☕
+          </button>
           {adminMode ? (
             <button
               type="button"
