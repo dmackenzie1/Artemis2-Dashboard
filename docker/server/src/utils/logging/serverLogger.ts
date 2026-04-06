@@ -1,7 +1,4 @@
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc.js";
-
-dayjs.extend(utc);
+import { dayjs } from "../../lib/dayjs.js";
 
 type LogContext = Record<string, unknown>;
 

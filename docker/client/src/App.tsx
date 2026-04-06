@@ -7,6 +7,7 @@ import { StatusBadge } from "./components/dashboard/primitives/StatusBadge";
 import { useComponentIdentity } from "./components/dashboard/primitives/useComponentIdentity";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DailyPage } from "./pages/DailyPage";
+import styles from "./styles.module.css";
 import { TimelinePage } from "./pages/TimelinePage";
 import { TopicPage } from "./pages/TopicPage";
 import { clientLogger } from "./utils/logging/clientLogger";
@@ -40,14 +41,14 @@ export const App: FC = () => {
   const connected = useMemo(() => (!health ? true : health.llm.connected), [health]);
 
   return (
-    <div className="app-shell" data-component-id={componentId} data-component-uid={componentUid}>
-      <header className="topbar">
+    <div className={styles["app-shell"]} data-component-id={componentId} data-component-uid={componentUid}>
+      <header className={styles.topbar}>
         <h1>Artemis 2 Mission Intelligence</h1>
-        <nav className="topbar-nav">
+        <nav className={styles["topbar-nav"]}>
           <NavLink to="/">Overview</NavLink>
           <NavLink to="/daily">Daily</NavLink>
           <NavLink to="/timeline">Timeline</NavLink>
-          <div className="topbar-status" title={connected ? "LLM connected" : "LLM disconnected"}>
+          <div className={styles["topbar-status"]} title={connected ? "LLM connected" : "LLM disconnected"}>
             <StatusBadge label={connected ? "connected" : "disconnected"} />
           </div>
         </nav>

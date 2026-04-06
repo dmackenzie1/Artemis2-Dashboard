@@ -1,12 +1,9 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { parse } from "csv-parse/sync";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc.js";
+import { dayjs } from "./dayjs.js";
 import { randomUUID } from "node:crypto";
 import type { TranscriptUtterance } from "../types.js";
-
-dayjs.extend(utc);
 
 type IngestCsvDirectoryOptions = {
   onDirectoryRead?: (context: { directoryPath: string; totalFiles: number }) => void;

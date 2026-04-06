@@ -1,8 +1,5 @@
 import { EntitySchema } from "@mikro-orm/core";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc.js";
-
-dayjs.extend(utc);
+import { dayjs } from "../lib/dayjs.js";
 
 export class TranscriptUtterance {
   id!: number;

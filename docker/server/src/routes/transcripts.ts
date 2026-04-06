@@ -1,11 +1,8 @@
 import { Router } from "express";
 import { EntityManager } from "@mikro-orm/postgresql";
 import { z } from "zod";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc.js";
+import { dayjs } from "../lib/dayjs.js";
 import { TranscriptUtterance } from "../entities/TranscriptUtterance.js";
-
-dayjs.extend(utc);
 
 const querySchema = z.object({
   start: z.string().datetime().optional(),
@@ -15,7 +12,9 @@ const querySchema = z.object({
   format: z.enum(["json", "text"]).default("text")
 });
 
-export const createTranscriptRouter = (em: EntityManager): Router => {
+type EntityManagerProvider = () => EntityManager;
+
+export const createTranscriptRouter = (getEntityManager: EntityManagerProvider): Router => {
   const router = Router();
 
   router.get("/context", async (req, res, next) => {
@@ -42,7 +41,7 @@ export const createTranscriptRouter = (em: EntityManager): Router => {
         where.channel = channel;
       }
 
-      const rows = await em.find(TranscriptUtterance, where, {
+      const rows = await getEntityManager().find(TranscriptUtterance, where, {
         orderBy: { timestamp: "asc" },
         limit
       });

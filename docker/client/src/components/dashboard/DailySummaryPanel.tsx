@@ -1,4 +1,5 @@
 import type { FunctionComponent } from "react";
+import styles from "../../styles.module.css";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
 import { StatusBadge } from "./primitives/StatusBadge";
@@ -27,18 +28,18 @@ export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
   return (
     <DashboardPanel
       componentId="daily-summary-panel"
-      className="daily-summary-panel"
+      className={styles["daily-summary-panel"]}
       kicker="Operational Readout"
       title="Last 24 Hours"
       headerAccessory={<StatusBadge label={statusLabel} />}
-      footer={<small className="subtle">{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>}
+      footer={<small className={styles.subtle}>{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>}
     >
       {rows.length === 0 ? (
         <PaneStateMessage message="Building daily snapshot…" tone="loading" />
       ) : (
-        <div className="summary-feed" role="list">
+        <div className={styles["summary-feed"]} role="list">
           {rows.map((row, index) => (
-            <p key={`${row}-${index}`} role="listitem" className="summary-row">
+            <p key={`${row}-${index}`} role="listitem" className={styles["summary-row"]}>
               {row}
             </p>
           ))}

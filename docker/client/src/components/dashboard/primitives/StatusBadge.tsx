@@ -1,4 +1,5 @@
 import type { FunctionComponent } from "react";
+import styles from "../../../styles.module.css";
 import { useComponentIdentity } from "./useComponentIdentity";
 
 type StatusTone =
@@ -54,8 +55,8 @@ export const StatusBadge: FunctionComponent<StatusBadgeProps> = ({ label }) => {
   const { componentId, componentUid } = useComponentIdentity("status-badge");
 
   return (
-    <span className={`status-badge status-${tone}`} data-component-id={componentId} data-component-uid={componentUid}>
-      <span className="status-dot" aria-hidden="true" />
+    <span className={`${styles["status-badge"]} ${styles[`status-${tone}`]}`} data-component-id={componentId} data-component-uid={componentUid}>
+      <span className={styles["status-dot"]} aria-hidden="true" />
       <span>{label}</span>
     </span>
   );

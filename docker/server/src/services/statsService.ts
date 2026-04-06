@@ -1,9 +1,8 @@
 import { EntityManager } from "@mikro-orm/postgresql";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc.js";
+import { dayjs } from "../lib/dayjs.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 
-dayjs.extend(utc);
+type EntityManagerProvider = () => EntityManager;
 
 export type MissionStatsSummary = {
   generatedAt: string;
@@ -32,10 +31,10 @@ export type MissionHourlyChannelEntry = {
 };
 
 export class StatsService {
-  constructor(private readonly em: EntityManager) {}
+  constructor(private readonly getEntityManager: EntityManagerProvider) {}
 
   async getSummary(): Promise<MissionStatsSummary> {
-    const [summary] = await this.em.getConnection().execute<
+    const [summary] = await this.getEntityManager().getConnection().execute<
       {
         minDay: string | null;
         maxDay: string | null;
@@ -70,7 +69,7 @@ export class StatsService {
   }
 
   async getStatsByDay(): Promise<MissionStatsByDayEntry[]> {
-    const rows = await this.em.getConnection().execute<
+    const rows = await this.getEntityManager().getConnection().execute<
       { day: string; utterances: string; words: string; channels: string }[]
     >(
       `
@@ -96,7 +95,7 @@ export class StatsService {
   async getUtterancesPerHourPerChannel(days = 7): Promise<MissionHourlyChannelEntry[]> {
     const safeDays = Math.min(Math.max(days, 1), 30);
     serverLogger.info("Running hourly channel stats query", { requestedDays: days, safeDays });
-    const rows = await this.em.getConnection().execute<{ hour: string; channel: string; utterances: string }[]>(
+    const rows = await this.getEntityManager().getConnection().execute<{ hour: string; channel: string; utterances: string }[]>(
       `
         with max_day as (
           select max(date(timestamp at time zone 'utc')) as value

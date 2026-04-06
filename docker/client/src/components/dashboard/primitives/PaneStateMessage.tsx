@@ -1,4 +1,5 @@
 import type { FunctionComponent } from "react";
+import styles from "../../../styles.module.css";
 import { LoadingIndicator } from "./LoadingIndicator";
 import { useComponentIdentity } from "./useComponentIdentity";
 
@@ -15,7 +16,11 @@ export const PaneStateMessage: FunctionComponent<PaneStateMessageProps> = ({ mes
   }
 
   return (
-    <p className={`subtle pane-state-message pane-state-${tone}`} data-component-id={componentId} data-component-uid={componentUid}>
+    <p
+      className={`${styles.subtle} ${styles["pane-state-message"]} ${styles[`pane-state-${tone}`]}`}
+      data-component-id={componentId}
+      data-component-uid={componentUid}
+    >
       {message}
     </p>
   );
