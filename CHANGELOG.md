@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: fallback dashboard mission overview rendering to `/api/dashboard` mission summary content when `mission_summary` pipeline prompt state is missing, while still preferring pipeline output when available. Intent: Ensure operators see completed mission summaries immediately even if pipeline dashboard rows are unavailable or delayed.
 - fix: scope MikroORM EntityManager usage per request/background cycle via RequestContext-backed providers, migrate frontend class wiring to CSS Modules, and centralize UTC dayjs bootstrap into a shared utility. Intent: Prevent cross-request identity-map state bleed while aligning UI styling with EMSS conventions and removing repeated dayjs plugin setup.
 - fix: increase mission background image prominence and tune dashboard surfaces to a more transparent glass treatment across panels/toolbar layers. Intent: Ensure the operator-requested Earth background remains visually present while keeping UI items semi-transparent for readability and depth.
 - fix: run `daily_summary` before `mission_summary` in pipeline priority ordering and add regression coverage for summary-first prompt sequencing. Intent: Ensure mission-level synthesis can consume freshly generated daily summaries instead of falling back to raw source documents during the same pipeline cycle.

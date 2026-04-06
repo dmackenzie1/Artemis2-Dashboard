@@ -37,10 +37,25 @@ export const buildDashboardViewModel = (
   const latestDay = data?.days[data.days.length - 1]?.day;
   const missionPrompt = pipeline?.prompts.find((entry) => entry.key === "mission_summary");
   const dailyPrompt = pipeline?.prompts.find((entry) => entry.key === "daily_summary");
+  const missionSummaryFallback = data?.missionSummary?.trim();
+
+  const missionSummary = missionPrompt
+    ? toPromptView(missionPrompt, "Building mission overview...")
+    : missionSummaryFallback
+      ? {
+          statusLabel: "ready",
+          text: missionSummaryFallback,
+          lastRunAt: data?.generatedAt ?? null
+        }
+      : {
+          statusLabel: "not ready",
+          text: "Building mission overview...",
+          lastRunAt: null
+        };
 
   return {
     latestDay,
-    missionSummary: toPromptView(missionPrompt, "Building mission overview..."),
+    missionSummary,
     dailySummary: toPromptView(dailyPrompt, "Not ready yet."),
     stats: toStats(statsSummary)
   };
