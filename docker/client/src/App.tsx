@@ -47,12 +47,15 @@ export const App: FC = () => {
           <span className={styles["topbar-emblem"]} aria-hidden="true">
             A2
           </span>
-          <h1>Artemis 2 Mission Intelligence</h1>
+          <h1>TalkyBot Transcript Review</h1>
         </div>
         <nav className={styles["topbar-nav"]}>
           <NavLink to="/">Overview</NavLink>
           <NavLink to="/daily">Daily</NavLink>
           <NavLink to="/timeline">Timeline</NavLink>
+          <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer">
+            TalkyBot
+          </a>
           <div className={styles["topbar-status"]} title={connected ? "LLM connected" : "LLM disconnected"}>
             <StatusBadge label={connected ? "connected" : "disconnected"} />
           </div>

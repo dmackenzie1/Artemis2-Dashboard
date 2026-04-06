@@ -29,6 +29,18 @@ const toStats = (statsSummary: MissionStatsSummaryData | null): DashboardStat[] 
   ];
 };
 
+const toDailyTranscriptVolume = (data: DashboardData | null): DashboardViewModel["dailyTranscriptVolume"] => {
+  if (!data) {
+    return [];
+  }
+
+  return data.days.map((day) => ({
+    day: day.day,
+    utterances: day.stats.utteranceCount,
+    words: day.stats.wordCount
+  }));
+};
+
 export const buildDashboardViewModel = (
   data: DashboardData | null,
   pipeline: PipelineDashboardData | null,
@@ -64,6 +76,7 @@ export const buildDashboardViewModel = (
           text: recentChangesFallback ?? "Not ready yet.",
           lastRunAt: data?.generatedAt ?? null
         },
-    stats: toStats(statsSummary)
+    stats: toStats(statsSummary),
+    dailyTranscriptVolume: toDailyTranscriptVolume(data)
   };
 };

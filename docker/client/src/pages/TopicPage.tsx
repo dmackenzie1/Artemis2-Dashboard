@@ -42,7 +42,10 @@ export const TopicPage: FC = () => {
       <ul>
         {topic.mentionTimestamps.map((timestamp) => (
           <li key={timestamp}>
-            {timestamp} - <a href="#">Talkybot Link Placeholder</a>
+            {timestamp} -{" "}
+            <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer">
+              Open in TalkyBot
+            </a>
           </li>
         ))}
       </ul>

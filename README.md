@@ -1,6 +1,14 @@
-# Artemis 2 Mission Intelligence Dashboard
+# TalkyBot Transcript Review Dashboard
 
-A full-stack internal demo that ingests Artemis communication transcript CSVs and turns them into LLM-powered mission intelligence.
+A full-stack internal demo that ingests Artemis communication transcript CSVs (downloaded from TalkyBot) and turns them into LLM-powered transcript review outputs.
+
+TalkyBot source system: https://talkybot.fit.nasa.gov/
+
+## Mission intent (preserved)
+
+- This site is designed for delayed review and post-mission analysis workflows.
+- It helps operators and analysts review what already happened (day-over-day summaries, topic extraction, timeline activity, and search/chat over transcript context).
+- It is not intended to provide real-time flight-control decision support or replace primary mission analysis systems.
 
 ## What it does
 
@@ -10,9 +18,9 @@ A full-stack internal demo that ingests Artemis communication transcript CSVs an
 - Generates:
   - hourly summaries
   - daily summaries
-  - mission summary
+  - mission review summary
   - top daily topics
-  - recent change analysis
+  - recent transcript window change analysis
   - chat responses with evidence snippets
 - Exposes APIs via Node + Express (`/docker/server`)
 - Renders a polished mission-control style React UI (`/docker/client`)
