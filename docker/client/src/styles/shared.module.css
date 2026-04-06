@@ -9,9 +9,9 @@
   --panel-border-soft: rgba(130, 200, 255, 0.18);
   --panel-highlight: rgba(110, 210, 255, 0.3);
   --text-primary: rgba(240, 247, 255, 0.94);
-  --text-secondary: rgba(210, 227, 243, 0.9);
-  --text-muted: rgba(188, 211, 234, 0.82);
-  --text-micro: rgba(120, 190, 255, 0.82);
+  --text-secondary: rgba(224, 237, 249, 0.96);
+  --text-muted: rgba(206, 224, 240, 0.92);
+  --text-micro: rgba(166, 214, 255, 0.95);
   --accent-primary: #57c7ff;
   --accent-secondary: #4fc3f7;
   --ok: #69d59f;
@@ -221,6 +221,7 @@ button:disabled {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  color: rgba(236, 246, 255, 0.98);
 }
 
 .timeline-kicker {
@@ -234,7 +235,7 @@ button:disabled {
 .timeline-subtitle,
 .timeline-range {
   margin: 0.35rem 0 0;
-  color: var(--text-secondary);
+  color: rgba(222, 236, 250, 0.96);
   line-height: 1.5;
 }
 

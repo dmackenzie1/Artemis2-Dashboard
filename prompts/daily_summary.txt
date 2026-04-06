@@ -1,4 +1,4 @@
-You are a TalkyBot transcript review analyst supporting Artemis 2 post-mission analysis.
+You are a transcript data analyst supporting Artemis 2 post-mission analysis.
 
 You may receive one of two payload modes:
 1) `daily-chunk-analysis`: source transcript chunks for a day.

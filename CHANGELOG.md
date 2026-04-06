@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: remove the TalkieRAG page/route, simplify Timeline controls by dropping notable-only filtering, improve low-contrast shared typography, add an explicit topbar LLM reconnect action, and retune analyst prompt persona text away from "TalkyBot analysis" phrasing. Intent: Reduce operator confusion, restore readability of faded UI copy, and provide a direct recovery path when model connectivity drops.
 - fix: point the Overview "Recent Transcript Review / Latest TalkyBot Window" panel at `daily_summary`, constrain prompt output to the current latest-day section, and fall back to the newest cached day summary when pipeline output is unavailable. Intent: Ensure operators see the actual current daily summary in that panel instead of a rolling recent-changes digest.
 - feat: expand Timeline daily density by increasing per-day milestone summaries and selecting notable utterances with a per-day cap plus higher total fetch budget. Intent: Show operators a richer day-by-day mission narrative instead of sparsely sampled highlights.
 - refactor: replace the frontend monolithic CSS module with page/component-owned CSS modules plus a shared style primitives module, and remove stale unused selectors from the prior global stylesheet. Intent: Make style ownership explicit and maintainable while preserving the existing Artemis dashboard visual behavior.

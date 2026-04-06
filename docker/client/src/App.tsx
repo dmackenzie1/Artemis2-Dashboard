@@ -1,6 +1,6 @@
 import type { FC } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { fetchHealth, triggerPipelineRun } from "./api";
 import type { HealthData } from "./api";
 import { StatusBadge } from "./components/dashboard/primitives/StatusBadge";
@@ -15,33 +15,35 @@ import { TimelinePage } from "./pages/TimelinePage";
 import { TopicPage } from "./pages/TopicPage";
 import { NotableMomentsPage } from "./pages/NotableMomentsPage";
 import { SystemLogsPage } from "./pages/SystemLogsPage";
-import { TalkieRagPage } from "./pages/TalkieRagPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 
 const HEALTH_POLL_INTERVAL_MS = 60 * 1000;
 
 export const App: FC = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
+  const [isRefreshingHealth, setIsRefreshingHealth] = useState(false);
   const [isAdminRefreshRunning, setIsAdminRefreshRunning] = useState(false);
   const location = useLocation();
   const { componentId, componentUid } = useComponentIdentity("app-shell");
 
-  useEffect(() => {
-    const loadHealth = async (): Promise<void> => {
-      try {
-        const payload = await fetchHealth();
-        setHealth(payload);
-      } catch (error) {
-        clientLogger.error("Topbar health poll failed", { error });
-      }
-    };
+  const refreshHealth = async (): Promise<HealthData | null> => {
+    try {
+      const payload = await fetchHealth();
+      setHealth(payload);
+      return payload;
+    } catch (error) {
+      clientLogger.error("Topbar health poll failed", { error });
+      return null;
+    }
+  };
 
-    void loadHealth();
+  useEffect(() => {
+    void refreshHealth();
     const pollHandle = window.setInterval(() => {
-      void loadHealth();
+      void refreshHealth();
     }, HEALTH_POLL_INTERVAL_MS);
     const onWindowFocus = (): void => {
-      void loadHealth();
+      void refreshHealth();
     };
     window.addEventListener("focus", onWindowFocus);
 
@@ -74,6 +76,27 @@ export const App: FC = () => {
     }
   };
 
+  const onReconnectClick = async (): Promise<void> => {
+    if (isRefreshingHealth) {
+      return;
+    }
+
+    setIsRefreshingHealth(true);
+    try {
+      const latestHealth = await refreshHealth();
+      if (latestHealth?.llm.connected) {
+        return;
+      }
+
+      await triggerPipelineRun();
+      await refreshHealth();
+    } catch (error) {
+      clientLogger.error("LLM reconnect request failed", { error });
+    } finally {
+      setIsRefreshingHealth(false);
+    }
+  };
+
   return (
     <div className={styles["app-shell"]} data-component-id={componentId} data-component-uid={componentUid}>
       <header className={styles.topbar}>
@@ -91,7 +114,6 @@ export const App: FC = () => {
           <NavLink to="/12-hour">12 Hour</NavLink>
           <NavLink to="/timeline">Timeline</NavLink>
           <NavLink to="/notable">Notable</NavLink>
-          <NavLink to="/talkierag">TalkieRAG</NavLink>
           <NavLink to="/system-logs">System Logs</NavLink>
           <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer">
             TalkyBot
@@ -99,6 +121,19 @@ export const App: FC = () => {
           <div className={styles["topbar-status"]} title={connected ? "LLM connected" : "LLM disconnected"}>
             <StatusBadge label={connected ? "connected" : "disconnected"} />
           </div>
+          {!connected ? (
+            <button
+              type="button"
+              className={styles["reconnect-button"]}
+              onClick={() => {
+                void onReconnectClick();
+              }}
+              disabled={isRefreshingHealth}
+              title="Retry LLM health check and trigger pipeline refresh"
+            >
+              {isRefreshingHealth ? "Reconnecting…" : "Reconnect LLM"}
+            </button>
+          ) : null}
           {adminMode ? (
             <button
               type="button"
@@ -124,7 +159,7 @@ export const App: FC = () => {
           <Route path="/12-hour" element={<TwelveHourPage />} />
           <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/notable" element={<NotableMomentsPage />} />
-          <Route path="/talkierag" element={<TalkieRagPage />} />
+          <Route path="/talkierag" element={<Navigate to="/" replace />} />
           <Route path="/system-logs" element={<SystemLogsPage />} />
           <Route path="/topics/:title" element={<TopicPage />} />
         </Routes>
