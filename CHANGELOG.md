@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: publish nginx on host ports 80/443 while preserving 8080/8443 compatibility and proxy HTTP traffic directly instead of forcing HTTPS redirects. Intent: Ensure EC2-hosted containers are reachable on plain HTTP and HTTPS entrypoints while avoiding certificate-driven redirect failures during bring-up.
 - fix: remove topbar 3-hour/6-hour/12-hour navigation, fold histogram hour-count coverage into Transcript Metrics, and strengthen Timeline/Chat/System Logs header contrast while trimming redundant histogram footer copy. Intent: Reduce duplicate window controls and improve readability where operators reported page headings and timeline chrome were too faded.
 - feat: enable local nginx TLS termination by mounting generated dev certificates, exposing HTTPS on port 8443, and redirecting HTTP traffic to the secure endpoint. Intent: Let operators validate dashboard behavior over HTTPS in Docker using the repo-provided local certificate script.
 - docs: add an EC2 deployment runbook with AL2023 bootstrap script, environment-variable template, and local-first positioning linked from the top-level README. Intent: Preserve local development as the default while giving operators a repeatable production-host setup path for `a2.emss-mess.org`.

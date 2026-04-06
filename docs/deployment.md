@@ -170,7 +170,8 @@ curl -sS http://localhost:8080/api/health
   - `22/tcp` (SSH)
   - `80/tcp` (HTTP)
   - `443/tcp` (HTTPS, if TLS enabled)
-  - `8080/tcp` only if you keep current compose mapping as-is.
+  - `8080/tcp` and `8443/tcp` only if you need compatibility access paths in addition to standard ports.
+- Current nginx config proxies app traffic on both `80` and `443` (it does not force an HTTP-to-HTTPS redirect).
 - Add TLS termination (Caddy or Nginx+Certbot) before production use.
 
 ## Operational notes
