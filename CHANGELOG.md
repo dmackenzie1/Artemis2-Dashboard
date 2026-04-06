@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: boost topbar/tab and panel contrast while tightening LLM health refresh cadence with focus-triggered checks so navigation remains readable and connectivity state is less likely to stay stale. Intent: Address operator feedback that primary page controls were too faded to scan and provide faster confirmation when model connectivity changes.
 - chore: perform a comprehensive repo hygiene pass by removing confirmed unused frontend artifacts and adding authoritative top-level/client/server documentation maps with file-level architecture guides. Intent: Give maintainers and future agents a trustworthy onboarding/reference baseline while reducing drift from stale, unreferenced code paths.
 - feat: add a dedicated TalkieRAG topbar route/page with full-page query submission, retrieval-style evidence ranking, and answer synthesis via the existing chat API while preserving existing dashboard search behavior. Intent: Provide a larger operator-focused RAG workflow surface without disrupting the current Overview Query Console experience.
 - fix: remove stale `ChatMode` typing from the frontend chat API helper signature so client TypeScript builds no longer fail after merge refactors to single-mode chat strategy handling. Intent: Unblock Docker/frontend production builds by aligning client API typings with the current server chat contract and dashboard call sites.
