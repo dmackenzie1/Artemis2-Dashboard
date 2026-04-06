@@ -19,7 +19,7 @@ export const getPromptDisplay = (
 
   if (prompt.status === "running") {
     return {
-      text: "Querying...",
+      text: "Waiting for results...",
       statusLabel: "querying",
       preview: prompt.submittedPreview
     };
@@ -33,5 +33,5 @@ export const getPromptDisplay = (
     };
   }
 
-  return { text: "Building...", statusLabel: "building", preview: prompt.submittedPreview };
+  return { text: "Waiting for results...", statusLabel: "building", preview: prompt.submittedPreview };
 };

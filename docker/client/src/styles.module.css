@@ -829,3 +829,52 @@ pre {
     flex-wrap: wrap;
   }
 }
+
+.formatted-copy {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.formatted-copy p {
+  margin: 0;
+  line-height: 1.45;
+  color: rgba(225, 235, 248, 0.9);
+}
+
+.formatted-copy h3 {
+  margin: 0.25rem 0 0;
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-micro);
+}
+
+.formatted-list {
+  margin: 0;
+  padding-left: 1.05rem;
+  display: grid;
+  gap: 0.3rem;
+  color: rgba(224, 235, 248, 0.9);
+}
+
+.hourly-highlight-grid {
+  margin-top: 0.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.45rem;
+}
+
+.hourly-highlight-card {
+  border: 1px solid rgba(130, 200, 255, 0.14);
+  border-radius: 10px;
+  padding: 0.5rem 0.58rem;
+  background: linear-gradient(180deg, rgba(10, 24, 44, 0.5), rgba(8, 16, 32, 0.44));
+}
+
+.hourly-highlight-hour {
+  margin: 0 0 0.32rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-micro);
+}
