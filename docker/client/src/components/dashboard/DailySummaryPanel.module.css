@@ -1,0 +1,10 @@
+.daily-summary-panel {
+  min-height: 0;
+}
+
+.summary-scroll-copy {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.2rem;
+}

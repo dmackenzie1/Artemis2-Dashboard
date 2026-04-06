@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { fetchTimeWindowSummary, type TimeWindowSummaryData } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import { LoadingIndicator } from "../components/dashboard/primitives/LoadingIndicator";
-import styles from "../styles.module.css";
+import sharedStyles from "../styles/shared.module.css";
+import styles from "./WindowedDailyPage.module.css";
 import { renderStructuredText } from "../utils/formatting/renderStructuredText";
 
 type WindowedDailyPageProps = {
@@ -36,8 +37,8 @@ export const WindowedDailyPage: FC<WindowedDailyPageProps> = ({ componentKey, pa
   }, [windowHours]);
 
   return (
-    <div className={styles.stack} data-component-id={componentId} data-component-uid={componentUid}>
-      <article className={styles.panel}>
+    <div className={sharedStyles.stack} data-component-id={componentId} data-component-uid={componentUid}>
+      <article className={sharedStyles.panel}>
         <h2>{pageTitle}</h2>
         <p>
           Rolling summary for the last <strong>{windowHours} hours</strong>, queried from the transcript database and synthesized by the
@@ -46,10 +47,10 @@ export const WindowedDailyPage: FC<WindowedDailyPageProps> = ({ componentKey, pa
       </article>
 
       {isLoading ? <LoadingIndicator message="Waiting for results…" variant="pane" /> : null}
-      {error ? <article className={styles.panel}>Unable to load results: {error}</article> : null}
+      {error ? <article className={sharedStyles.panel}>Unable to load results: {error}</article> : null}
 
       {!isLoading && !error && data ? (
-        <article className={styles.panel}>
+        <article className={sharedStyles.panel}>
           <h2>Window Overview</h2>
           <p>
             Window: {data.window.start} → {data.window.end}
@@ -57,13 +58,13 @@ export const WindowedDailyPage: FC<WindowedDailyPageProps> = ({ componentKey, pa
           <p>
             Utterances: {data.stats.utterances} | Words: {data.stats.words} | Channels: {data.stats.channels}
           </p>
-          <div className={styles["formatted-copy"]}>{renderStructuredText(data.summary, styles["formatted-list"])}</div>
+          <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(data.summary, sharedStyles["formatted-list"])}</div>
           <h3>{windowHours}-Hour Highlights</h3>
           <div className={styles["hourly-highlight-grid"]}>
             {data.highlights.map((highlight) => (
               <section className={styles["hourly-highlight-card"]} key={`${highlight.hour}-${windowHours}`}>
                 <p className={styles["hourly-highlight-hour"]}>{highlight.hour}</p>
-                <div className={styles["formatted-copy"]}>{renderStructuredText(highlight.summary, styles["formatted-list"])}</div>
+                <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(highlight.summary, sharedStyles["formatted-list"])}</div>
               </section>
             ))}
             {data.highlights.length === 0 ? <p>No highlights were returned for this window.</p> : null}

@@ -1,5 +1,6 @@
 import type { FunctionComponent } from "react";
-import styles from "../../styles.module.css";
+import sharedStyles from "../../styles/shared.module.css";
+import styles from "./DailySummaryPanel.module.css";
 import { renderStructuredText } from "../../utils/formatting/renderStructuredText";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
@@ -29,13 +30,13 @@ export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
       kicker="Recent Transcript Review"
       title="Latest TalkyBot Window"
       headerAccessory={<StatusBadge label={statusLabel} />}
-      footer={<small className={styles.subtle}>{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>}
+      footer={<small className={sharedStyles.subtle}>{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>}
     >
       {shouldShowWaiting ? (
         <PaneStateMessage message="Waiting for results…" tone="loading" />
       ) : (
         <div className={styles["summary-scroll-copy"]}>
-          <div className={styles["formatted-copy"]}>{renderStructuredText(summaryText, styles["formatted-list"])}</div>
+          <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(summaryText, sharedStyles["formatted-list"])}</div>
         </div>
       )}
     </DashboardPanel>

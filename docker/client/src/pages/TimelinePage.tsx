@@ -2,7 +2,8 @@ import type { FC } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchNotableUtterances, fetchTimeline, type NotableUtterancesResponse, type TimelineDayEntry } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
-import styles from "../styles.module.css";
+import sharedStyles from "../styles/shared.module.css";
+import styles from "./TimelinePage.module.css";
 import { renderStructuredText } from "../utils/formatting/renderStructuredText";
 import { clientLogger } from "../utils/logging/clientLogger";
 
@@ -32,8 +33,9 @@ type TimelineDisplayItem =
     };
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-const MAX_TOPICS_PER_DAY = 3;
-const MAX_NOTABLE_UTTERANCES = 28;
+const MAX_TOPICS_PER_DAY = 5;
+const MAX_NOTABLE_UTTERANCES = 72;
+const MAX_NOTABLE_UTTERANCES_PER_DAY = 4;
 
 const formatDateLabel = (timestamp: number): string =>
   new Intl.DateTimeFormat("en-US", {
@@ -58,6 +60,14 @@ const toTimestamp = (input: string): number => {
   const parsed = Date.parse(input);
   return Number.isNaN(parsed) ? 0 : parsed;
 };
+
+const toUtcDayKey = (timestamp: number): string =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(timestamp);
 
 const toSummaryBody = (summary: string): string => {
   const compact = summary.replace(/\s+/g, " ").trim();
@@ -113,9 +123,22 @@ const buildTimelineItems = (days: TimelineDayEntry[], notable: NotableUtterances
     });
   });
 
-  (notable?.utterances ?? []).slice(0, MAX_NOTABLE_UTTERANCES).forEach((entry) => {
+  const utterancesPerDay = new Map<string, number>();
+  let selectedUtterances = 0;
+
+  (notable?.utterances ?? []).forEach((entry) => {
+    if (selectedUtterances >= MAX_NOTABLE_UTTERANCES) {
+      return;
+    }
+
     const timestamp = toTimestamp(entry.timestamp);
     if (!timestamp) {
+      return;
+    }
+
+    const utcDayKey = toUtcDayKey(timestamp);
+    const dayCount = utterancesPerDay.get(utcDayKey) ?? 0;
+    if (dayCount >= MAX_NOTABLE_UTTERANCES_PER_DAY) {
       return;
     }
 
@@ -129,6 +152,9 @@ const buildTimelineItems = (days: TimelineDayEntry[], notable: NotableUtterances
       tags: entry.reasons.slice(0, 2),
       meta: `Ref ${entry.id} • ${formatDateLabel(timestamp)} UTC • ${entry.filename} • Score ${entry.score.toFixed(2)}`
     });
+
+    utterancesPerDay.set(utcDayKey, dayCount + 1);
+    selectedUtterances += 1;
   });
 
   const sortedContent = contentItems.sort((left, right) => left.timestamp - right.timestamp);
@@ -264,22 +290,22 @@ export const TimelinePage: FC = () => {
   };
 
   return (
-    <section className={styles["timeline-page"]} data-component-id={componentId} data-component-uid={componentUid}>
-      <header className={styles["timeline-header"]}>
-        <p className={styles["timeline-kicker"]}>Artemis II Mission Intelligence</p>
+    <section className={sharedStyles["timeline-page"]} data-component-id={componentId} data-component-uid={componentUid}>
+      <header className={sharedStyles["timeline-header"]}>
+        <p className={sharedStyles["timeline-kicker"]}>Artemis II Mission Intelligence</p>
         <h2>Mission Timeline</h2>
-        <p className={styles["timeline-subtitle"]}>Chronological mission history with day breaks, major milestones, notable communications, and transcript references.</p>
-        <p className={styles["timeline-range"]}>{missionRangeLabel}</p>
+        <p className={sharedStyles["timeline-subtitle"]}>Chronological mission history with day breaks, major milestones, notable communications, and transcript references.</p>
+        <p className={sharedStyles["timeline-range"]}>{missionRangeLabel}</p>
       </header>
 
-      <section className={styles["timeline-controls"]}>
-        <button type="button" className={styles["timeline-control-button"]} onClick={() => setHighlightsOnly((value) => !value)}>
+      <section className={sharedStyles["timeline-controls"]}>
+        <button type="button" className={sharedStyles["timeline-control-button"]} onClick={() => setHighlightsOnly((value) => !value)}>
           {highlightsOnly ? "Show Full Timeline" : "Notable Milestones Only"}
         </button>
-        <button type="button" className={styles["timeline-control-button"]} onClick={scrollToLatest}>
+        <button type="button" className={sharedStyles["timeline-control-button"]} onClick={scrollToLatest}>
           Jump to Latest
         </button>
-        <button type="button" className={styles["timeline-control-button"]} onClick={scrollToTop}>
+        <button type="button" className={sharedStyles["timeline-control-button"]} onClick={scrollToTop}>
           Back to Top
         </button>
       </section>
@@ -290,14 +316,14 @@ export const TimelinePage: FC = () => {
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={`timeline-skeleton-${index}`} className={`${styles["timeline-skeleton-card"]} ${index % 2 === 0 ? styles["timeline-skeleton-left"] : styles["timeline-skeleton-right"]}`} />
           ))}
-          <p className={styles["timeline-loading-label"]}>Loading mission chronology…</p>
+          <p className={sharedStyles["timeline-loading-label"]}>Loading mission chronology…</p>
         </section>
       ) : null}
 
-      {!isLoading && error ? <p className={styles["timeline-error"]}>{error}</p> : null}
+      {!isLoading && error ? <p className={sharedStyles["timeline-error"]}>{error}</p> : null}
 
       {!isLoading && !error && visibleItems.length === 0 ? (
-        <p className={styles["timeline-empty"]}>No timeline data available yet. Trigger ingestion from Overview, then return here.</p>
+        <p className={sharedStyles["timeline-empty"]}>No timeline data available yet. Trigger ingestion from Overview, then return here.</p>
       ) : null}
 
       {!isLoading && !error && visibleItems.length > 0 ? (
@@ -333,7 +359,7 @@ export const TimelinePage: FC = () => {
                   <section className={`${styles["timeline-event-card"]} ${styles[`timeline-event-${item.type}`]}`}>
                     <p className={styles["timeline-event-time"]}>{item.timeLabel}</p>
                     <h3>{item.title}</h3>
-                    <div className={styles["formatted-copy"]}>{renderStructuredText(item.body, styles["formatted-list"])}</div>
+                    <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(item.body, sharedStyles["formatted-list"])}</div>
                     {item.meta ? <p className={styles["timeline-event-meta"]}>{item.meta}</p> : null}
                     {item.tags.length > 0 ? (
                       <div className={styles["timeline-tag-row"]}>

@@ -10,7 +10,7 @@ import { DailyPage } from "./pages/DailyPage";
 import { ThreeHourPage } from "./pages/ThreeHourPage";
 import { SixHourPage } from "./pages/SixHourPage";
 import { TwelveHourPage } from "./pages/TwelveHourPage";
-import styles from "./styles.module.css";
+import styles from "./App.module.css";
 import { TimelinePage } from "./pages/TimelinePage";
 import { TopicPage } from "./pages/TopicPage";
 import { NotableMomentsPage } from "./pages/NotableMomentsPage";

@@ -1,5 +1,5 @@
 import type { FunctionComponent } from "react";
-import styles from "../../../styles.module.css";
+import styles from "./LoadingIndicator.module.css";
 import { useComponentIdentity } from "./useComponentIdentity";
 
 type LoadingVariant = "pane" | "inline" | "console" | "pipeline" | "refreshing";
@@ -14,9 +14,10 @@ export const LoadingIndicator: FunctionComponent<LoadingIndicatorProps> = ({ mes
 
   return (
     <div
-      className={`${styles["loading-indicator"]} ${styles[`loading-${variant}`]}`}
+      className={styles["loading-indicator"]}
       role="status"
       aria-live="polite"
+      data-loading-variant={variant}
       data-component-id={componentId}
       data-component-uid={componentUid}
     >

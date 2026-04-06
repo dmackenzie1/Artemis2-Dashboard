@@ -1,0 +1,47 @@
+.space-panel {
+  backdrop-filter: none;
+}
+
+.dashboard-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.72rem;
+}
+
+.panel-body {
+  margin-top: 0.48rem;
+  min-height: 1px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.panel-footer-row {
+  margin-top: 0.82rem;
+  padding-top: 0.62rem;
+  border-top: 1px solid rgba(130, 180, 230, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.panel-kicker {
+  margin: 0 0 0.2rem;
+  color: var(--text-micro);
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.dashboard-panel-header h2 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 1.06rem;
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
