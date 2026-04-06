@@ -1,6 +1,6 @@
 import type { FC } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { fetchDashboard, fetchNotableUtterances, fetchTimeline, type DashboardData, type NotableUtterancesResponse, type TimelineDayEntry } from "../api";
+import { fetchNotableUtterances, fetchTimeline, type NotableUtterancesResponse, type TimelineDayEntry } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import styles from "../styles.module.css";
 import { renderStructuredText } from "../utils/formatting/renderStructuredText";
@@ -77,14 +77,12 @@ const toReadableQuote = (quote: string): string => {
   return `${compact.slice(0, 237)}...`;
 };
 
-const buildTimelineItems = (days: TimelineDayEntry[], dashboard: DashboardData | null, notable: NotableUtterancesResponse | null): TimelineDisplayItem[] => {
+const buildTimelineItems = (days: TimelineDayEntry[], notable: NotableUtterancesResponse | null): TimelineDisplayItem[] => {
   if (days.length === 0) {
     return [];
   }
 
   const sortedDays = [...days].sort((left, right) => left.day.localeCompare(right.day));
-  const dayToDetails = new Map((dashboard?.days ?? []).map((day) => [day.day, day]));
-
   const contentItems: TimelineDisplayItem[] = [];
 
   sortedDays.forEach((dayEntry, dayIndex) => {
@@ -101,34 +99,16 @@ const buildTimelineItems = (days: TimelineDayEntry[], dashboard: DashboardData |
       meta: `${dayEntry.topics.length} tracked topic${dayEntry.topics.length === 1 ? "" : "s"}`
     });
 
-    const hourlyEntries = Object.entries(dayToDetails.get(dayEntry.day)?.hourly ?? {}).sort(([left], [right]) => left.localeCompare(right));
-    hourlyEntries.forEach(([hour, summary]) => {
-      const hourTimestamp = toTimestamp(`${dayEntry.day}T${hour}:00Z`);
-      if (!hourTimestamp) {
-        return;
-      }
-
-      contentItems.push({
-        id: `hourly-${dayEntry.day}-${hour}`,
-        timestamp: hourTimestamp,
-        type: "summary",
-        title: `Hourly Summary • ${hour}`,
-        timeLabel: formatDateLabel(hourTimestamp),
-        body: toSummaryBody(summary),
-        tags: ["hourly"]
-      });
-    });
-
     dayEntry.topics.slice(0, MAX_TOPICS_PER_DAY).forEach((topic, topicIndex) => {
       const topicTimestamp = dayStart + (topicIndex + 1) * 80 * 60 * 1000;
       contentItems.push({
         id: `topic-${dayEntry.day}-${topic.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
         timestamp: topicTimestamp,
         type: "notable-event",
-        title: topic,
+        title: `Notable Milestone • ${topic}`,
         timeLabel: formatDateLabel(topicTimestamp),
-        body: `Topic priority surfaced in mission synthesis for ${formatDayLabel(dayEntry.day)}.`,
-        tags: ["topic", "highlight"]
+        body: `Mission synthesis flagged this as a high-interest milestone for ${formatDayLabel(dayEntry.day)}.`,
+        tags: ["milestone", "public-facing"]
       });
     });
   });
@@ -147,7 +127,7 @@ const buildTimelineItems = (days: TimelineDayEntry[], dashboard: DashboardData |
       timeLabel: formatDateLabel(timestamp),
       body: `“${toReadableQuote(entry.text)}”`,
       tags: entry.reasons.slice(0, 2),
-      meta: `Score ${entry.score.toFixed(2)}`
+      meta: `Ref ${entry.id} • ${formatDateLabel(timestamp)} UTC • ${entry.filename} • Score ${entry.score.toFixed(2)}`
     });
   });
 
@@ -200,7 +180,6 @@ const buildTimelineItems = (days: TimelineDayEntry[], dashboard: DashboardData |
 
 export const TimelinePage: FC = () => {
   const [timelineDays, setTimelineDays] = useState<TimelineDayEntry[]>([]);
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [notableUtterances, setNotableUtterances] = useState<NotableUtterancesResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -216,9 +195,8 @@ export const TimelinePage: FC = () => {
       setError(null);
 
       try {
-        const [timelinePayload, dashboardPayload, notablePayload] = await Promise.all([
+        const [timelinePayload, notablePayload] = await Promise.all([
           fetchTimeline(),
-          fetchDashboard(),
           fetchNotableUtterances(MAX_NOTABLE_UTTERANCES, 10)
         ]);
 
@@ -227,7 +205,6 @@ export const TimelinePage: FC = () => {
         }
 
         setTimelineDays(timelinePayload);
-        setDashboardData(dashboardPayload);
         setNotableUtterances(notablePayload);
       } catch (loadError) {
         if (!active) {
@@ -250,7 +227,7 @@ export const TimelinePage: FC = () => {
     };
   }, []);
 
-  const allItems = useMemo(() => buildTimelineItems(timelineDays, dashboardData, notableUtterances), [timelineDays, dashboardData, notableUtterances]);
+  const allItems = useMemo(() => buildTimelineItems(timelineDays, notableUtterances), [timelineDays, notableUtterances]);
 
   const visibleItems = useMemo(
     () =>
@@ -291,13 +268,13 @@ export const TimelinePage: FC = () => {
       <header className={styles["timeline-header"]}>
         <p className={styles["timeline-kicker"]}>Artemis II Mission Intelligence</p>
         <h2>Mission Timeline</h2>
-        <p className={styles["timeline-subtitle"]}>Chronological mission history with day breaks, 6-hour markers, synthesis summaries, and notable communications.</p>
+        <p className={styles["timeline-subtitle"]}>Chronological mission history with day breaks, major milestones, notable communications, and transcript references.</p>
         <p className={styles["timeline-range"]}>{missionRangeLabel}</p>
       </header>
 
       <section className={styles["timeline-controls"]}>
         <button type="button" className={styles["timeline-control-button"]} onClick={() => setHighlightsOnly((value) => !value)}>
-          {highlightsOnly ? "Show Full Timeline" : "Highlights Only"}
+          {highlightsOnly ? "Show Full Timeline" : "Notable Milestones Only"}
         </button>
         <button type="button" className={styles["timeline-control-button"]} onClick={scrollToLatest}>
           Jump to Latest
