@@ -136,6 +136,8 @@ export class TimeWindowSummaryService {
             end: windowEnd.toISOString()
           },
           stats: totals,
+          promptGuidance:
+            "Focus on what is new, currently changing, and operationally relevant in this exact rolling window. Prioritize recency and avoid retrospective mission-history narration.",
           hours: context
         },
         null,

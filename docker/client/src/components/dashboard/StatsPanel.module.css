@@ -59,52 +59,48 @@
   font-variant-numeric: tabular-nums;
 }
 
-.snapshot-chart-grid {
-  display: grid;
-  gap: 0.26rem;
-  margin-top: 0.18rem;
+
+.daily-volume-table {
+  width: 100%;
+  margin-top: 0.1rem;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
 
-.snapshot-chart-row {
-  display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
-  gap: 0.3rem;
-  align-items: center;
+.snapshot-day-col {
+  width: 46%;
 }
 
-.snapshot-chart-day {
-  font-size: 0.64rem;
-  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+.snapshot-value-col {
+  width: 27%;
+}
+
+.daily-volume-table th,
+.daily-volume-table td {
+  text-align: left;
+  font-size: 0.7rem;
+  padding: 0.28rem 0.12rem;
+}
+
+.daily-volume-table thead th {
+  color: var(--text-micro);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.daily-volume-table tbody th {
   color: var(--text-secondary);
-  letter-spacing: 0.02em;
-}
-
-.snapshot-chart-bars {
-  display: grid;
-  gap: 0.16rem;
-}
-
-.snapshot-chart-bar-wrap {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr);
-  gap: 0.22rem;
-  align-items: center;
-}
-
-.snapshot-chart-bar-label {
-  font-size: 0.56rem;
   font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-  color: rgba(144, 208, 255, 0.78);
+  font-weight: 500;
 }
 
-.snapshot-chart-bar {
-  height: 8px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(94, 204, 255, 0.88), rgba(64, 149, 255, 0.65));
-}
-
-.snapshot-chart-bar-secondary {
-  background: linear-gradient(90deg, rgba(120, 234, 220, 0.78), rgba(88, 180, 255, 0.56));
+.daily-volume-table tbody td {
+  color: var(--text-primary);
+  text-align: right;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 .stats-skeleton-grid {
