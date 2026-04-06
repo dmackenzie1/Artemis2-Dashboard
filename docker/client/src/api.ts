@@ -298,7 +298,7 @@ export const fetchSystemLogFile = async (id: string): Promise<SystemLogFileRespo
   return (await response.json()) as SystemLogFileResponse;
 };
 
-export const chat = async (query: string, mode: ChatMode = "rag"): Promise<ChatResponse> => {
+export const chat = async (query: string): Promise<ChatResponse> => {
   const response = await fetch(`${base}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
