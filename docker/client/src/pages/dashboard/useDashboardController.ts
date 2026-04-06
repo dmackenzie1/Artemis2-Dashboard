@@ -6,7 +6,7 @@ import {
   fetchPipelineDashboard,
   fetchStatsSummary
 } from "../../api";
-import type { ChatMode, DashboardData, MissionStatsSummaryData, PipelineDashboardData } from "../../api";
+import type { DashboardData, MissionStatsSummaryData, PipelineDashboardData } from "../../api";
 import type { ChatMessage } from "../../components/dashboard/types";
 import { clientLogger } from "../../utils/logging/clientLogger";
 import { buildDashboardViewModel } from "./dashboardViewModel";
@@ -23,12 +23,10 @@ const DASHBOARD_POLL_INTERVAL_MS = 5 * 60 * 1000;
 export type DashboardController = {
   viewModel: ReturnType<typeof buildDashboardViewModel>;
   chatInput: string;
-  chatMode: ChatMode;
   isThinking: boolean;
   chatMessages: ChatMessage[];
   hasLoadFailure: boolean;
   onChatInputChange: (value: string) => void;
-  onChatModeChange: (value: ChatMode) => void;
   onChatSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   refreshDashboard: () => Promise<void>;
 };
@@ -38,7 +36,6 @@ export const useDashboardController = (): DashboardController => {
   const [pipeline, setPipeline] = useState<PipelineDashboardData | null>(null);
   const [statsSummary, setStatsSummary] = useState<MissionStatsSummaryData | null>(null);
   const [chatInput, setChatInput] = useState(starterQueries[0]);
-  const [chatMode, setChatMode] = useState<ChatMode>("rag");
   const [isThinking, setIsThinking] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [hasLoadFailure, setHasLoadFailure] = useState(false);
@@ -84,7 +81,7 @@ export const useDashboardController = (): DashboardController => {
     setIsThinking(true);
 
     try {
-      const result = await chat(trimmed, chatMode);
+      const result = await chat(trimmed);
       setChatMessages((previous) => [
         ...previous,
         {
@@ -111,12 +108,10 @@ export const useDashboardController = (): DashboardController => {
   return {
     viewModel,
     chatInput,
-    chatMode,
     isThinking,
     chatMessages,
     hasLoadFailure,
     onChatInputChange: setChatInput,
-    onChatModeChange: setChatMode,
     onChatSubmit,
     refreshDashboard: loadData
   };

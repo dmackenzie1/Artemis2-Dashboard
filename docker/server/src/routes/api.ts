@@ -155,11 +155,10 @@ export const createApiRouter = (
     try {
       const body = z
         .object({
-          query: z.string().min(1),
-          mode: z.enum(["rag", "all"]).optional()
+          query: z.string().min(1)
         })
         .parse(req.body);
-      const result = await analysisService.chat(body.query, body.mode ?? "rag");
+      const result = await analysisService.chat(body.query);
       res.json(result);
     } catch (error) {
       next(error);
