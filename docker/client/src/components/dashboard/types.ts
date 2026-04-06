@@ -1,12 +1,10 @@
-import type { ChatMode } from "../../api";
-
 export type ChatMessage = {
   role: "user" | "assistant";
   text: string;
   strategy?: {
-    mode: ChatMode;
+    mode: "multi-day";
     totalUtterances: number;
     contextUtterances: number;
-    wasTruncated: boolean;
+    daysQueried: number;
   };
 };

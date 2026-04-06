@@ -25,12 +25,10 @@ export const DashboardPage: FunctionComponent = () => {
   const {
     viewModel,
     chatInput,
-    chatMode,
     isThinking,
     chatMessages,
     hasLoadFailure,
     onChatInputChange,
-    onChatModeChange,
     onChatSubmit,
     refreshDashboard
   } = useDashboardController();
@@ -106,11 +104,9 @@ export const DashboardPage: FunctionComponent = () => {
         />
         <MissionChatPanel
           chatInput={chatInput}
-          chatMode={chatMode}
           isThinking={isThinking}
           chatMessages={chatMessages}
           onChatInputChange={onChatInputChange}
-          onChatModeChange={onChatModeChange}
           onChatSubmit={onChatSubmit}
         />
       </section>
