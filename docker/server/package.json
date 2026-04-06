@@ -20,6 +20,8 @@
     "dayjs": "^1.11.13",
     "express": "^5.1.0",
     "lodash": "^4.17.21",
+    "stopword": "^3.1.5",
+    "wink-tokenizer": "^5.3.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

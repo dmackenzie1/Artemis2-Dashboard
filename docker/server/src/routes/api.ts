@@ -174,14 +174,32 @@ export const createApiRouter = (
     }
   });
 
+
+  router.get("/search/utterances", (req, res, next) => {
+    try {
+      const query = z
+        .object({
+          q: z.string().trim().min(1),
+          limit: z.coerce.number().int().min(1).max(25).optional()
+        })
+        .parse(req.query);
+
+      const payload = analysisService.searchUtterances(query.q, query.limit ?? 8);
+      res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post("/chat", async (req, res, next) => {
     try {
       const body = z
         .object({
-          query: z.string().min(1)
+          query: z.string().trim().min(1),
+          mode: z.enum(["rag", "all"]).optional()
         })
         .parse(req.body);
-      const result = await analysisService.chat(body.query);
+      const result = await analysisService.chat(body.query, body.mode ?? "all");
       res.json(result);
     } catch (error) {
       next(error);
