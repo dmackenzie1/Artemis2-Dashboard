@@ -32,24 +32,6 @@ export type PipelineDashboardData = {
   }>;
 };
 
-export type PipelineStatsData = {
-  generatedAt: string;
-  range: {
-    minTimestamp: string | null;
-    maxTimestamp: string | null;
-  };
-  totals: {
-    dataDays: number;
-    utterances: number;
-    lines: number;
-    words: number;
-  };
-  utterancesPerHour: Array<{
-    hour: string;
-    utterances: number;
-  }>;
-};
-
 export type MissionStatsSummaryData = {
   generatedAt: string;
   days: {
@@ -151,11 +133,6 @@ export type NotableMoment = {
   sourcePath: string;
 };
 
-export type NotableMomentsDay = {
-  day: string;
-  moments: NotableMoment[];
-};
-
 export type NotableMomentsData = {
   generatedAt: string;
   status: "running" | "success" | "failed" | "never";
@@ -196,16 +173,6 @@ export const fetchPipelineDashboard = async (): Promise<PipelineDashboardData | 
   }
 
   return (await response.json()) as PipelineDashboardData;
-};
-
-export const fetchPipelineStats = async (): Promise<PipelineStatsData | null> => {
-  const response = await fetch(`${base}/pipeline/stats`);
-  if (!response.ok) {
-    clientLogger.warn("Pipeline stats unavailable", { status: response.status });
-    return null;
-  }
-
-  return (await response.json()) as PipelineStatsData;
 };
 
 export const triggerPipelineRun = async (): Promise<TriggerPipelineRunResponse> => {

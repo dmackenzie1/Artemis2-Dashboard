@@ -1,32 +1,32 @@
 # TalkyBot Transcript Review Dashboard
 
-A full-stack internal demo that ingests Artemis communication transcript CSVs (downloaded from TalkyBot) and turns them into LLM-powered transcript review outputs.
+A full-stack internal demo that ingests Artemis communication transcript CSVs (from TalkyBot exports) and produces LLM-assisted mission review outputs.
 
 TalkyBot source system: https://talkybot.fit.nasa.gov/
 
-## Mission intent (preserved)
+## Mission intent
 
-- This site is designed for delayed review and post-mission analysis workflows.
-- It helps operators and analysts review what already happened (day-over-day summaries, topic extraction, timeline activity, and search/chat over transcript context).
-- It is not intended to provide real-time flight-control decision support or replace primary mission analysis systems.
+- Supports delayed review and post-mission analysis workflows.
+- Focuses on what already happened (summaries, topics, timeline activity, and transcript-grounded query/chat).
+- Not intended as real-time flight-control decision support.
 
-## What it does
+## Repository layout
 
-- Ingests transcript CSV files from `source_files/` (or configured data directory)
-- Ingests source text files from `source_files/` into Postgres for scheduled prompt runs
-- Handles quoted text, commas, multiline transcript text, and trailing CSV columns
-- Generates:
-  - hourly summaries
-  - daily summaries
-  - mission review summary
-  - top daily topics
-  - recent transcript window change analysis
-  - chat responses with evidence snippets
-- Exposes APIs via Node + Express (`/docker/server`)
-- Renders a polished mission-control style React UI (`/docker/client`)
-- Runs locally with Docker Compose + NGINX reverse proxy (`/docker/client`, `/docker/server`, `/docker/nginx`)
+- `docker/client`: React 19 + Vite frontend workspace.
+- `docker/server`: Express 5 + TypeScript backend workspace.
+- `docker/nginx`: Reverse proxy used in Dockerized runs.
+- `prompts`: Prompt templates used by pipeline jobs.
+- `source_files`: Operator-provided transcript/source inputs.
+- `docs/branch-notes`: Task-level engineering paper trail.
 
-## Quick start
+## Project documentation map (single-source, no duplication)
+
+- Top-level setup and operations: this file.
+- Frontend implementation map: `docker/client/README.md` and `docker/client/ARCHITECTURE.md`.
+- Backend implementation map: `docker/server/README.md` and `docker/server/ARCHITECTURE.md`.
+- UI visual direction and guardrails: `docs/ui-design-guidance.md`.
+
+## Quick start (Docker)
 
 1. Copy env file:
 
@@ -34,148 +34,44 @@ TalkyBot source system: https://talkybot.fit.nasa.gov/
 cp .env.example .env
 ```
 
-2. Install dependencies locally (optional for lint/test):
+2. (Optional) install dependencies for local lint/test:
 
 ```bash
 npm install
 ```
 
-This project is Node/TypeScript only (no Python runtime required).
-
-3. Run with Docker:
+3. Start stack:
 
 ```bash
 docker compose up --build
 ```
 
-4. Open `http://localhost:8080`
+4. Open `http://localhost:8080`.
 
-5. Backend startup now auto-runs ingestion and scheduled prompt workflow; once loaded, open the Overview page for mission outputs.
-
-## Run without Docker (local Node dev)
-
-You can run client/server directly for fast local testing:
-
-1. Install deps:
+## Local Node development (without Docker)
 
 ```bash
 npm install
-```
-
-2. Terminal A (backend):
-
-```bash
 npm run dev:server
-```
-
-3. Terminal B (frontend):
-
-```bash
 npm run dev:client
 ```
 
-4. Open the Vite URL printed by the frontend dev server (typically `http://localhost:5173`).
+Open the Vite URL (typically `http://localhost:5173`).
 
-### Do I need Postgres for local dev?
-
-- **By default, yes.** Database-backed transcript/pipeline features are enabled by default (`TRANSCRIPTS_DB_ENABLED=true`).
-- If Postgres is not available for a local-only frontend/backend smoke run, set `TRANSCRIPTS_DB_ENABLED=false` to disable transcript/pipeline DB routes temporarily.
-- For full local functionality without Docker, run a local Postgres instance and set `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, and `DB_NAME` in `.env`.
-
-
-## UI design guidance (single source of truth)
-
-For shared UI visual direction, implementation guardrails, and loading/alert-state behavior, use:
-
-- `docs/ui-design-guidance.md`
-
-## Capture client screenshots (Codex-friendly)
-
-When the stack is running at `http://localhost:8080`, run:
+## Core commands
 
 ```bash
-npm run screenshot:client
+npm run lint
+npm run test
+npm run build
 ```
 
-This writes `artifacts/client-screenshot.png` and supports optional overrides:
+## API overview
 
-```bash
-npm run screenshot -- --url http://localhost:8080 --output artifacts/my-shot.png --retries 12 --timeout-ms 180000
-```
+- Health + overview: `/api/health`, `/api/dashboard`, `/api/timeline`
+- Mission stats: `/api/stats/*`
+- Prompt pipeline: `/api/pipeline/*`
+- Query/chat: `POST /api/chat`
+- System logs: `/api/system-logs`
 
-If Playwright cannot download its managed browser in your network, point the script to an existing Chromium/Chrome binary:
-
-```bash
-PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run screenshot:client
-# or
-npm run screenshot -- --url http://localhost:8080 --output artifacts/client-screenshot.png --browser-path /usr/bin/google-chrome
-```
-
-## Ingestion workflow
-
-### Docker volume mapping defaults
-
-Containerized runs now persist Postgres in a named Docker volume and keep operator-editable/debug artifacts on the host:
-
-- `./source_files -> /app/source_files`
-- `./prompts -> /app/prompts`
-- `./.local/query-set -> /app/.local/query-set` (captured outgoing LLM request payloads)
-- `./.local/query-receive -> /app/.local/query-receive` (captured incoming LLM response payloads)
-- `db_data -> /var/lib/postgresql/data` (Docker-managed persistent Postgres data)
-
-- Drop one or many transcript CSV files into `source_files/`
-- Trigger a manual re-run with `POST /api/ingest` when you need an immediate refresh outside the startup/scheduled flow
-- Ingestion is safe to rerun and always rebuilds normalized records + derived intelligence
-
-## Production readiness checklist
-
-- Confirm Docker volumes are created before first run:
-  - `mkdir -p .local/query-set .local/query-receive`
-  - `docker volume create artemis2-dashboard_db_data` (or let Compose create it automatically)
-- Add a repeatable schema migration flow before making breaking DB changes (current setup relies on schema auto-sync).
-- Keep `.env` production values externalized (no secrets in repo) and rotate API keys regularly.
-- Keep `LLM_DEBUG_PROMPTS_DIR` enabled only while debugging; payload captures can contain sensitive prompt context.
-
-## Source-file workflow (new)
-
-- Drop 4-6 text/code files into `source_files/`
-- Backend ingests them into Postgres (`source_documents`)
-- Prompt definitions are sourced from `/prompts/*.txt` and stored with IDs + update timestamps
-- Prompt executions run sequentially (never in parallel) and store results in `prompt_executions`
-- Scheduled pipeline reruns every `PIPELINE_INTERVAL_HOURS` (default 6 hours)
-
-## Prompt management
-
-Prompts are editable text files in `/prompts`:
-
-- `hourly_summary.txt`
-- `daily_summary.txt`
-- `mission_summary.txt`
-- `top_topics.txt`
-- `topic_page.txt`
-- `recent_changes.txt`
-- `chat_system.txt`
-
-## API endpoints
-
-- `GET /api/health`
-- `POST /api/ingest`
-- `GET /api/dashboard`
-- `GET /api/timeline`
-- `GET /api/stats`
-- `GET /api/topics/:topicTitle`
-- `GET /api/notable-utterances?limit=10&days=7`
-- `POST /api/chat` with `{ "query": "..." }`
-- `GET /api/pipeline/dashboard`
-- `POST /api/pipeline/ingest`
-- `POST /api/pipeline/run`
-
-## Internal LLM API configuration
-
-Set in `.env`:
-
-- `ANTHROPIC_BASE_URL`
-- `ANTHROPIC_API_KEY`
-- `ANTHROPIC_MODEL`
-
-If `ANTHROPIC_BASE_URL` is empty, backend uses deterministic fallback text to keep the demo working offline.
+See backend architecture docs for detailed endpoint behavior.
