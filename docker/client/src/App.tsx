@@ -12,6 +12,7 @@ import { TimelinePage } from "./pages/TimelinePage";
 import { TopicPage } from "./pages/TopicPage";
 import { NotableMomentsPage } from "./pages/NotableMomentsPage";
 import { SystemLogsPage } from "./pages/SystemLogsPage";
+import { TalkieRagPage } from "./pages/TalkieRagPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 
 const HEALTH_POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -79,6 +80,7 @@ export const App: FC = () => {
           <NavLink to="/daily">Daily</NavLink>
           <NavLink to="/timeline">Timeline</NavLink>
           <NavLink to="/notable">Notable</NavLink>
+          <NavLink to="/talkierag">TalkieRAG</NavLink>
           <NavLink to="/system-logs">System Logs</NavLink>
           <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer">
             TalkyBot
@@ -108,6 +110,7 @@ export const App: FC = () => {
           <Route path="/daily" element={<DailyPage />} />
           <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/notable" element={<NotableMomentsPage />} />
+          <Route path="/talkierag" element={<TalkieRagPage />} />
           <Route path="/system-logs" element={<SystemLogsPage />} />
           <Route path="/topics/:title" element={<TopicPage />} />
         </Routes>

@@ -109,12 +109,14 @@ export type ChatResponse = {
   answer: string;
   evidence: Array<{ timestamp: string; channel: string; text: string; filename: string }>;
   strategy: {
-    mode: "multi-day";
+    mode: "multi-day" | "rag" | "all";
     totalUtterances: number;
     contextUtterances: number;
     daysQueried: number;
   };
 };
+
+export type ChatMode = "rag" | "all";
 
 
 export type SystemLogEntry = {
@@ -302,7 +304,7 @@ export const chat = async (query: string, mode: ChatMode = "rag"): Promise<ChatR
   const response = await fetch(`${base}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query })
+    body: JSON.stringify({ query, mode })
   });
 
   if (!response.ok) {
