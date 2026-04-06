@@ -89,7 +89,8 @@ const llmClient = new LlmClient(
   env.LLM_DEBUG_PROMPTS_DIR,
   env.LLM_MAX_TOKENS,
   redisLlmCache ?? undefined,
-  env.REDIS_CACHE_TTL_SECONDS
+  env.REDIS_CACHE_TTL_SECONDS,
+  env.REDIS_CACHE_STALE_TTL_SECONDS
 );
 let llmConnectivityStatus = await llmClient.checkConnectivity();
 
@@ -237,6 +238,15 @@ app.use(
   "/api",
   createApiRouter(analysisService, () => llmConnectivityStatus, async () => {
     await runTranscriptAndPipelineRefresh();
+    statsService?.invalidateCaches();
+    timeWindowSummaryService?.invalidateCache();
+    if (statsService) {
+      void statsService.primeCoreCaches().catch((error) => {
+        serverLogger.warn("Failed to prime stats caches after ingestion", {
+          error: serializeUnknownError(error)
+        });
+      });
+    }
   }, () => statsService, () => timeWindowSummaryService)
 );
 

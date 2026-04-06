@@ -17,6 +17,11 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   server:
     build:
@@ -29,14 +34,18 @@ services:
       DB_HOST: db
       DATA_DIR: /app/source_files
       LLM_DEBUG_PROMPTS_DIR: /app/.local
+      REDIS_CACHE_ENABLED: "true"
+      REDIS_URL: redis://redis:6379
     volumes:
       - ./prompts:/app/prompts:ro
       - ./source_files:/app/source_files:ro
       - ./.local/query-set:/app/.local/query-set
       - ./.local/query-receive:/app/.local/query-receive
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_started
+      redis:
+        condition: service_healthy
 
   frontend:
     build:

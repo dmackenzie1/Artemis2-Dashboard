@@ -49,6 +49,8 @@ npm install
 
 4. Open `http://localhost:8080`.
 
+Redis-backed LLM response caching is enabled in Docker Compose by default (`redis` service + `REDIS_URL=redis://redis:6379` on `server`).
+
 ### Optional local HTTPS (dev SSL)
 
 If you want TLS termination at nginx in local Docker runs:
@@ -81,6 +83,12 @@ Open the Vite URL (typically `http://localhost:5173`).
 npm run lint
 npm run test
 npm run build
+```
+
+If TypeScript linting reports `Cannot find module 'redis'`, re-run workspace install from the repo root:
+
+```bash
+npm install
 ```
 
 ## API overview

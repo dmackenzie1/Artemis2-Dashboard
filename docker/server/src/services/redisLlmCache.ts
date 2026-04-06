@@ -20,7 +20,7 @@ export class RedisLlmCache implements LlmResponseCache {
       return;
     }
 
-    this.client.on("error", (error) => {
+    this.client.on("error", (error: unknown) => {
       serverLogger.warn("Redis client error", {
         error: error instanceof Error ? error.message : "Unknown redis error"
       });
