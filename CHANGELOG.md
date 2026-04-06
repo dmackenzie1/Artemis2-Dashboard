@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: remove topbar 3-hour/6-hour/12-hour navigation, fold histogram hour-count coverage into Transcript Metrics, and strengthen Timeline/Chat/System Logs header contrast while trimming redundant histogram footer copy. Intent: Reduce duplicate window controls and improve readability where operators reported page headings and timeline chrome were too faded.
 - docs: add an EC2 deployment runbook with AL2023 bootstrap script, environment-variable template, and local-first positioning linked from the top-level README. Intent: Preserve local development as the default while giving operators a repeatable production-host setup path for `a2.emss-mess.org`.
 - fix: align Signal Chat evidence rendering to the dedicated ranked `/api/search/utterances` payload and tighten chat strategy typing to `rag|all` across client contracts. Intent: Ensure the new chat page always displays server-ranked evidence and avoid stale mode assumptions in frontend state.
 - feat: add a new Signal Chat route/page with server-side tokenizer-backed utterance retrieval, ranked evidence APIs, and mode-aware chat synthesis while leaving Overview Query Console interactions intact. Intent: Deliver a dedicated transcript RAG workspace without regressing the existing overview mission workflow.

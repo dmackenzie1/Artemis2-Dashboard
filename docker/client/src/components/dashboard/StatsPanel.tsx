@@ -8,6 +8,7 @@ import { StatusBadge } from "./primitives/StatusBadge";
 
 type StatsPanelProps = {
   stats: DashboardStat[];
+  timelineHours: number;
   dailyTranscriptVolume: Array<{
     day: string;
     utterances: number;
@@ -19,12 +20,13 @@ const formatMetricValue = (value: number): string => {
   return value.toLocaleString();
 };
 
-export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats, dailyTranscriptVolume }) => {
+export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats, timelineHours, dailyTranscriptVolume }) => {
   const statusLabel = stats.length > 0 ? "ready" : "loading";
+  const coverageEntries = [...stats.filter((stat) => stat.label.includes("Day")), { label: "Hours", value: `${timelineHours}` }];
   const groupedStats = [
     {
       title: "Coverage",
-      entries: stats.filter((stat) => stat.label.includes("Day"))
+      entries: coverageEntries
     },
     {
       title: "Volume",

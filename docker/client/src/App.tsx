@@ -7,9 +7,6 @@ import { StatusBadge } from "./components/dashboard/primitives/StatusBadge";
 import { useComponentIdentity } from "./components/dashboard/primitives/useComponentIdentity";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DailyPage } from "./pages/DailyPage";
-import { ThreeHourPage } from "./pages/ThreeHourPage";
-import { SixHourPage } from "./pages/SixHourPage";
-import { TwelveHourPage } from "./pages/TwelveHourPage";
 import styles from "./App.module.css";
 import { TimelinePage } from "./pages/TimelinePage";
 import { TopicPage } from "./pages/TopicPage";
@@ -110,9 +107,6 @@ export const App: FC = () => {
         <nav className={styles["topbar-nav"]}>
           <NavLink to="/">Overview</NavLink>
           <NavLink to="/daily">Daily</NavLink>
-          <NavLink to="/3-hour">3 Hour</NavLink>
-          <NavLink to="/6-hour">6 Hour</NavLink>
-          <NavLink to="/12-hour">12 Hour</NavLink>
           <NavLink to="/timeline">Timeline</NavLink>
           <NavLink to="/notable">Notable</NavLink>
           <NavLink to="/chat">Chat</NavLink>
@@ -156,9 +150,9 @@ export const App: FC = () => {
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/daily" element={<DailyPage />} />
-          <Route path="/3-hour" element={<ThreeHourPage />} />
-          <Route path="/6-hour" element={<SixHourPage />} />
-          <Route path="/12-hour" element={<TwelveHourPage />} />
+          <Route path="/3-hour" element={<Navigate to="/daily" replace />} />
+          <Route path="/6-hour" element={<Navigate to="/daily" replace />} />
+          <Route path="/12-hour" element={<Navigate to="/daily" replace />} />
           <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/notable" element={<NotableMomentsPage />} />
           <Route path="/talkierag" element={<Navigate to="/" replace />} />
