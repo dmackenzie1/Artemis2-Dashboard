@@ -56,8 +56,6 @@ const parseHourlyHighlights = (rawResponse: string): Record<string, string> => {
   }
 };
 
-export type ChatMode = "rag" | "all";
-
 type ServiceConfig = {
   dataDir: string;
   promptsDir: string;
@@ -214,43 +212,6 @@ export class AnalysisService {
     return this.cache;
   }
 
-  private getEvidenceForRag(query: string): TranscriptUtterance[] {
-    const queryTokens = query
-      .toLowerCase()
-      .split(/\s+/)
-      .map((token) => token.replace(/[^a-z0-9]/g, ""))
-      .filter((token) => token.length > 2);
-
-    const scored = this.utterances
-      .map((item) => {
-        const haystack = `${item.channel} ${item.text}`.toLowerCase();
-        const score = queryTokens.reduce((total, token) => (haystack.includes(token) ? total + 1 : total), 0);
-        return { item, score };
-      })
-      .filter(({ score }) => score > 0)
-      .sort((left, right) => right.score - left.score)
-      .slice(0, 48)
-      .map(({ item }) => item);
-
-    if (scored.length > 0) {
-      return scored;
-    }
-
-    return this.utterances.slice(0, 24);
-  }
-
-  private getEvidenceForBroadSweep(): { context: TranscriptUtterance[]; wasTruncated: boolean } {
-    const MAX_CONTEXT = 400;
-    if (this.utterances.length <= MAX_CONTEXT) {
-      return { context: this.utterances, wasTruncated: false };
-    }
-
-    return {
-      context: this.utterances.slice(-MAX_CONTEXT),
-      wasTruncated: true
-    };
-  }
-
   getTopNotableUtterances(limit = 10, days = 7): NotableUtterance[] {
     if (this.utterances.length === 0) {
       return [];
@@ -324,50 +285,64 @@ export class AnalysisService {
   }
 
   async chat(
-    query: string,
-    mode: ChatMode = "rag"
+    query: string
   ): Promise<{
     answer: string;
     evidence: TranscriptUtterance[];
-    strategy: { mode: ChatMode; totalUtterances: number; contextUtterances: number; wasTruncated: boolean };
+    strategy: { mode: "multi-day"; totalUtterances: number; contextUtterances: number; daysQueried: number };
   }> {
     serverLogger.info("Chat prompt requested", {
-      mode,
       queryLength: query.length
     });
+    const utterancesByDay = groupBy(this.utterances, (item) => item.day);
+    const sortedDays = Object.keys(utterancesByDay).sort();
+    const dayQueryPrompt = await getPrompt(this.config.promptsDir, "query_console_day_extract.txt");
+    const aggregatePrompt = await getPrompt(this.config.promptsDir, "query_console_aggregate.txt");
+    const dayResults: Array<{ day: string; result: string; utteranceCount: number }> = [];
 
-    const ragEvidence = this.getEvidenceForRag(query);
-    const sweepContext = this.getEvidenceForBroadSweep();
+    for (const day of sortedDays) {
+      const dayUtterances = utterancesByDay[day];
+      const dayResult = await this.config.llmClient.generateText({
+        systemPrompt: dayQueryPrompt,
+        userPrompt: JSON.stringify({
+          query,
+          day,
+          utteranceCount: dayUtterances.length,
+          utterances: dayUtterances
+        }),
+        componentId: `analysis/query-console/day/${day}`
+      });
 
-    const evidence = mode === "all" ? sweepContext.context : ragEvidence;
-    const wasTruncated = mode === "all" ? sweepContext.wasTruncated : false;
+      dayResults.push({
+        day,
+        result: dayResult,
+        utteranceCount: dayUtterances.length
+      });
+    }
 
     const answer = await this.config.llmClient.generateText({
-      systemPrompt: await getPrompt(this.config.promptsDir, "chat_system.txt"),
+      systemPrompt: aggregatePrompt,
       userPrompt: JSON.stringify({
         query,
-        mode,
         totalUtterances: this.utterances.length,
-        contextUtterances: evidence.length,
-        evidence
+        dayResults
       }),
-      componentId: `analysis/chat/${mode}`
+      componentId: "analysis/query-console/aggregate"
     });
 
     serverLogger.info("Chat prompt received", {
-      mode,
-      evidenceCount: evidence.length,
-      wasTruncated
+      daysQueried: sortedDays.length,
+      evidenceCount: this.utterances.length
     });
 
     return {
       answer,
-      evidence,
+      evidence: this.utterances,
       strategy: {
-        mode,
+        mode: "multi-day",
         totalUtterances: this.utterances.length,
-        contextUtterances: evidence.length,
-        wasTruncated
+        contextUtterances: this.utterances.length,
+        daysQueried: sortedDays.length
       }
     };
   }

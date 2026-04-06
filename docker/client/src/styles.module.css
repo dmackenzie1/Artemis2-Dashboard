@@ -634,6 +634,12 @@ main {
   font-size: 1.08rem;
 }
 
+.query-console-ready-button {
+  justify-self: end;
+  align-self: flex-start;
+  min-width: 84px;
+}
+
 .chat-mode-picker {
   display: inline-flex;
   flex-direction: column;

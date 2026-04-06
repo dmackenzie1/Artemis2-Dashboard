@@ -186,42 +186,62 @@ export class LlmClient {
 
       const isOpenAiCompatible = this.apiUrl.includes("/v1/chat/completions");
 
-      const response = await fetch(this.apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}`, "x-api-key": this.apiKey } : {}),
-          ...(isOpenAiCompatible ? {} : { "anthropic-version": "2023-06-01" })
-        },
-        body: JSON.stringify(
-          isOpenAiCompatible
-            ? {
-                model: this.model,
-                max_tokens: this.maxTokens,
-                messages: [
-                  {
-                    role: "system",
-                    content: options.systemPrompt
-                  },
-                  {
-                    role: "user",
-                    content: options.userPrompt
-                  }
-                ]
-              }
-            : {
-                model: this.model,
-                system: options.systemPrompt,
-                max_tokens: this.maxTokens,
-                messages: [
-                  {
-                    role: "user",
-                    content: options.userPrompt
-                  }
-                ]
-              }
-        )
-      });
+      let response: Response;
+      try {
+        response = await fetch(this.apiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}`, "x-api-key": this.apiKey } : {}),
+            ...(isOpenAiCompatible ? {} : { "anthropic-version": "2023-06-01" })
+          },
+          body: JSON.stringify(
+            isOpenAiCompatible
+              ? {
+                  model: this.model,
+                  max_tokens: this.maxTokens,
+                  messages: [
+                    {
+                      role: "system",
+                      content: options.systemPrompt
+                    },
+                    {
+                      role: "user",
+                      content: options.userPrompt
+                    }
+                  ]
+                }
+              : {
+                  model: this.model,
+                  system: options.systemPrompt,
+                  max_tokens: this.maxTokens,
+                  messages: [
+                    {
+                      role: "user",
+                      content: options.userPrompt
+                    }
+                  ]
+                }
+          )
+        });
+      } catch (error) {
+        const fallback = `Prototype fallback response:\n${options.userPrompt.slice(0, 500)}...`;
+        serverLogger.warn("LLM transport error, using fallback response", {
+          requestId,
+          componentId,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+        await this.persistDebugPrompt("incoming", requestId, componentId, {
+          requestId,
+          componentId,
+          receivedAt: new Date().toISOString(),
+          response: fallback,
+          responseLength: fallback.length,
+          mode: "transport-fallback",
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+        return fallback;
+      }
 
       if (!response.ok) {
         const text = await response.text();
