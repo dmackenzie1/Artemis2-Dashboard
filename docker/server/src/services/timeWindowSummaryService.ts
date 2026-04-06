@@ -7,7 +7,8 @@ import { serverLogger } from "../utils/logging/serverLogger.js";
 import { ExpiringCache } from "./expiringCache.js";
 
 type EntityManagerProvider = () => EntityManager;
-const rollingWindowCacheTtlMs = 3 * 60 * 1000;
+const rollingWindowFreshCacheTtlMs = 40 * 60 * 1000;
+const rollingWindowStaleCacheTtlMs = 80 * 60 * 1000;
 
 type TimeWindowUtteranceRow = {
   timestamp: string;
@@ -58,7 +59,8 @@ const extractJsonObject = (raw: string): string | null => {
 };
 
 export class TimeWindowSummaryService {
-  private readonly cache = new ExpiringCache<TimeWindowSummary>(rollingWindowCacheTtlMs);
+  private readonly cache = new ExpiringCache<TimeWindowSummary>(rollingWindowFreshCacheTtlMs, rollingWindowStaleCacheTtlMs);
+  private readonly refreshInFlight = new Map<string, Promise<void>>();
 
   constructor(
     private readonly getEntityManager: EntityManagerProvider,
@@ -69,11 +71,23 @@ export class TimeWindowSummaryService {
   async generate(hours: number): Promise<TimeWindowSummary> {
     const safeHours = Math.min(Math.max(Math.floor(hours), 1), 24);
     const cacheKey = `hours:${safeHours}`;
-    const cached = this.cache.get(cacheKey);
-    if (cached) {
-      return cached;
+    const cached = this.cache.getWithStaleness(cacheKey);
+    if (cached && !cached.isStale) {
+      return cached.value;
+    }
+    if (cached && cached.isStale) {
+      this.triggerBackgroundRefresh(cacheKey, safeHours);
+      return cached.value;
     }
 
+    return this.computeAndCacheWindowSummary(cacheKey, safeHours);
+  }
+
+  invalidateCache(): void {
+    this.cache.clear();
+  }
+
+  private async computeAndCacheWindowSummary(cacheKey: string, safeHours: number): Promise<TimeWindowSummary> {
     const windowEnd = dayjs().utc();
     const windowStart = windowEnd.subtract(safeHours, "hour");
 
@@ -235,5 +249,24 @@ export class TimeWindowSummaryService {
     };
     this.cache.set(cacheKey, payload);
     return payload;
+  }
+
+  private triggerBackgroundRefresh(cacheKey: string, safeHours: number): void {
+    if (this.refreshInFlight.has(cacheKey)) {
+      return;
+    }
+
+    const refreshPromise = this.computeAndCacheWindowSummary(cacheKey, safeHours)
+      .catch((error) => {
+        serverLogger.warn("Background refresh failed for time-window summary", {
+          cacheKey,
+          safeHours,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      })
+      .finally(() => {
+        this.refreshInFlight.delete(cacheKey);
+      });
+    this.refreshInFlight.set(cacheKey, refreshPromise.then(() => undefined));
   }
 }

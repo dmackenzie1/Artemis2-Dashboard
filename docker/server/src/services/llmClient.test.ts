@@ -285,4 +285,62 @@ describe("LlmClient.checkConnectivity", () => {
       global.fetch = originalFetch;
     }
   });
+
+  it("returns stale cached output immediately and refreshes in background", async () => {
+    const originalFetch = global.fetch;
+    const mockFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "refreshed-output"
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    const cachedValues = new Map<string, string>();
+    const cache = {
+      get: vi.fn(async (key: string) => cachedValues.get(key) ?? null),
+      set: vi.fn(async (key: string, value: string) => {
+        cachedValues.set(key, value);
+      })
+    };
+
+    try {
+      global.fetch = mockFetch as unknown as typeof fetch;
+      const client = new LlmClient("https://example.test/v1/chat/completions", "test-key", "model-test", undefined, 12000, cache, 3600, 3600);
+
+      const staleEnvelope = JSON.stringify({
+        response: "stale-output",
+        freshUntilEpochMs: Date.now() - 5_000,
+        staleUntilEpochMs: Date.now() + 60_000
+      });
+      const cacheKey = (client as unknown as { createCacheKey: (options: { systemPrompt: string; userPrompt: string }) => string }).createCacheKey({
+        systemPrompt: "System",
+        userPrompt: "Prompt"
+      });
+      cachedValues.set(cacheKey, staleEnvelope);
+
+      const output = await client.generateText({
+        systemPrompt: "System",
+        userPrompt: "Prompt"
+      });
+      expect(output).toBe("stale-output");
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const refreshedEnvelopeRaw = cachedValues.get(cacheKey);
+      expect(refreshedEnvelopeRaw).toBeTruthy();
+      expect(refreshedEnvelopeRaw).toContain("refreshed-output");
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });

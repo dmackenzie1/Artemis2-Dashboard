@@ -4,7 +4,8 @@ import { serverLogger } from "../utils/logging/serverLogger.js";
 import { ExpiringCache } from "./expiringCache.js";
 
 type EntityManagerProvider = () => EntityManager;
-const statsCacheTtlMs = 5 * 60 * 1000;
+const statsFreshCacheTtlMs = 2 * 60 * 1000;
+const statsStaleCacheTtlMs = 40 * 60 * 1000;
 
 export type MissionStatsSummary = {
   generatedAt: string;
@@ -33,130 +34,165 @@ export type MissionHourlyChannelEntry = {
 };
 
 export class StatsService {
-  private readonly summaryCache = new ExpiringCache<MissionStatsSummary>(statsCacheTtlMs);
-  private readonly dailyCache = new ExpiringCache<MissionStatsByDayEntry[]>(statsCacheTtlMs);
-  private readonly hourlyCache = new ExpiringCache<MissionHourlyChannelEntry[]>(statsCacheTtlMs);
+  private readonly summaryCache = new ExpiringCache<MissionStatsSummary>(statsFreshCacheTtlMs, statsStaleCacheTtlMs);
+  private readonly dailyCache = new ExpiringCache<MissionStatsByDayEntry[]>(statsFreshCacheTtlMs, statsStaleCacheTtlMs);
+  private readonly hourlyCache = new ExpiringCache<MissionHourlyChannelEntry[]>(statsFreshCacheTtlMs, statsStaleCacheTtlMs);
+  private readonly refreshInFlight = new Map<string, Promise<void>>();
 
   constructor(private readonly getEntityManager: EntityManagerProvider) {}
 
   async getSummary(): Promise<MissionStatsSummary> {
-    const cacheKey = "summary";
-    const cached = this.summaryCache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    return this.resolveWithStaleWhileRevalidate("summary", this.summaryCache, async () => {
+      const [summary] = await this.getEntityManager().getConnection().execute<
+        {
+          minDay: string | null;
+          maxDay: string | null;
+          utterances: string;
+          words: string;
+          channels: string;
+        }[]
+      >(
+        `
+          select
+            min(date(timestamp at time zone 'utc'))::text as "minDay",
+            max(date(timestamp at time zone 'utc'))::text as "maxDay",
+            count(*)::text as "utterances",
+            coalesce(sum(word_count), 0)::text as "words",
+            count(distinct nullif(trim(channel), ''))::text as "channels"
+          from transcript_utterances
+        `
+      );
 
-    const [summary] = await this.getEntityManager().getConnection().execute<
-      {
-        minDay: string | null;
-        maxDay: string | null;
-        utterances: string;
-        words: string;
-        channels: string;
-      }[]
-    >(
-      `
-        select
-          min(date(timestamp at time zone 'utc'))::text as "minDay",
-          max(date(timestamp at time zone 'utc'))::text as "maxDay",
-          count(*)::text as "utterances",
-          coalesce(sum(word_count), 0)::text as "words",
-          count(distinct nullif(trim(channel), ''))::text as "channels"
-        from transcript_utterances
-      `
-    );
-
-    const payload: MissionStatsSummary = {
-      generatedAt: dayjs().utc().toISOString(),
-      days: {
-        minDay: summary?.minDay ?? null,
-        maxDay: summary?.maxDay ?? null
-      },
-      totals: {
-        utterances: Number(summary?.utterances ?? 0),
-        words: Number(summary?.words ?? 0),
-        channels: Number(summary?.channels ?? 0)
-      }
-    };
-
-    this.summaryCache.set(cacheKey, payload);
-    return payload;
+      return {
+        generatedAt: dayjs().utc().toISOString(),
+        days: {
+          minDay: summary?.minDay ?? null,
+          maxDay: summary?.maxDay ?? null
+        },
+        totals: {
+          utterances: Number(summary?.utterances ?? 0),
+          words: Number(summary?.words ?? 0),
+          channels: Number(summary?.channels ?? 0)
+        }
+      };
+    });
   }
 
   async getStatsByDay(): Promise<MissionStatsByDayEntry[]> {
-    const cacheKey = "days";
-    const cached = this.dailyCache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    return this.resolveWithStaleWhileRevalidate("days", this.dailyCache, async () => {
+      const rows = await this.getEntityManager().getConnection().execute<
+        { day: string; utterances: string; words: string; channels: string }[]
+      >(
+        `
+          select
+            date(timestamp at time zone 'utc')::text as "day",
+            count(*)::text as "utterances",
+            coalesce(sum(word_count), 0)::text as "words",
+            count(distinct nullif(trim(channel), ''))::text as "channels"
+          from transcript_utterances
+          group by 1
+          order by 1 asc
+        `
+      );
 
-    const rows = await this.getEntityManager().getConnection().execute<
-      { day: string; utterances: string; words: string; channels: string }[]
-    >(
-      `
-        select
-          date(timestamp at time zone 'utc')::text as "day",
-          count(*)::text as "utterances",
-          coalesce(sum(word_count), 0)::text as "words",
-          count(distinct nullif(trim(channel), ''))::text as "channels"
-        from transcript_utterances
-        group by 1
-        order by 1 asc
-      `
-    );
-
-    const payload = rows.map((row) => ({
-      day: row.day,
-      utterances: Number(row.utterances),
-      words: Number(row.words),
-      channels: Number(row.channels)
-    }));
-
-    this.dailyCache.set(cacheKey, payload);
-    return payload;
+      return rows.map((row) => ({
+        day: row.day,
+        utterances: Number(row.utterances),
+        words: Number(row.words),
+        channels: Number(row.channels)
+      }));
+    });
   }
 
   async getUtterancesPerHourPerChannel(days = 7): Promise<MissionHourlyChannelEntry[]> {
     const safeDays = Math.min(Math.max(days, 1), 30);
     const cacheKey = `hourly:${safeDays}`;
-    const cached = this.hourlyCache.get(cacheKey);
-    if (cached) {
-      return cached;
+    return this.resolveWithStaleWhileRevalidate(cacheKey, this.hourlyCache, async () => {
+      serverLogger.info("Running hourly channel stats query", { requestedDays: days, safeDays });
+      const rows = await this.getEntityManager().getConnection().execute<
+        { hour: string; channel: string; utterances: string }[]
+      >(
+        `
+          with max_day as (
+            select max(date(timestamp at time zone 'utc')) as value
+            from transcript_utterances
+          ),
+          scoped as (
+            select
+              date_trunc('hour', timestamp) as bucket_hour,
+              channel
+            from transcript_utterances
+            cross join max_day
+            where max_day.value is not null
+              and date(timestamp at time zone 'utc') >= max_day.value - ((${safeDays} - 1) * interval '1 day')
+          )
+          select
+            to_char(scoped.bucket_hour at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') as "hour",
+            scoped.channel as "channel",
+            count(*)::text as "utterances"
+          from scoped
+          group by 1, 2
+          order by 1 asc, 2 asc
+        `
+      );
+
+      return rows.map((row) => ({
+        hour: row.hour,
+        channel: row.channel,
+        utterances: Number(row.utterances)
+      }));
+    });
+  }
+
+  invalidateCaches(): void {
+    this.summaryCache.clear();
+    this.dailyCache.clear();
+    this.hourlyCache.clear();
+  }
+
+  async primeCoreCaches(): Promise<void> {
+    await Promise.all([this.getSummary(), this.getStatsByDay()]);
+  }
+
+  private async resolveWithStaleWhileRevalidate<T>(
+    cacheKey: string,
+    cache: ExpiringCache<T>,
+    loader: () => Promise<T>
+  ): Promise<T> {
+    const cached = cache.getWithStaleness(cacheKey);
+    if (cached && !cached.isStale) {
+      return cached.value;
     }
 
-    serverLogger.info("Running hourly channel stats query", { requestedDays: days, safeDays });
-    const rows = await this.getEntityManager().getConnection().execute<{ hour: string; channel: string; utterances: string }[]>(
-      `
-        with max_day as (
-          select max(date(timestamp at time zone 'utc')) as value
-          from transcript_utterances
-        ),
-        scoped as (
-          select
-            date_trunc('hour', timestamp) as bucket_hour,
-            channel
-          from transcript_utterances
-          cross join max_day
-          where max_day.value is not null
-            and date(timestamp at time zone 'utc') >= max_day.value - ((${safeDays} - 1) * interval '1 day')
-        )
-        select
-          to_char(scoped.bucket_hour at time zone 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') as "hour",
-          scoped.channel as "channel",
-          count(*)::text as "utterances"
-        from scoped
-        group by 1, 2
-        order by 1 asc, 2 asc
-      `
-    );
+    if (cached && cached.isStale) {
+      this.triggerBackgroundRefresh(cacheKey, cache, loader);
+      return cached.value;
+    }
 
-    const payload = rows.map((row) => ({
-      hour: row.hour,
-      channel: row.channel,
-      utterances: Number(row.utterances)
-    }));
+    const value = await loader();
+    cache.set(cacheKey, value);
+    return value;
+  }
 
-    this.hourlyCache.set(cacheKey, payload);
-    return payload;
+  private triggerBackgroundRefresh<T>(cacheKey: string, cache: ExpiringCache<T>, loader: () => Promise<T>): void {
+    if (this.refreshInFlight.has(cacheKey)) {
+      return;
+    }
+
+    const refreshPromise = (async () => {
+      try {
+        const nextValue = await loader();
+        cache.set(cacheKey, nextValue);
+      } catch (error) {
+        serverLogger.warn("Background cache refresh failed for stats query", {
+          cacheKey,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      } finally {
+        this.refreshInFlight.delete(cacheKey);
+      }
+    })();
+
+    this.refreshInFlight.set(cacheKey, refreshPromise);
   }
 }

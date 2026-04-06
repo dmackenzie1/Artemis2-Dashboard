@@ -9,6 +9,17 @@ export type LlmResponseCache = {
   set(key: string, value: string, ttlSeconds: number): Promise<void>;
 };
 
+type CachedLlmEnvelope = {
+  response: string;
+  freshUntilEpochMs: number;
+  staleUntilEpochMs: number;
+};
+
+type CacheLookupResult = {
+  response: string;
+  cacheState: "fresh" | "stale";
+};
+
 type GenerateOptions = {
   systemPrompt: string;
   userPrompt: string;
@@ -29,6 +40,7 @@ export class LlmClient {
   private queue = Promise.resolve();
   private requestCounter = 0;
   private debugDirectoryInitialized = false;
+  private readonly staleRefreshInFlight = new Set<string>();
 
   constructor(
     private readonly apiUrl?: string,
@@ -37,7 +49,8 @@ export class LlmClient {
     private readonly debugPromptsDir?: string,
     private readonly maxTokens = 12_000,
     private readonly responseCache?: LlmResponseCache,
-    private readonly cacheTtlSeconds = 60 * 60
+    private readonly cacheTtlSeconds = 60 * 60,
+    private readonly staleWhileRevalidateSeconds = 60 * 60
   ) {}
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
@@ -114,21 +127,58 @@ export class LlmClient {
       .digest("hex");
   }
 
-  private async readCachedResponse(cacheKey: string, componentId: string, requestId: string): Promise<string | null> {
+  private parseCacheEnvelope(rawCached: string): CachedLlmEnvelope | null {
+    try {
+      const parsed = JSON.parse(rawCached) as Partial<CachedLlmEnvelope>;
+      if (
+        typeof parsed?.response === "string" &&
+        typeof parsed.freshUntilEpochMs === "number" &&
+        typeof parsed.staleUntilEpochMs === "number"
+      ) {
+        return parsed as CachedLlmEnvelope;
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  }
+
+  private async readCachedResponse(cacheKey: string, componentId: string, requestId: string): Promise<CacheLookupResult | null> {
     if (!this.responseCache) {
       return null;
     }
 
     try {
       const cached = await this.responseCache.get(cacheKey);
-      if (cached) {
-        serverLogger.info("LLM response served from Redis cache", {
+      if (!cached) {
+        return null;
+      }
+
+      const envelope = this.parseCacheEnvelope(cached);
+      if (!envelope) {
+        serverLogger.info("LLM response served from Redis cache (legacy format)", {
           requestId,
           componentId,
           cacheKey
         });
+        return { response: cached, cacheState: "fresh" };
       }
-      return cached;
+
+      const now = Date.now();
+      if (now >= envelope.staleUntilEpochMs) {
+        return null;
+      }
+
+      const cacheState = now >= envelope.freshUntilEpochMs ? "stale" : "fresh";
+      serverLogger.info("LLM response served from Redis cache", {
+        requestId,
+        componentId,
+        cacheKey,
+        cacheState
+      });
+
+      return { response: envelope.response, cacheState };
     } catch (error) {
       serverLogger.warn("Redis cache read failed for LLM request", {
         requestId,
@@ -146,7 +196,13 @@ export class LlmClient {
     }
 
     try {
-      await this.responseCache.set(cacheKey, value, this.cacheTtlSeconds);
+      const now = Date.now();
+      const payload: CachedLlmEnvelope = {
+        response: value,
+        freshUntilEpochMs: now + this.cacheTtlSeconds * 1000,
+        staleUntilEpochMs: now + (this.cacheTtlSeconds + this.staleWhileRevalidateSeconds) * 1000
+      };
+      await this.responseCache.set(cacheKey, JSON.stringify(payload), this.cacheTtlSeconds + this.staleWhileRevalidateSeconds);
     } catch (error) {
       serverLogger.warn("Redis cache write failed for LLM request", {
         requestId,
@@ -213,11 +269,48 @@ export class LlmClient {
     if (cacheEnabled && cacheKey) {
       const cachedResponse = await this.readCachedResponse(cacheKey, componentId, requestId);
       if (cachedResponse) {
-        return cachedResponse;
+        if (cachedResponse.cacheState === "stale") {
+          this.revalidateStaleCacheEntry(cacheKey, options);
+        }
+        return cachedResponse.response;
       }
     }
 
-    return this.enqueue(async () => {
+    return this.enqueue(() => this.performGenerateText(options, requestId, componentId, cacheKey, cacheEnabled));
+  }
+
+  private revalidateStaleCacheEntry(cacheKey: string, options: GenerateOptions): void {
+    if (this.staleRefreshInFlight.has(cacheKey)) {
+      return;
+    }
+
+    this.staleRefreshInFlight.add(cacheKey);
+    this.enqueue(async () => {
+      const refreshRequestId = `llm-stale-refresh-${Date.now()}-${++this.requestCounter}`;
+      const componentId = options.componentId ?? "unknown-component";
+      try {
+        await this.performGenerateText(options, refreshRequestId, `${componentId}/stale-refresh`, cacheKey, true);
+      } catch (error) {
+        serverLogger.warn("Background LLM cache refresh failed", {
+          componentId,
+          cacheKey,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      } finally {
+        this.staleRefreshInFlight.delete(cacheKey);
+      }
+    }).catch(() => {
+      this.staleRefreshInFlight.delete(cacheKey);
+    });
+  }
+
+  private async performGenerateText(
+    options: GenerateOptions,
+    requestId: string,
+    componentId: string,
+    cacheKey: string | null,
+    cacheEnabled: boolean
+  ): Promise<string> {
       const requestUserPreview = this.createPreview(options.userPrompt, 350, 2);
       const requestSystemPreview = this.createPreview(options.systemPrompt, 350, 2);
       serverLogger.info("LLM request queued", {
@@ -376,7 +469,6 @@ export class LlmClient {
       }
 
       return output;
-    });
   }
 
   async checkConnectivity(): Promise<LlmConnectivityStatus> {

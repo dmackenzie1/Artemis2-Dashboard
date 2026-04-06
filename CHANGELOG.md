@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+- chore: add explicit Redis cache wiring/health checks in Docker Compose and document Redis dependency/install troubleshooting in setup docs. Intent: Ensure LLM cache infrastructure is reliably present in local stacks and reduce false lint/runtime failures caused by missing workspace installs.
+- fix: implement stale-while-revalidate cache behavior for DB stats/time-window summaries and Redis-backed LLM responses, plus post-ingest cache invalidation and stats prewarming for immediate min/max/total reads. Intent: Keep operator-visible outputs fast and always available by serving recent cached data immediately while refreshing expensive queries/prompts in the background.
 - refactor: remove PromptExecution database cache lookups from the prompt pipeline and add short-lived in-memory caching for stable stats/time-window/mission-metrics views (3-5 minute TTLs). Intent: Cache read-heavy outputs that are effectively stable over a few minutes while eliminating the older DB prompt-response cache path.
 - chore: perform a deep production-grade full-stack review across backend/frontend/nginx/postgres and publish prioritized risk findings with remediation guidance. Intent: Give maintainers an actionable, production-focused reliability/security hardening plan before additional feature work.
 - feat: add Redis-backed LLM API response caching with a 60-minute TTL for repeated non-chat prompts, wire the backend to a new Redis service, and explicitly bypass cache for chat-mode calls. Intent: Cut duplicate model calls for identical analysis requests while preserving live conversational behavior for operator chat workflows.

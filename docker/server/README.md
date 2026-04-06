@@ -26,6 +26,7 @@ npm run db:ingest -w backend
 ## Runtime notes
 
 - `TRANSCRIPTS_DB_ENABLED=true` enables DB-backed routes (`/api/transcripts`, `/api/pipeline`, `/api/stats`).
+- Redis-backed LLM cache requires the `redis` npm package (already listed in this workspace dependencies) and a reachable Redis instance (`REDIS_CACHE_ENABLED=true`, `REDIS_URL=redis://redis:6379` in Docker Compose).
 - Startup sequence loads cache, ingests CSV data, and optionally runs prompt pipeline.
 - System logs route exposes prompt artifacts from configured local directories.
 

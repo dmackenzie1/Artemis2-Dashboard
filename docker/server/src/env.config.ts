@@ -23,6 +23,7 @@ const EnvSchema = z.object({
   PIPELINE_AUTO_RUN: z.coerce.boolean().default(true),
   REDIS_URL: z.string().default("redis://redis:6379"),
   REDIS_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 60),
+  REDIS_CACHE_STALE_TTL_SECONDS: z.coerce.number().int().nonnegative().default(60 * 60),
   REDIS_CACHE_ENABLED: z.coerce.boolean().default(true)
 });
 
