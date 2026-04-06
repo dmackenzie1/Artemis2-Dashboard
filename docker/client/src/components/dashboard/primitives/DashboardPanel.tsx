@@ -1,5 +1,6 @@
 import type { FunctionComponent, ReactNode } from "react";
-import styles from "../../../styles.module.css";
+import sharedStyles from "../../../styles/shared.module.css";
+import styles from "./DashboardPanel.module.css";
 import { useComponentIdentity } from "./useComponentIdentity";
 
 type DashboardPanelProps = {
@@ -25,7 +26,7 @@ export const DashboardPanel: FunctionComponent<DashboardPanelProps> = ({
 
   return (
     <section
-      className={`${styles.panel} ${styles["space-panel"]} ${className ?? ""}`.trim()}
+      className={`${sharedStyles.panel} ${styles["space-panel"]} ${className ?? ""}`.trim()}
       data-component-id={componentId}
       data-component-uid={componentUid}
     >

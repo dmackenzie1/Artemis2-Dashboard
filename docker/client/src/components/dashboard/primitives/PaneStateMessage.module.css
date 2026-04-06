@@ -1,0 +1,7 @@
+.pane-state-message {
+  margin: 0.45rem 0 0;
+}
+
+.pane-state-error {
+  color: var(--err);
+}

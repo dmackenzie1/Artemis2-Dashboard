@@ -1,5 +1,6 @@
 import type { FunctionComponent } from "react";
-import styles from "../../../styles.module.css";
+import sharedStyles from "../../../styles/shared.module.css";
+import styles from "./PaneStateMessage.module.css";
 import { LoadingIndicator } from "./LoadingIndicator";
 import { useComponentIdentity } from "./useComponentIdentity";
 
@@ -17,7 +18,7 @@ export const PaneStateMessage: FunctionComponent<PaneStateMessageProps> = ({ mes
 
   return (
     <p
-      className={`${styles.subtle} ${styles["pane-state-message"]} ${styles[`pane-state-${tone}`]}`}
+      className={`${sharedStyles.subtle} ${styles["pane-state-message"]} ${styles[`pane-state-${tone}`] ?? ""}`}
       data-component-id={componentId}
       data-component-uid={componentUid}
     >

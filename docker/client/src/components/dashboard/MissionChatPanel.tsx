@@ -1,5 +1,5 @@
 import type { FunctionComponent, FormEvent } from "react";
-import styles from "../../styles.module.css";
+import styles from "./MissionChatPanel.module.css";
 import type { ChatMessage } from "./types";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { LoadingIndicator } from "./primitives/LoadingIndicator";
