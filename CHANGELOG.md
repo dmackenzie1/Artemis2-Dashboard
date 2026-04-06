@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 - fix: scope `recent_changes` prompt submissions to the latest two day groups (rolling 24-hour window + prior baseline) instead of sending every source document in the corpus. Intent: Prevent context-window overflow failures in Recent Transcript Review while keeping output focused on the intended last-day delta.
+- fix: update the Overview Query Console to use the shared green Ready status badge, keep a single 5-row input box with Search action, and add a visible empty chat-results placeholder plus stronger bottom input separation. Intent: Make query entry and readiness state immediately recognizable when the console has no prior messages.
 - fix: darken and solidify System Logs containers/items/textbox surfaces so entries stay legible without hover against the Earth background imagery. Intent: Address operator visibility issues where log text and cards appeared too transparent for reliable scanning.
 - feat: restyle the Notable Moments page with larger quote emphasis, day-divider headers, and a 3-up staggered card layout that feels more like a curated wall of highlights than rigid side-by-side tiles. Intent: Address operator feedback to make top utterances easier to scan while preserving day-based organization.
 - fix: remove redundant hourly timeline cards, rename highlight language to notable milestones, and include richer utterance reference metadata (id/time/source file) on Timeline entries. Intent: Focus the timeline page on high-signal moments with clearer provenance while eliminating duplicate hourly labeling noise.
