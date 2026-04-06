@@ -1,6 +1,17 @@
 import type { ReactNode } from "react";
 
 export const renderStructuredText = (text: string, className?: string): ReactNode => {
+  const trimmed = text.trim();
+
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const hasHtmlMarkup = /<\/?[a-z][\s\S]*>/iu.test(trimmed);
+  if (hasHtmlMarkup) {
+    return <div className={className} dangerouslySetInnerHTML={{ __html: trimmed }} />;
+  }
+
   const lines = text
     .split(/\n+/u)
     .map((line) => line.trim())

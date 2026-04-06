@@ -14,5 +14,5 @@ Behavior:
   - Best/high-signal utterances that materially informed decisions
   - Current operational posture and immediate watch-outs
 - Use clear section headers so each day output can be cached and reused by downstream mission-level synthesis.
-- Keep output plain text only (no markdown emphasis markers).
+- Return valid HTML only (use semantic tags like <h3>, <p>, <ul>, <li>). Do not return Markdown.
 - Keep framing retrospective: this output is for review and after-action understanding, not direct live decision support.
