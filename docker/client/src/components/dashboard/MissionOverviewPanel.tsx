@@ -1,5 +1,6 @@
 import type { FunctionComponent } from "react";
 import styles from "../../styles.module.css";
+import { renderStructuredText } from "../../utils/formatting/renderStructuredText";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
 import { StatusBadge } from "./primitives/StatusBadge";
@@ -10,26 +11,12 @@ type MissionOverviewPanelProps = {
   lastRunAt: string | null;
 };
 
-const splitSummary = (text: string): { lead: string; bullets: string[] } => {
-  const segments = text
-    .split(/\n+/u)
-    .map((segment) => segment.replace(/^[-•*]\s*/u, "").trim())
-    .filter((segment) => segment.length > 0);
-
-  const [lead, ...rest] = segments;
-
-  return {
-    lead: lead ?? text,
-    bullets: rest.slice(0, 4)
-  };
-};
-
 export const MissionOverviewPanel: FunctionComponent<MissionOverviewPanelProps> = ({
   statusLabel,
   summaryText,
   lastRunAt
 }) => {
-  const parsed = splitSummary(summaryText);
+  const hasSummary = summaryText.trim().length > 0;
 
   return (
     <DashboardPanel
@@ -40,16 +27,10 @@ export const MissionOverviewPanel: FunctionComponent<MissionOverviewPanelProps> 
       headerAccessory={<StatusBadge label={statusLabel} />}
       footer={<small className={styles.subtle}>{lastRunAt ? `Run: ${lastRunAt}` : "Awaiting first run"}</small>}
     >
-      <p className={styles["panel-lead"]}>{parsed.lead}</p>
-      {parsed.bullets.length > 0 ? (
-        <>
-          <p className={styles["panel-meta-label"]}>Key Points</p>
-          <ul className={styles["panel-bullets"]}>
-            {parsed.bullets.map((bullet, index) => (
-              <li key={`${bullet}-${index}`}>{bullet}</li>
-            ))}
-          </ul>
-        </>
+      {hasSummary ? (
+        <div className={styles["summary-scroll-copy"]}>
+          <div className={styles["formatted-copy"]}>{renderStructuredText(summaryText, styles["formatted-list"])}</div>
+        </div>
       ) : (
         <PaneStateMessage message="Waiting for key points…" tone="loading" />
       )}

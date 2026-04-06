@@ -1,5 +1,6 @@
 import type { FunctionComponent } from "react";
 import styles from "../../styles.module.css";
+import { renderStructuredText } from "../../utils/formatting/renderStructuredText";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
 import { StatusBadge } from "./primitives/StatusBadge";
@@ -8,14 +9,6 @@ type DailySummaryPanelProps = {
   statusLabel: string;
   summaryText: string;
   latestDay: string | undefined;
-};
-
-const summarizeLines = (text: string): string[] => {
-  return text
-    .split(/\n+/u)
-    .map((line) => line.replace(/^[-•*]\s*/u, "").trim())
-    .filter((line) => line.length > 0)
-    .slice(0, 5);
 };
 
 const isWaitingState = (statusLabel: string): boolean => {
@@ -27,8 +20,7 @@ export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
   summaryText,
   latestDay
 }) => {
-  const rows = summarizeLines(summaryText);
-  const shouldShowWaiting = isWaitingState(statusLabel) || rows.length === 0;
+  const shouldShowWaiting = isWaitingState(statusLabel) || summaryText.trim().length === 0;
 
   return (
     <DashboardPanel
@@ -42,13 +34,8 @@ export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
       {shouldShowWaiting ? (
         <PaneStateMessage message="Waiting for results…" tone="loading" />
       ) : (
-        <div className={styles["summary-feed"]} role="list">
-          {rows.map((row, index) => (
-            <p key={`${row}-${index}`} role="listitem" className={styles["summary-row"]}>
-              <span className={styles["summary-row-index"]}>{String(index + 1).padStart(2, "0")}</span>
-              <span>{row}</span>
-            </p>
-          ))}
+        <div className={styles["summary-scroll-copy"]}>
+          <div className={styles["formatted-copy"]}>{renderStructuredText(summaryText, styles["formatted-list"])}</div>
         </div>
       )}
     </DashboardPanel>

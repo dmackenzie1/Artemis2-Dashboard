@@ -344,6 +344,13 @@ main {
   gap: 0.4rem;
 }
 
+.summary-scroll-copy {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.2rem;
+}
+
 .summary-row {
   margin: 0;
   padding: 0.44rem 0.52rem;
