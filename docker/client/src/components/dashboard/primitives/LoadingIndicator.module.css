@@ -1,0 +1,36 @@
+.loading-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text-secondary);
+}
+
+.loading-label {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.loading-orbit {
+  width: 30px;
+  height: 30px;
+  transform-origin: center;
+  animation: orbit-spin 3.1s linear infinite;
+}
+
+.loading-ring {
+  fill: none;
+  stroke: rgba(120, 190, 255, 0.45);
+  stroke-width: 2;
+}
+
+.loading-ring-inner {
+  stroke: rgba(120, 220, 255, 0.62);
+  stroke-dasharray: 9 6;
+}
+
+.loading-beacon {
+  fill: rgba(120, 220, 255, 0.92);
+  filter: drop-shadow(0 0 4px rgba(70, 190, 255, 0.6));
+}

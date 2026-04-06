@@ -1,0 +1,48 @@
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.24rem 0.56rem;
+  border-radius: 999px;
+  border: 1px solid rgba(130, 200, 255, 0.18);
+  background: rgba(9, 22, 40, 0.82);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.56rem;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 9px currentColor;
+}
+
+.status-ready,
+.status-connected {
+  border-color: rgba(105, 213, 159, 0.26);
+  color: rgba(105, 213, 159, 0.9);
+  background: rgba(15, 35, 28, 0.42);
+}
+
+.status-loading,
+.status-building,
+.status-partial {
+  border-color: rgba(87, 199, 255, 0.24);
+  color: rgba(120, 206, 255, 0.9);
+}
+
+.status-degraded {
+  border-color: rgba(229, 184, 106, 0.26);
+  color: rgba(229, 184, 106, 0.92);
+}
+
+.status-error,
+.status-disconnected {
+  border-color: rgba(224, 123, 123, 0.28);
+  color: rgba(224, 123, 123, 0.94);
+  background: rgba(55, 24, 24, 0.4);
+}

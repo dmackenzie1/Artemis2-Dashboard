@@ -2,7 +2,8 @@ import type { FunctionComponent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { fetchNotableMoments, type NotableMoment, type NotableMomentsData } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
-import styles from "../styles.module.css";
+import sharedStyles from "../styles/shared.module.css";
+import styles from "./NotableMomentsPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
 
 type NotableMomentsDay = {
@@ -41,24 +42,24 @@ export const NotableMomentsPage: FunctionComponent = () => {
 
   return (
     <div
-      className={`${styles.stack} ${styles["notable-moments-page"]}`}
+      className={`${sharedStyles.stack} ${styles["notable-moments-page"]}`}
       data-component-id={componentId}
       data-component-uid={componentUid}
     >
-      <section className={styles.panel}>
+      <section className={sharedStyles.panel}>
         <h2 className={styles["notable-moments-title"]}>Notable Moments</h2>
-        <p className={styles.subtle}>
+        <p className={sharedStyles.subtle}>
           Top {data?.targetMomentsPerDay ?? 10} utterances per day selected by the notable moments prompt pipeline.
         </p>
       </section>
 
       {days.length === 0 ? (
-        <section className={styles.panel}>
+        <section className={sharedStyles.panel}>
           <p>No notable moments yet. Run ingestion/pipeline and refresh this page.</p>
         </section>
       ) : (
         days.map((dayEntry) => (
-          <article className={`${styles.panel} ${styles["notable-moments-day-panel"]}`} key={dayEntry.day}>
+          <article className={`${sharedStyles.panel} ${styles["notable-moments-day-panel"]}`} key={dayEntry.day}>
             <div className={styles["notable-moment-day-divider"]}>
               <h2>{dayEntry.day}</h2>
             </div>
