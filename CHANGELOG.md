@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: enable local nginx TLS termination by mounting generated dev certificates, exposing HTTPS on port 8443, and redirecting HTTP traffic to the secure endpoint. Intent: Let operators validate dashboard behavior over HTTPS in Docker using the repo-provided local certificate script.
 - fix: align Signal Chat evidence rendering to the dedicated ranked `/api/search/utterances` payload and tighten chat strategy typing to `rag|all` across client contracts. Intent: Ensure the new chat page always displays server-ranked evidence and avoid stale mode assumptions in frontend state.
 - feat: add a new Signal Chat route/page with server-side tokenizer-backed utterance retrieval, ranked evidence APIs, and mode-aware chat synthesis while leaving Overview Query Console interactions intact. Intent: Deliver a dedicated transcript RAG workspace without regressing the existing overview mission workflow.
 - feat: add backend filesystem-triggered auto-ingestion for dropped/replaced source files with debounce and single-flight queueing, reusing existing transcript refresh and prompt pipeline execution paths. Intent: Let operators update input files in a running instance and have processing kick off automatically without manual endpoint calls.
