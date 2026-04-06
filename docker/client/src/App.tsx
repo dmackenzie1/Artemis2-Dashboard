@@ -14,7 +14,7 @@ import { NotableMomentsPage } from "./pages/NotableMomentsPage";
 import { SystemLogsPage } from "./pages/SystemLogsPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 
-const HEALTH_POLL_INTERVAL_MS = 5 * 60 * 1000;
+const HEALTH_POLL_INTERVAL_MS = 60 * 1000;
 
 export const App: FC = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -36,9 +36,14 @@ export const App: FC = () => {
     const pollHandle = window.setInterval(() => {
       void loadHealth();
     }, HEALTH_POLL_INTERVAL_MS);
+    const onWindowFocus = (): void => {
+      void loadHealth();
+    };
+    window.addEventListener("focus", onWindowFocus);
 
     return () => {
       window.clearInterval(pollHandle);
+      window.removeEventListener("focus", onWindowFocus);
     };
   }, []);
 

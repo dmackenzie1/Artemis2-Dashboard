@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: boost topbar/tab and panel contrast while tightening LLM health refresh cadence with focus-triggered checks so navigation remains readable and connectivity state is less likely to stay stale. Intent: Address operator feedback that primary page controls were too faded to scan and provide faster confirmation when model connectivity changes.
 - fix: remove stale `ChatMode` typing from the frontend chat API helper signature so client TypeScript builds no longer fail after merge refactors to single-mode chat strategy handling. Intent: Unblock Docker/frontend production builds by aligning client API typings with the current server chat contract and dashboard call sites.
 - feat: add a dedicated System Logs route/page with refreshable prompt artifact listing and click-to-open file viewer backed by a standalone server-side system logs service/router. Intent: Let operators audit exact prompt submissions and model request/response artifacts without digging through container files.
 - feat: rename the dashboard search surface to Query Console, remove context-mode controls/empty-state helper text, move Ready/Working status control to the panel header, and switch backend query handling to a day-by-day extraction pass followed by aggregate synthesis prompts. Intent: Match operator-requested query UX simplification while enabling whole-window transcript coverage before final answer summarization.

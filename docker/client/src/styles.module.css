@@ -3,14 +3,14 @@
   --bg-base: #020612;
   --bg-mid: #061120;
   --bg-upper: #0a1424;
-  --bg-panel: rgba(8, 18, 36, 0.28);
-  --bg-panel-strong: rgba(10, 20, 40, 0.4);
+  --bg-panel: rgba(8, 18, 36, 0.56);
+  --bg-panel-strong: rgba(10, 20, 40, 0.64);
   --panel-border: rgba(120, 192, 255, 0.24);
   --panel-border-soft: rgba(130, 200, 255, 0.18);
   --panel-highlight: rgba(110, 210, 255, 0.3);
   --text-primary: rgba(240, 247, 255, 0.94);
-  --text-secondary: rgba(190, 210, 230, 0.72);
-  --text-muted: rgba(170, 195, 220, 0.64);
+  --text-secondary: rgba(210, 227, 243, 0.9);
+  --text-muted: rgba(188, 211, 234, 0.82);
   --text-micro: rgba(120, 190, 255, 0.82);
   --accent-primary: #57c7ff;
   --accent-secondary: #4fc3f7;
@@ -150,20 +150,23 @@ body::after {
 .topbar a {
   color: var(--text-secondary);
   text-decoration: none;
-  border: 1px solid transparent;
+  border: 1px solid rgba(130, 200, 255, 0.2);
   border-radius: 999px;
-  padding: 0.34rem 0.75rem;
+  padding: 0.34rem 0.8rem;
   font-size: 0.68rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  transition: border-color 200ms ease, color 200ms ease, background-color 200ms ease;
+  background: rgba(8, 25, 48, 0.54);
+  text-shadow: 0 0 10px rgba(40, 130, 220, 0.2);
+  transition: border-color 200ms ease, color 200ms ease, background-color 200ms ease, box-shadow 200ms ease;
 }
 
 .topbar a.active,
 .topbar a:hover {
-  border-color: rgba(120, 190, 255, 0.28);
-  background: rgba(21, 53, 92, 0.48);
+  border-color: rgba(140, 208, 255, 0.5);
+  background: rgba(26, 62, 105, 0.74);
   color: var(--text-primary);
+  box-shadow: 0 0 14px rgba(72, 156, 238, 0.24);
 }
 
 .topbar-status {
@@ -228,7 +231,7 @@ main {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--panel-border);
-  background: linear-gradient(180deg, rgba(10, 20, 38, 0.42), var(--bg-panel));
+  background: linear-gradient(180deg, rgba(10, 20, 38, 0.72), var(--bg-panel));
   border-radius: 14px;
   padding: 0.68rem 0.75rem;
   box-shadow: inset 0 1px 0 rgba(140, 210, 255, 0.14), 0 0 24px rgba(60, 170, 255, 0.13), 0 0 48px rgba(40, 120, 220, 0.09),
@@ -803,7 +806,7 @@ pre {
   padding: 0.24rem 0.56rem;
   border-radius: 999px;
   border: 1px solid rgba(130, 200, 255, 0.18);
-  background: rgba(9, 22, 40, 0.66);
+  background: rgba(9, 22, 40, 0.82);
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.12em;
