@@ -32,24 +32,6 @@ export type PipelineDashboardData = {
   }>;
 };
 
-export type PipelineStatsData = {
-  generatedAt: string;
-  range: {
-    minTimestamp: string | null;
-    maxTimestamp: string | null;
-  };
-  totals: {
-    dataDays: number;
-    utterances: number;
-    lines: number;
-    words: number;
-  };
-  utterancesPerHour: Array<{
-    hour: string;
-    utterances: number;
-  }>;
-};
-
 export type MissionStatsSummaryData = {
   generatedAt: string;
   days: {
@@ -109,12 +91,14 @@ export type ChatResponse = {
   answer: string;
   evidence: Array<{ timestamp: string; channel: string; text: string; filename: string }>;
   strategy: {
-    mode: "multi-day";
+    mode: "multi-day" | "rag" | "all";
     totalUtterances: number;
     contextUtterances: number;
     daysQueried: number;
   };
 };
+
+export type ChatMode = "rag" | "all";
 
 
 export type SystemLogEntry = {
@@ -149,11 +133,6 @@ export type NotableMoment = {
   timestamp: string | null;
   channel: string | null;
   sourcePath: string;
-};
-
-export type NotableMomentsDay = {
-  day: string;
-  moments: NotableMoment[];
 };
 
 export type NotableMomentsData = {
@@ -196,16 +175,6 @@ export const fetchPipelineDashboard = async (): Promise<PipelineDashboardData | 
   }
 
   return (await response.json()) as PipelineDashboardData;
-};
-
-export const fetchPipelineStats = async (): Promise<PipelineStatsData | null> => {
-  const response = await fetch(`${base}/pipeline/stats`);
-  if (!response.ok) {
-    clientLogger.warn("Pipeline stats unavailable", { status: response.status });
-    return null;
-  }
-
-  return (await response.json()) as PipelineStatsData;
 };
 
 export const triggerPipelineRun = async (): Promise<TriggerPipelineRunResponse> => {
@@ -302,7 +271,7 @@ export const chat = async (query: string): Promise<ChatResponse> => {
   const response = await fetch(`${base}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query })
+    body: JSON.stringify({ query, mode })
   });
 
   if (!response.ok) {
