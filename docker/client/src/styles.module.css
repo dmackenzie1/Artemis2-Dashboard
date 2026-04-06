@@ -512,6 +512,15 @@ main {
   margin: 0 0.12rem;
 }
 
+.timeline-x-axis-title {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: rgba(190, 216, 242, 0.72);
+  text-transform: uppercase;
+  text-align: right;
+  padding-right: 0.14rem;
+}
+
 .timeline-x-tick-label {
   position: absolute;
   top: 0;

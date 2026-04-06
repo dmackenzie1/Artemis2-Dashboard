@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: recalculate Mission Hourly Stats y-axis ticks from the true hourly peak, clamp bar scaling to that peak with a 0 baseline, and switch x-axis tick labels/title to UTC `mm/dd`. Intent: Correct misleading timeline scale cues so operators can reliably read hourly intensity and day coverage at a glance.
 - fix: define mission timeline x-axis label indexes from rendered hourly buckets and align bottom axis iteration with aggregated totals to restore successful frontend TypeScript builds. Intent: Unblock Docker/frontend builds by removing an undefined label-index reference introduced during timeline refactoring.
 - fix: fallback dashboard mission overview rendering to `/api/dashboard` mission summary content when `mission_summary` pipeline prompt state is missing, while still preferring pipeline output when available. Intent: Ensure operators see completed mission summaries immediately even if pipeline dashboard rows are unavailable or delayed.
 - feat: condense the communications histogram into "Mission Hourly Stats" with hourly aggregation, visible x/y axis ticks, and highlighted newest bars. Intent: Improve at-a-glance operator readability by making timeline scale/recency explicit in the mission activity chart.
