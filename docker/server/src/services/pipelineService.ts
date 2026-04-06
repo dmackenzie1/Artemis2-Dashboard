@@ -456,6 +456,7 @@ export class PipelineService {
 
     this.runInProgress = true;
     try {
+      await this.markStaleRunningExecutionsAsFailed();
       await this.syncSourceDocuments();
       await this.syncPromptDefinitions();
       await this.executePromptsSequentially();
@@ -463,6 +464,30 @@ export class PipelineService {
     } finally {
       this.runInProgress = false;
     }
+  }
+
+  isPipelineRunInProgress(): boolean {
+    return this.runInProgress;
+  }
+
+  private async markStaleRunningExecutionsAsFailed(): Promise<void> {
+    const em = this.getEntityManager();
+    const staleExecutions = await em.find(PromptExecution, { status: "running" });
+    if (staleExecutions.length === 0) {
+      return;
+    }
+
+    const failedAt = dayjs().utc().toDate();
+    for (const execution of staleExecutions) {
+      execution.status = "failed";
+      execution.finishedAt = failedAt;
+      execution.errorMessage = "Recovered after interrupted pipeline run before completion.";
+    }
+
+    await em.flush();
+    serverLogger.warn("Recovered stale running prompt executions", {
+      staleExecutionCount: staleExecutions.length
+    });
   }
 
   async executePromptsSequentially(): Promise<void> {
@@ -647,7 +672,7 @@ export class PipelineService {
           min(timestamp) as "minTimestamp",
           max(timestamp) as "maxTimestamp",
           count(*)::text as "utterances",
-          sum(cardinality(regexp_split_to_array(trim(text), E'\\s+')))::text as "words"
+          coalesce(sum(word_count), 0)::text as "words"
         from transcript_utterances
       `
     );

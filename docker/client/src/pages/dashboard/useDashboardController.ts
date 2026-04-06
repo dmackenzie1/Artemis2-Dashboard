@@ -3,17 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   chat,
   fetchDashboard,
-  fetchHealth,
   fetchPipelineDashboard,
   fetchStatsSummary
 } from "../../api";
-import type {
-  ChatMode,
-  DashboardData,
-  HealthData,
-  MissionStatsSummaryData,
-  PipelineDashboardData
-} from "../../api";
+import type { ChatMode, DashboardData, MissionStatsSummaryData, PipelineDashboardData } from "../../api";
 import type { ChatMessage } from "../../components/dashboard/types";
 import { clientLogger } from "../../utils/logging/clientLogger";
 import { buildDashboardViewModel } from "./dashboardViewModel";
@@ -28,7 +21,6 @@ const starterQueries = [
 const DASHBOARD_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 export type DashboardController = {
-  health: HealthData | null;
   viewModel: ReturnType<typeof buildDashboardViewModel>;
   chatInput: string;
   chatMode: ChatMode;
@@ -41,7 +33,6 @@ export type DashboardController = {
 
 export const useDashboardController = (): DashboardController => {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [health, setHealth] = useState<HealthData | null>(null);
   const [pipeline, setPipeline] = useState<PipelineDashboardData | null>(null);
   const [statsSummary, setStatsSummary] = useState<MissionStatsSummaryData | null>(null);
   const [chatInput, setChatInput] = useState(starterQueries[0]);
@@ -52,15 +43,13 @@ export const useDashboardController = (): DashboardController => {
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       try {
-        const [dashboardPayload, healthPayload, pipelinePayload, statsSummaryPayload] = await Promise.all([
+        const [dashboardPayload, pipelinePayload, statsSummaryPayload] = await Promise.all([
           fetchDashboard(),
-          fetchHealth(),
           fetchPipelineDashboard(),
           fetchStatsSummary()
         ]);
 
         setData(dashboardPayload);
-        setHealth(healthPayload);
         setPipeline(pipelinePayload);
         setStatsSummary(statsSummaryPayload);
       } catch (error) {
@@ -115,7 +104,6 @@ export const useDashboardController = (): DashboardController => {
   }, [data, pipeline, statsSummary]);
 
   return {
-    health,
     viewModel,
     chatInput,
     chatMode,
