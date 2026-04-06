@@ -13,10 +13,35 @@ export const DailyPage: FC = () => {
     void fetchDashboard().then((payload) => setData(payload));
   }, []);
 
+  const scrollToDay = (day: string): void => {
+    const section = document.getElementById(`daily-day-${day}`);
+    section?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div className={styles.stack} data-component-id={componentId} data-component-uid={componentUid}>
+      {data?.days.length ? (
+        <nav className={styles["daily-day-nav"]} aria-label="Daily sections">
+          {data.days.map((day) => (
+            <button
+              className={styles["daily-day-nav-button"]}
+              key={`daily-nav-${day.day}`}
+              onClick={() => scrollToDay(day.day)}
+              type="button"
+            >
+              Day {day.day}
+            </button>
+          ))}
+        </nav>
+      ) : null}
       {data?.days.map((day) => (
-        <article className={styles.panel} key={day.day} data-component-id="daily-day-panel" data-component-uid={`${componentUid}-${day.day}`}>
+        <article
+          className={styles.panel}
+          id={`daily-day-${day.day}`}
+          key={day.day}
+          data-component-id="daily-day-panel"
+          data-component-uid={`${componentUid}-${day.day}`}
+        >
           <h2>{day.day}</h2>
           <div className={styles["formatted-copy"]}>{renderStructuredText(day.summary, styles["formatted-list"])}</div>
           <p>
