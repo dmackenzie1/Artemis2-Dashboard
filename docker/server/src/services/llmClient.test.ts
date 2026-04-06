@@ -151,6 +151,27 @@ describe("LlmClient.generateText", () => {
       await rm(debugDir, { recursive: true, force: true });
     }
   });
+
+  it("returns a fallback response when upstream transport fails", async () => {
+    const originalFetch = global.fetch;
+
+    try {
+      global.fetch = async (): Promise<Response> => {
+        throw new TypeError("fetch failed");
+      };
+
+      const client = new LlmClient("https://example.test/v1/chat/completions", "test-key", "model-test");
+      const output = await client.generateText({
+        systemPrompt: "System prompt",
+        userPrompt: "Please summarize this context."
+      });
+
+      expect(output).toContain("Prototype fallback response:");
+      expect(output).toContain("Please summarize this context.");
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });
 
 describe("LlmClient.checkConnectivity", () => {
