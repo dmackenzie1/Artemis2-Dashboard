@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: add dedicated 3 Hour, 6 Hour, and 12 Hour pages that call a new DB-backed time-window API, synthesize rolling-window transcript context with an LLM, and show explicit waiting-state feedback while results are generated. Intent: Let operators request near-now mission snapshots at different time scales with trustworthy database scope and clear in-progress UI status.
 - fix: refactor System Logs page styling to reuse shared timeline/panel primitives, remove redundant bespoke shell styles, and harden log text readability with larger type and stronger surfaces. Intent: Standardize page chrome with the rest of the dashboard while ensuring logs remain readable over mission imagery.
 - fix: darken the outer System Logs page shell background and add a stronger bordered panel treatment so the page no longer reads as transparent over mission imagery. Intent: Address operator feedback that the system logs page background remained too see-through for reliable use.
 - feat: add sticky Day shortcut buttons on the Daily page that jump directly to each rendered day section while preserving existing summary, anomalies, and hourly highlight content blocks. Intent: Let operators navigate long multi-day daily-summary views quickly without repeated manual scrolling.

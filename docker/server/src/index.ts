@@ -15,6 +15,7 @@ import { StatsService } from "./services/statsService.js";
 import { ingestTranscriptCsvDirectory } from "./services/transcriptIngestionService.js";
 import { SystemLogsService } from "./services/systemLogsService.js";
 import { createSystemLogsRouter } from "./routes/systemLogs.js";
+import { TimeWindowSummaryService } from "./services/timeWindowSummaryService.js";
 
 const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
   await orm.em.getConnection().execute(`
@@ -106,6 +107,7 @@ let pipelineService: PipelineService | null = null;
 let statsService: StatsService | null = null;
 let transcriptOrm: MikroORM | null = null;
 let pipelineIntervalStarted = false;
+let timeWindowSummaryService: TimeWindowSummaryService | null = null;
 const startPipelineSchedule = (): void => {
   if (!pipelineService || !env.PIPELINE_AUTO_RUN || pipelineIntervalStarted) {
     return;
@@ -138,7 +140,7 @@ app.use(
       await currentPipelineService.runPipelineCycle();
       serverLogger.info("Prompt workflow completed after ingestion");
     }
-  }, () => statsService)
+  }, () => statsService, () => timeWindowSummaryService)
 );
 
 if (env.TRANSCRIPTS_DB_ENABLED) {
@@ -156,6 +158,7 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
   const getEntityManager = (): EntityManager => (RequestContext.getEntityManager() as EntityManager | undefined) ?? orm.em.fork();
   app.use("/api/transcripts", createTranscriptRouter(getEntityManager));
   statsService = new StatsService(getEntityManager);
+  timeWindowSummaryService = new TimeWindowSummaryService(getEntityManager, llmClient, env.PROMPTS_DIR);
 
   pipelineService = new PipelineService(getEntityManager, {
     sourceFilesDir: env.SOURCE_FILES_DIR,
