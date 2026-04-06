@@ -106,11 +106,29 @@ export type HealthData = {
   };
 };
 
+export type RankedEvidence = {
+  timestamp: string;
+  day: string;
+  channel: string;
+  text: string;
+  filename: string;
+  source: string;
+  score: number;
+};
+
+export type UtteranceSearchResponse = {
+  query: string;
+  queryTokens: string[];
+  totalUtterances: number;
+  resultCount: number;
+  utterances: RankedEvidence[];
+};
+
 export type ChatResponse = {
   answer: string;
-  evidence: Array<{ timestamp: string; channel: string; text: string; filename: string }>;
+  evidence: RankedEvidence[];
   strategy: {
-    mode: "multi-day" | "rag" | "all";
+    mode: "rag" | "all";
     totalUtterances: number;
     contextUtterances: number;
     daysQueried: number;
@@ -291,7 +309,16 @@ export const fetchSystemLogFile = async (id: string): Promise<SystemLogFileRespo
   return (await response.json()) as SystemLogFileResponse;
 };
 
-export const chat = async (query: string, mode: ChatMode = "rag"): Promise<ChatResponse> => {
+export const searchUtterances = async (query: string, limit = 8): Promise<UtteranceSearchResponse> => {
+  const response = await fetch(`${base}/search/utterances?q=${encodeURIComponent(query)}&limit=${limit}`);
+  if (!response.ok) {
+    throw new Error("Unable to search utterances");
+  }
+
+  return (await response.json()) as UtteranceSearchResponse;
+};
+
+export const chat = async (query: string, mode: ChatMode = "all"): Promise<ChatResponse> => {
   const response = await fetch(`${base}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
