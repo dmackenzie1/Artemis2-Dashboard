@@ -14,4 +14,9 @@ export type DashboardViewModel = {
   missionSummary: DashboardPromptView;
   dailySummary: DashboardPromptView;
   stats: DashboardStat[];
+  dailyTranscriptVolume: Array<{
+    day: string;
+    utterances: number;
+    words: number;
+  }>;
 };

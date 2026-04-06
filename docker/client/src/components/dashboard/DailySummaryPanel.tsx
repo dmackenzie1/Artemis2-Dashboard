@@ -26,8 +26,8 @@ export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
     <DashboardPanel
       componentId="daily-summary-panel"
       className={styles["daily-summary-panel"]}
-      kicker="Operational Readout"
-      title="Last 24 Hours"
+      kicker="Recent Transcript Review"
+      title="Latest TalkyBot Window"
       headerAccessory={<StatusBadge label={statusLabel} />}
       footer={<small className={styles.subtle}>{latestDay ? `Latest ingested day: ${latestDay}` : "No ingested day yet"}</small>}
     >

@@ -72,7 +72,7 @@ export const DashboardPage: FunctionComponent = () => {
           summaryText={viewModel.missionSummary.text}
           lastRunAt={viewModel.missionSummary.lastRunAt}
         />
-        <StatsPanel stats={viewModel.stats} />
+        <StatsPanel stats={viewModel.stats} dailyTranscriptVolume={viewModel.dailyTranscriptVolume} />
       </section>
 
       <section className={styles["dashboard-mid-row"]} data-component-id="dashboard-mid-row" data-component-uid={`${componentUid}-mid`}>

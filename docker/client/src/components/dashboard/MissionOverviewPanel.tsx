@@ -22,8 +22,8 @@ export const MissionOverviewPanel: FunctionComponent<MissionOverviewPanelProps> 
     <DashboardPanel
       componentId="mission-overview-panel"
       className={styles["mission-summary-panel"]}
-      kicker="Mission Intelligence"
-      title="Mission Summary"
+      kicker="Post-Mission Review"
+      title="Mission Review Summary"
       headerAccessory={<StatusBadge label={statusLabel} />}
       footer={<small className={styles.subtle}>{lastRunAt ? `Run: ${lastRunAt}` : "Awaiting first run"}</small>}
     >
@@ -32,7 +32,7 @@ export const MissionOverviewPanel: FunctionComponent<MissionOverviewPanelProps> 
           <div className={styles["formatted-copy"]}>{renderStructuredText(summaryText, styles["formatted-list"])}</div>
         </div>
       ) : (
-        <PaneStateMessage message="Waiting for key points…" tone="loading" />
+        <PaneStateMessage message="Waiting for review highlights…" tone="loading" />
       )}
     </DashboardPanel>
   );

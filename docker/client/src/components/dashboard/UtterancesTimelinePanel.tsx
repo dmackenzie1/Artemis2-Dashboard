@@ -33,8 +33,8 @@ export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ hist
     <DashboardPanel
       componentId="utterances-timeline-panel"
       className={styles["timeline-strip-panel"]}
-      kicker="Mission Timeline"
-      title="Mission Hourly Stats"
+      kicker="Transcript Timeline"
+      title="Hourly Transcript Activity"
       headerAccessory={<StatusBadge label={hourlyTotals.length > 0 ? "ready" : "loading"} />}
       footer={<small className={styles.subtle}>Coverage: {hourlyTotals.length} hourly buckets.</small>}
     >
