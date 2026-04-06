@@ -45,7 +45,8 @@ export const DailySummaryPanel: FunctionComponent<DailySummaryPanelProps> = ({
         <div className={styles["summary-feed"]} role="list">
           {rows.map((row, index) => (
             <p key={`${row}-${index}`} role="listitem" className={styles["summary-row"]}>
-              {row}
+              <span className={styles["summary-row-index"]}>{String(index + 1).padStart(2, "0")}</span>
+              <span>{row}</span>
             </p>
           ))}
         </div>
