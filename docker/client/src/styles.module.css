@@ -1020,3 +1020,39 @@ pre {
   text-transform: uppercase;
   color: var(--text-micro);
 }
+
+.notable-moment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.45rem;
+}
+
+.notable-moment-card {
+  border: 1px solid rgba(130, 200, 255, 0.14);
+  border-radius: 10px;
+  padding: 0.5rem 0.58rem;
+  background: linear-gradient(180deg, rgba(10, 24, 44, 0.5), rgba(8, 16, 32, 0.44));
+}
+
+.notable-moment-rank {
+  margin: 0;
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-micro);
+}
+
+.notable-moment-quote {
+  margin: 0.35rem 0;
+  padding: 0.38rem 0.5rem;
+  border-left: 2px solid rgba(120, 206, 255, 0.56);
+  background: rgba(14, 31, 56, 0.42);
+  color: rgba(225, 235, 248, 0.92);
+}
+
+.notable-moment-meta {
+  margin: 0;
+  font-size: 0.66rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+}
