@@ -1,13 +1,20 @@
 import type { Topic } from "../types.js";
+import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { serverLogger } from "../utils/logging/serverLogger.js";
+
+export type LlmResponseCache = {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, ttlSeconds: number): Promise<void>;
+};
 
 type GenerateOptions = {
   systemPrompt: string;
   userPrompt: string;
   componentId?: string;
   requestId?: string;
+  cacheEnabled?: boolean;
 };
 
 export type LlmConnectivityStatus = {
@@ -28,7 +35,9 @@ export class LlmClient {
     private readonly apiKey?: string,
     private readonly model?: string,
     private readonly debugPromptsDir?: string,
-    private readonly maxTokens = 12_000
+    private readonly maxTokens = 12_000,
+    private readonly responseCache?: LlmResponseCache,
+    private readonly cacheTtlSeconds = 60 * 60
   ) {}
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
@@ -93,6 +102,61 @@ export class LlmClient {
     return segment.replace(/[^a-zA-Z0-9_-]/g, "_");
   }
 
+  private createCacheKey(options: GenerateOptions): string {
+    return createHash("sha256")
+      .update(JSON.stringify({
+        model: this.model ?? null,
+        apiUrl: this.apiUrl ?? null,
+        maxTokens: this.maxTokens,
+        systemPrompt: options.systemPrompt,
+        userPrompt: options.userPrompt
+      }))
+      .digest("hex");
+  }
+
+  private async readCachedResponse(cacheKey: string, componentId: string, requestId: string): Promise<string | null> {
+    if (!this.responseCache) {
+      return null;
+    }
+
+    try {
+      const cached = await this.responseCache.get(cacheKey);
+      if (cached) {
+        serverLogger.info("LLM response served from Redis cache", {
+          requestId,
+          componentId,
+          cacheKey
+        });
+      }
+      return cached;
+    } catch (error) {
+      serverLogger.warn("Redis cache read failed for LLM request", {
+        requestId,
+        componentId,
+        cacheKey,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+      return null;
+    }
+  }
+
+  private async writeCachedResponse(cacheKey: string, value: string, componentId: string, requestId: string): Promise<void> {
+    if (!this.responseCache) {
+      return;
+    }
+
+    try {
+      await this.responseCache.set(cacheKey, value, this.cacheTtlSeconds);
+    } catch (error) {
+      serverLogger.warn("Redis cache write failed for LLM request", {
+        requestId,
+        componentId,
+        cacheKey,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
   private async persistDebugPrompt(
     direction: "outgoing" | "incoming",
     requestId: string,
@@ -143,6 +207,15 @@ export class LlmClient {
   async generateText(options: GenerateOptions): Promise<string> {
     const requestId = options.requestId ?? `llm-${Date.now()}-${++this.requestCounter}`;
     const componentId = options.componentId ?? "unknown-component";
+    const cacheEnabled = options.cacheEnabled ?? true;
+    const cacheKey = cacheEnabled ? this.createCacheKey(options) : null;
+
+    if (cacheEnabled && cacheKey) {
+      const cachedResponse = await this.readCachedResponse(cacheKey, componentId, requestId);
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+    }
 
     return this.enqueue(async () => {
       const requestUserPreview = this.createPreview(options.userPrompt, 350, 2);
@@ -181,6 +254,9 @@ export class LlmClient {
           responseLength: fallback.length,
           mode: "fallback"
         });
+        if (cacheEnabled && cacheKey) {
+          await this.writeCachedResponse(cacheKey, fallback, componentId, requestId);
+        }
         return fallback;
       }
 
@@ -240,6 +316,9 @@ export class LlmClient {
           mode: "transport-fallback",
           error: error instanceof Error ? error.message : "Unknown error"
         });
+        if (cacheEnabled && cacheKey) {
+          await this.writeCachedResponse(cacheKey, fallback, componentId, requestId);
+        }
         return fallback;
       }
 
@@ -292,6 +371,9 @@ export class LlmClient {
         responseLength: output.length,
         rawPayload: payload
       });
+      if (cacheEnabled && cacheKey) {
+        await this.writeCachedResponse(cacheKey, output, componentId, requestId);
+      }
 
       return output;
     });

@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: add Redis-backed LLM API response caching with a 60-minute TTL for repeated non-chat prompts, wire the backend to a new Redis service, and explicitly bypass cache for chat-mode calls. Intent: Cut duplicate model calls for identical analysis requests while preserving live conversational behavior for operator chat workflows.
 - feat: add a topbar coffee-cup easter egg toggle that mounts/unmounts EMSSpressoBot with animated movement, chatter bubbles, and optional `window.emsspressobot` controls. Intent: Let operators summon or dismiss a lightweight morale-boosting bot without affecting core dashboard workflows.
 - fix: retune query and summary prompt templates to always surface notable/memorable utterances alongside narrative synthesis across chat, daily, mission, and rolling-window outputs. Intent: Ensure operators keep high-level summaries while consistently seeing transcript-grounded lines that tell the mission story.
 - feat: greatly expand Mission Timeline density by adding summary-derived highlight cards, more per-day milestones, notable-moment quote entries, and broader notable-utterance coverage windows. Intent: Ensure operators see substantially more mission-significant events, quotes, and narrative milestones without needing to leave the timeline view.
