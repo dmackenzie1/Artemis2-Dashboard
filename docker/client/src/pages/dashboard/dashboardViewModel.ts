@@ -36,8 +36,9 @@ export const buildDashboardViewModel = (
 ): DashboardViewModel => {
   const latestDay = data?.days[data.days.length - 1]?.day;
   const missionPrompt = pipeline?.prompts.find((entry) => entry.key === "mission_summary");
-  const dailyPrompt = pipeline?.prompts.find((entry) => entry.key === "daily_summary");
+  const dailyPrompt = pipeline?.prompts.find((entry) => entry.key === "recent_changes");
   const missionSummaryFallback = data?.missionSummary?.trim();
+  const recentChangesFallback = data?.recentChanges?.trim();
 
   const missionSummary = missionPrompt
     ? toPromptView(missionPrompt, "Building mission overview...")
@@ -56,7 +57,13 @@ export const buildDashboardViewModel = (
   return {
     latestDay,
     missionSummary,
-    dailySummary: toPromptView(dailyPrompt, "Not ready yet."),
+    dailySummary: dailyPrompt
+      ? toPromptView(dailyPrompt, "Not ready yet.")
+      : {
+          statusLabel: recentChangesFallback ? "ready" : "not ready",
+          text: recentChangesFallback ?? "Not ready yet.",
+          lastRunAt: data?.generatedAt ?? null
+        },
     stats: toStats(statsSummary)
   };
 };
