@@ -56,7 +56,7 @@ type MissionStatsView = {
 };
 
 const promptFilePattern = /\.txt$/i;
-const promptExecutionPriority = ["mission_summary", "daily_summary"];
+const promptExecutionPriority = ["daily_summary", "mission_summary"];
 const skippedPromptKeys = new Set(["hourly_summary"]);
 const dailySummaryTargetWords = {
   min: 5_000,

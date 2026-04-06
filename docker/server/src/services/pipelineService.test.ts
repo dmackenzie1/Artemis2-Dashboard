@@ -85,3 +85,20 @@ describe("PipelineService daily-summary grouping", () => {
     ]);
   });
 });
+
+describe("PipelineService prompt queue ordering", () => {
+  it("orders daily_summary ahead of mission_summary to enable summary-first mission synthesis", () => {
+    const service = createPipelineService();
+    const prompts = [
+      { key: "mission_summary" },
+      { key: "daily_summary" },
+      { key: "top_topics" }
+    ] as Array<{ key: string }>;
+
+    const orderedPrompts = (service as unknown as {
+      buildPromptQueue: (promptDefinitions: Array<{ key: string }>) => Array<{ key: string }>;
+    }).buildPromptQueue(prompts);
+
+    expect(orderedPrompts.map((prompt) => prompt.key)).toEqual(["daily_summary", "mission_summary", "top_topics"]);
+  });
+});
