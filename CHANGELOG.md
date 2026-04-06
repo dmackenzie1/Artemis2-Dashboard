@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: persist Postgres data in a named Docker volume, split LLM debug payload artifacts into host-mounted `.local/query-set` and `.local/query-receive` directories, and document production-readiness follow-ups for migrations/secrets/debug retention. Intent: Support production-style durability and operator-accessible prompt trace artifacts while clarifying remaining hardening steps before deployment.
 - fix: retune mission, daily, and last-24-hours prompt templates to request 500-1,000 word high-signal summaries with explicit timeline callouts, anomalies, open watch terms, and best utterances guidance. Intent: Align generated mission intelligence output with operator workflow expectations for both executive synthesis and high-fidelity daily review.
 - feat: reframe the dashboard as TalkyBot transcript review with retrospective prompt guidance, add direct TalkyBot links, and include a dated daily utterances/words snapshot chart in the metrics panel. Intent: Align operator-facing terminology and analysis behavior with delayed post-mission transcript review workflows instead of real-time mission intelligence usage.
 - fix: collapse the app shell to a single mission background image layer by removing extra gradient/scanline pseudo-element overlays. Intent: Resolve follow-up feedback that dashboard still appeared to stack multiple background images and keep visual treatment consistent across overview, daily, and timeline routes.

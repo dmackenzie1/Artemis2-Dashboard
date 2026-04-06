@@ -115,14 +115,26 @@ npm run screenshot -- --url http://localhost:8080 --output artifacts/client-scre
 
 ### Docker volume mapping defaults
 
-Containerized runs intentionally keep database/cache storage internal to Docker. Only operator-editable inputs are bind-mounted from the host:
+Containerized runs now persist Postgres in a named Docker volume and keep operator-editable/debug artifacts on the host:
 
 - `./source_files -> /app/source_files`
 - `./prompts -> /app/prompts`
+- `./.local/query-set -> /app/.local/query-set` (captured outgoing LLM request payloads)
+- `./.local/query-receive -> /app/.local/query-receive` (captured incoming LLM response payloads)
+- `db_data -> /var/lib/postgresql/data` (Docker-managed persistent Postgres data)
 
 - Drop one or many transcript CSV files into `source_files/`
 - Trigger a manual re-run with `POST /api/ingest` when you need an immediate refresh outside the startup/scheduled flow
 - Ingestion is safe to rerun and always rebuilds normalized records + derived intelligence
+
+## Production readiness checklist
+
+- Confirm Docker volumes are created before first run:
+  - `mkdir -p .local/query-set .local/query-receive`
+  - `docker volume create artemis2-dashboard_db_data` (or let Compose create it automatically)
+- Add a repeatable schema migration flow before making breaking DB changes (current setup relies on schema auto-sync).
+- Keep `.env` production values externalized (no secrets in repo) and rotate API keys regularly.
+- Keep `LLM_DEBUG_PROMPTS_DIR` enabled only while debugging; payload captures can contain sensitive prompt context.
 
 ## Source-file workflow (new)
 

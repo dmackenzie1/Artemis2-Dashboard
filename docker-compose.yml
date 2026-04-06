@@ -7,6 +7,8 @@ services:
       POSTGRES_DB: ${DB_NAME:-artemis_transcripts}
     ports:
       - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
 
   server:
     build:
@@ -18,9 +20,12 @@ services:
       TRANSCRIPTS_DB_ENABLED: "true"
       DB_HOST: db
       DATA_DIR: /app/source_files
+      LLM_DEBUG_PROMPTS_DIR: /app/.local
     volumes:
       - ./prompts:/app/prompts:ro
       - ./source_files:/app/source_files:ro
+      - ./.local/query-set:/app/.local/query-set
+      - ./.local/query-receive:/app/.local/query-receive
     depends_on:
       - db
 
@@ -38,3 +43,6 @@ services:
     depends_on:
       - frontend
       - server
+
+volumes:
+  db_data:

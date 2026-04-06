@@ -106,6 +106,10 @@ export class LlmClient {
     try {
       await mkdir(this.debugPromptsDir, { recursive: true });
 
+      const directionDirectoryName = direction === "outgoing" ? "query-set" : "query-receive";
+      const directionDirectoryPath = path.join(this.debugPromptsDir, directionDirectoryName);
+      await mkdir(directionDirectoryPath, { recursive: true });
+
       if (!this.debugDirectoryInitialized) {
         const todoFilePath = path.join(this.debugPromptsDir, "README-TODO-DELETE-ME.txt");
         await writeFile(
@@ -123,7 +127,7 @@ export class LlmClient {
       const safeRequestId = this.sanitizeSegment(requestId);
       const safeComponentId = this.sanitizeSegment(componentId);
       const fileName = `${timestamp}_${direction}_${safeComponentId}_${safeRequestId}.json`;
-      const filePath = path.join(this.debugPromptsDir, fileName);
+      const filePath = path.join(directionDirectoryPath, fileName);
 
       await writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
     } catch (error) {
