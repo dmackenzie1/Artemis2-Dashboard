@@ -219,6 +219,32 @@ export class PipelineService {
       return this.createDailySummaryCacheSubmission(sourceContext);
     }
 
+    if (prompt.key === "recent_changes") {
+      const groupedDays = this.buildDailyGroups(sourceContext);
+      const latestWindowGroups = groupedDays.slice(-2);
+
+      return JSON.stringify(
+        {
+          generatedAt: dayjs().utc().toISOString(),
+          strategy: "rolling-24h-vs-prior-baseline",
+          window: {
+            latestDays: latestWindowGroups.length,
+            targetRollingHours: 24
+          },
+          dayGroups: latestWindowGroups.map((group) => ({
+            day: group.day,
+            sourceDocuments: group.documents.map((document) => ({
+              path: document.path,
+              checksum: document.checksum,
+              content: document.content
+            }))
+          }))
+        },
+        null,
+        2
+      );
+    }
+
     if (prompt.key === "notable_moments") {
       const groupedDays = this.buildDailyGroups(sourceContext);
       return JSON.stringify(
