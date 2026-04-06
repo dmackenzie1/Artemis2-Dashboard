@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: rebuild the Timeline route into a vertically scrollable Artemis II chronology with central spine layout, day dividers, 6-hour markers, alternating mission cards, notable utterance highlights, and resilient loading/empty/error UI states. Intent: Give operators a long-form, high-signal mission history view that is easier to scan by day/time while preserving existing API routes.
 - fix: retune mission, daily, and last-24-hours prompt templates to request 500-1,000 word high-signal summaries with explicit timeline callouts, anomalies, open watch terms, and best utterances guidance. Intent: Align generated mission intelligence output with operator workflow expectations for both executive synthesis and high-fidelity daily review.
 - feat: reframe the dashboard as TalkyBot transcript review with retrospective prompt guidance, add direct TalkyBot links, and include a dated daily utterances/words snapshot chart in the metrics panel. Intent: Align operator-facing terminology and analysis behavior with delayed post-mission transcript review workflows instead of real-time mission intelligence usage.
 - fix: collapse the app shell to a single mission background image layer by removing extra gradient/scanline pseudo-element overlays. Intent: Resolve follow-up feedback that dashboard still appeared to stack multiple background images and keep visual treatment consistent across overview, daily, and timeline routes.
