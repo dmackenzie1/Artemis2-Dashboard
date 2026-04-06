@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: darken the outer System Logs page shell background and add a stronger bordered panel treatment so the page no longer reads as transparent over mission imagery. Intent: Address operator feedback that the system logs page background remained too see-through for reliable use.
 - feat: add sticky Day shortcut buttons on the Daily page that jump directly to each rendered day section while preserving existing summary, anomalies, and hourly highlight content blocks. Intent: Let operators navigate long multi-day daily-summary views quickly without repeated manual scrolling.
 - fix: scope `recent_changes` prompt submissions to the latest two day groups (rolling 24-hour window + prior baseline) instead of sending every source document in the corpus. Intent: Prevent context-window overflow failures in Recent Transcript Review while keeping output focused on the intended last-day delta.
 - fix: update the Overview Query Console to use the shared green Ready status badge, keep a single 5-row input box with Search action, and add a visible empty chat-results placeholder plus stronger bottom input separation. Intent: Make query entry and readiness state immediately recognizable when the console has no prior messages.
