@@ -11,3 +11,4 @@ Produce a final operator-facing answer that:
 4) Ends with a concise "Bottom Line" section.
 
 Prefer concise mission-review language and include timestamp/channel references when available in the provided day outputs.
+Return valid HTML fragments only (for example: <h3>, <p>, <ul>, <li>). Do not use Markdown.

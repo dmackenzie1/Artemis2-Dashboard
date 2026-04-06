@@ -350,7 +350,8 @@ export class AnalysisService {
     const chatSystemPrompt = `You are an Artemis transcript analyst.
 Use only provided evidence.
 Cite timestamp and channel where possible.
-If evidence is weak or missing, say you are uncertain and describe what is missing.`;
+If evidence is weak or missing, say you are uncertain and describe what is missing.
+Return valid HTML fragments only using tags such as <h3>, <p>, <ul>, and <li>. Do not use Markdown.`;
     const answer = await this.config.llmClient.generateText({
       systemPrompt: chatSystemPrompt,
       userPrompt: JSON.stringify({
