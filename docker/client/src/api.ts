@@ -69,6 +69,31 @@ export type MissionHourlyChannelEntry = {
   utterances: number;
 };
 
+
+export type TimelineDayEntry = {
+  day: string;
+  summary: string;
+  topics: string[];
+};
+
+export type NotableUtteranceEntry = {
+  id: string;
+  timestamp: string;
+  day: string;
+  channel: string;
+  filename: string;
+  text: string;
+  score: number;
+  reasons: string[];
+};
+
+export type NotableUtterancesResponse = {
+  totalUtterances: number;
+  limit: number;
+  days: number;
+  utterances: NotableUtteranceEntry[];
+};
+
 export type HealthData = {
   ok: boolean;
   llm: {
@@ -193,6 +218,27 @@ export const fetchStatsHourlyByChannel = async (days = 7): Promise<MissionHourly
   }
 
   return (await response.json()) as MissionHourlyChannelEntry[];
+};
+
+
+
+export const fetchTimeline = async (): Promise<TimelineDayEntry[]> => {
+  const response = await fetch(`${base}/timeline`);
+  if (!response.ok) {
+    throw new Error("Unable to load timeline");
+  }
+
+  return (await response.json()) as TimelineDayEntry[];
+};
+
+export const fetchNotableUtterances = async (limit = 10, days = 7): Promise<NotableUtterancesResponse | null> => {
+  const response = await fetch(`${base}/notable-utterances?limit=${limit}&days=${days}`);
+  if (!response.ok) {
+    clientLogger.warn("Notable utterances unavailable", { status: response.status, limit, days });
+    return null;
+  }
+
+  return (await response.json()) as NotableUtterancesResponse;
 };
 
 export const fetchHealth = async (): Promise<HealthData> => {
