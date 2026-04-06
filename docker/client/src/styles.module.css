@@ -1337,38 +1337,126 @@ pre {
 
 .notable-moment-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 0.45rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.62rem;
+  align-items: start;
+}
+
+.notable-moments-page {
+  max-width: 1450px;
+  margin: 0 auto;
+}
+
+.notable-moments-day-panel {
+  gap: 0.72rem;
+}
+
+.notable-moments-title {
+  font-size: 1.16rem;
+}
+
+.notable-moment-day-divider {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.notable-moment-day-divider::after {
+  content: "";
+  height: 1px;
+  background: linear-gradient(90deg, rgba(126, 205, 255, 0.48), rgba(126, 205, 255, 0.12) 55%, rgba(126, 205, 255, 0));
 }
 
 .notable-moment-card {
   border: 1px solid rgba(130, 200, 255, 0.14);
   border-radius: 10px;
-  padding: 0.5rem 0.58rem;
+  padding: 0.62rem 0.72rem;
   background: linear-gradient(180deg, rgba(10, 24, 44, 0.5), rgba(8, 16, 32, 0.44));
+  min-height: 172px;
+}
+
+.notable-moment-card-0 {
+  transform: translateX(-8px);
+}
+
+.notable-moment-card-1 {
+  transform: translateX(6px);
+}
+
+.notable-moment-card-2 {
+  transform: translateX(0);
+}
+
+.notable-moment-card-3 {
+  transform: translateX(8px);
+}
+
+.notable-moment-card-4 {
+  transform: translateX(-5px);
+}
+
+.notable-moment-card-5 {
+  transform: translateX(4px);
+}
+
+.notable-moment-card h3 {
+  margin: 0.28rem 0 0.38rem;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.notable-moment-card > p {
+  margin: 0;
+  line-height: 1.36;
+  color: rgba(224, 236, 250, 0.9);
+  font-size: 0.84rem;
 }
 
 .notable-moment-rank {
   margin: 0;
-  font-size: 0.64rem;
+  font-size: 0.68rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-micro);
 }
 
 .notable-moment-quote {
-  margin: 0.35rem 0;
-  padding: 0.38rem 0.5rem;
+  margin: 0.3rem 0 0.48rem;
+  padding: 0.5rem 0.58rem;
   border-left: 2px solid rgba(120, 206, 255, 0.56);
   background: rgba(14, 31, 56, 0.42);
   color: rgba(225, 235, 248, 0.92);
+  font-size: 0.86rem;
+  line-height: 1.4;
 }
 
 .notable-moment-meta {
-  margin: 0;
-  font-size: 0.66rem;
+  margin: 0.46rem 0 0;
+  font-size: 0.7rem;
   color: var(--text-secondary);
   letter-spacing: 0.04em;
+}
+
+@media (max-width: 1180px) {
+  .notable-moment-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .notable-moment-card-0,
+  .notable-moment-card-1,
+  .notable-moment-card-2,
+  .notable-moment-card-3,
+  .notable-moment-card-4,
+  .notable-moment-card-5 {
+    transform: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .notable-moment-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .system-logs-page {

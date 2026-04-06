@@ -40,9 +40,13 @@ export const NotableMomentsPage: FunctionComponent = () => {
   }, [data]);
 
   return (
-    <div className={styles.stack} data-component-id={componentId} data-component-uid={componentUid}>
+    <div
+      className={`${styles.stack} ${styles["notable-moments-page"]}`}
+      data-component-id={componentId}
+      data-component-uid={componentUid}
+    >
       <section className={styles.panel}>
-        <h2>Notable Moments</h2>
+        <h2 className={styles["notable-moments-title"]}>Notable Moments</h2>
         <p className={styles.subtle}>
           Top {data?.targetMomentsPerDay ?? 10} utterances per day selected by the notable moments prompt pipeline.
         </p>
@@ -54,11 +58,16 @@ export const NotableMomentsPage: FunctionComponent = () => {
         </section>
       ) : (
         days.map((dayEntry) => (
-          <article className={styles.panel} key={dayEntry.day}>
-            <h2>{dayEntry.day}</h2>
+          <article className={`${styles.panel} ${styles["notable-moments-day-panel"]}`} key={dayEntry.day}>
+            <div className={styles["notable-moment-day-divider"]}>
+              <h2>{dayEntry.day}</h2>
+            </div>
             <div className={styles["notable-moment-grid"]}>
-              {dayEntry.moments.map((moment) => (
-                <section className={styles["notable-moment-card"]} key={`${dayEntry.day}-${moment.rank}-${moment.title}`}>
+              {dayEntry.moments.map((moment, momentIndex) => (
+                <section
+                  className={`${styles["notable-moment-card"]} ${styles[`notable-moment-card-${momentIndex % 6}`]}`}
+                  key={`${dayEntry.day}-${moment.rank}-${moment.title}`}
+                >
                   <p className={styles["notable-moment-rank"]}>#{moment.rank}</p>
                   <h3>{moment.title}</h3>
                   <blockquote className={styles["notable-moment-quote"]}>{moment.quote}</blockquote>
