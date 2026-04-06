@@ -55,13 +55,14 @@ type MissionStatsView = {
 };
 
 const promptFilePattern = /\.txt$/i;
-const promptExecutionPriority = ["daily_summary", "mission_summary"];
+const promptExecutionPriority = ["daily_summary", "notable_moments", "mission_summary"];
 const skippedPromptKeys = new Set(["hourly_summary"]);
 const dailySummaryTargetWords = {
   min: 5_000,
   max: 10_000
 } as const;
 const dailySummaryChunkCharacterLimit = 220_000;
+const notableMomentsPerDay = 10;
 
 type SourceContextDocument = {
   path: string;
@@ -218,6 +219,26 @@ export class PipelineService {
       return this.createDailySummaryCacheSubmission(sourceContext);
     }
 
+    if (prompt.key === "notable_moments") {
+      const groupedDays = this.buildDailyGroups(sourceContext);
+      return JSON.stringify(
+        {
+          generatedAt: dayjs().utc().toISOString(),
+          strategy: "daily-notable-moments",
+          dayGroups: groupedDays.map((group) => ({
+            day: group.day,
+            sourceDocuments: group.documents.map((document) => ({
+              path: document.path,
+              checksum: document.checksum
+            })),
+            targetMoments: notableMomentsPerDay
+          }))
+        },
+        null,
+        2
+      );
+    }
+
     return JSON.stringify(
       {
         generatedAt: dayjs().utc().toISOString(),
@@ -344,6 +365,47 @@ export class PipelineService {
     }
 
     return dayOutputs.join("\n\n");
+  }
+
+  private async generateNotableMomentsOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
+    const dayGroups = this.buildDailyGroups(sourceContext);
+    const dayOutputs: string[] = [];
+    serverLogger.info("Starting notable moments generation", {
+      groupedDayCount: dayGroups.length,
+      notableMomentsPerDay
+    });
+
+    for (const group of dayGroups) {
+      const output = await this.config.llmClient.generateText({
+        systemPrompt: prompt.content,
+        userPrompt: JSON.stringify(
+          {
+            mode: "daily-notable-moments",
+            day: group.day,
+            targetMoments: notableMomentsPerDay,
+            sourceDocuments: group.documents.map((document) => ({
+              path: document.path,
+              content: document.content
+            }))
+          },
+          null,
+          2
+        ),
+        componentId: `${prompt.key}:${group.day}`
+      });
+
+      dayOutputs.push(output);
+    }
+
+    return JSON.stringify(
+      {
+        generatedAt: dayjs().utc().toISOString(),
+        targetMomentsPerDay: notableMomentsPerDay,
+        days: dayOutputs
+      },
+      null,
+      2
+    );
   }
 
   private buildPromptQueue(prompts: PromptDefinition[]): PromptDefinition[] {
@@ -572,6 +634,8 @@ export class PipelineService {
         const output =
           prompt.key === "daily_summary"
             ? await this.generateDailySummaryOutput(prompt, sourceContext)
+            : prompt.key === "notable_moments"
+              ? await this.generateNotableMomentsOutput(prompt, sourceContext)
             : await this.config.llmClient.generateText({
                 systemPrompt: prompt.content,
                 userPrompt: missionSubmittedText,

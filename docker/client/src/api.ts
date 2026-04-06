@@ -118,6 +118,33 @@ export type ChatResponse = {
   };
 };
 
+export type TriggerPipelineRunResponse = {
+  accepted: boolean;
+  status: "already-running" | "started";
+}
+
+export type NotableMoment = {
+  rank: number;
+  title: string;
+  quote: string;
+  reason: string;
+  timestamp: string | null;
+  channel: string | null;
+  sourcePath: string;
+};
+
+export type NotableMomentsDay = {
+  day: string;
+  moments: NotableMoment[];
+};
+
+export type NotableMomentsData = {
+  generatedAt: string;
+  status: "running" | "success" | "failed" | "never";
+  targetMomentsPerDay?: number;
+  days: string[];
+};
+
 const base = "/api";
 
 export const fetchDashboard = async (): Promise<DashboardData | null> => {
@@ -161,6 +188,16 @@ export const fetchPipelineStats = async (): Promise<PipelineStatsData | null> =>
   }
 
   return (await response.json()) as PipelineStatsData;
+};
+
+export const triggerPipelineRun = async (): Promise<TriggerPipelineRunResponse> => {
+  const response = await fetch(`${base}/pipeline/run`, { method: "POST" });
+  if (!response.ok) {
+    clientLogger.error("Pipeline run request failed", { status: response.status });
+    throw new Error("Unable to trigger pipeline run");
+  }
+
+  return (await response.json()) as TriggerPipelineRunResponse;
 };
 
 export const fetchStatsSummary = async (): Promise<MissionStatsSummaryData | null> => {
@@ -211,6 +248,16 @@ export const fetchHealth = async (): Promise<HealthData> => {
   }
 
   return (await response.json()) as HealthData;
+};
+
+export const fetchNotableMoments = async (): Promise<NotableMomentsData | null> => {
+  const response = await fetch(`${base}/pipeline/notable-moments`);
+  if (!response.ok) {
+    clientLogger.warn("Notable moments unavailable", { status: response.status });
+    return null;
+  }
+
+  return (await response.json()) as NotableMomentsData;
 };
 
 export const chat = async (query: string, mode: ChatMode = "rag"): Promise<ChatResponse> => {

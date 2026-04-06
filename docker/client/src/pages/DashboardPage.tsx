@@ -1,5 +1,5 @@
 import type { FunctionComponent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchStatsHourlyByChannel } from "../api";
 import type { MissionHourlyChannelEntry } from "../api";
 import { DailySummaryPanel } from "../components/dashboard/DailySummaryPanel";
@@ -11,33 +11,44 @@ import { useComponentIdentity } from "../components/dashboard/primitives/useComp
 import styles from "../styles.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
 import { useDashboardController } from "./dashboard/useDashboardController";
+import { useLocation } from "react-router-dom";
 
 const HOURLY_STATS_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 export const DashboardPage: FunctionComponent = () => {
   const { componentId, componentUid } = useComponentIdentity("dashboard-page");
+  const location = useLocation();
+  const adminMode = useMemo(() => {
+    const adminQueryValue = new URLSearchParams(location.search).get("admin");
+    return adminQueryValue === "true";
+  }, [location.search]);
   const {
     viewModel,
     chatInput,
     chatMode,
     isThinking,
     chatMessages,
+    hasLoadFailure,
     onChatInputChange,
     onChatModeChange,
-    onChatSubmit
+    onChatSubmit,
+    refreshDashboard
   } = useDashboardController();
   const [hourlyByChannel, setHourlyByChannel] = useState<MissionHourlyChannelEntry[]>([]);
+  const [hourlyLoadFailed, setHourlyLoadFailed] = useState(false);
+
+  const loadHourly = useCallback(async (): Promise<void> => {
+    try {
+      const hourlyPayload = await fetchStatsHourlyByChannel(30);
+      setHourlyByChannel(hourlyPayload);
+      setHourlyLoadFailed(false);
+    } catch (error) {
+      setHourlyLoadFailed(true);
+      clientLogger.error("Unable to fetch hourly mission activity", { error });
+    }
+  }, []);
 
   useEffect(() => {
-    const loadHourly = async (): Promise<void> => {
-      try {
-        const hourlyPayload = await fetchStatsHourlyByChannel(30);
-        setHourlyByChannel(hourlyPayload);
-      } catch (error) {
-        clientLogger.error("Unable to fetch hourly mission activity", { error });
-      }
-    };
-
     void loadHourly();
     const pollHandle = window.setInterval(() => {
       void loadHourly();
@@ -46,7 +57,19 @@ export const DashboardPage: FunctionComponent = () => {
     return () => {
       window.clearInterval(pollHandle);
     };
-  }, []);
+  }, [loadHourly]);
+
+  useEffect(() => {
+    const handleAdminRefresh = (): void => {
+      void refreshDashboard();
+      void loadHourly();
+    };
+
+    window.addEventListener("dashboard-admin-refresh-requested", handleAdminRefresh);
+    return () => {
+      window.removeEventListener("dashboard-admin-refresh-requested", handleAdminRefresh);
+    };
+  }, [loadHourly, refreshDashboard]);
 
   const hourlyHistogram = useMemo(() => {
     if (hourlyByChannel.length === 0) {
@@ -95,6 +118,11 @@ export const DashboardPage: FunctionComponent = () => {
       <section className={styles["dashboard-bottom-row"]} data-component-id="dashboard-bottom-row" data-component-uid={`${componentUid}-bottom`}>
         <UtterancesTimelinePanel histogram={hourlyHistogram} />
       </section>
+      {adminMode && (hasLoadFailure || hourlyLoadFailed) ? (
+        <div className={styles["dashboard-admin-hint"]}>
+          Widget query failed. Automatic retry runs every 5 minutes. Use the top-right admin refresh to retry immediately.
+        </div>
+      ) : null}
     </div>
   );
 };
