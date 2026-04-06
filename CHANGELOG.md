@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- docs: add an EC2 deployment runbook with AL2023 bootstrap script, environment-variable template, and local-first positioning linked from the top-level README. Intent: Preserve local development as the default while giving operators a repeatable production-host setup path for `a2.emss-mess.org`.
 - feat: move the rolling transcript window to the top-left Overview pane with 3h/6h/12h/24h DB-backed controls, shift Mission Review Summary to the middle row, and add a per-day utterances/words metrics table. Intent: Prioritize what is new right now for operators while preserving quick day-level volume verification in one scan.
 - fix: remove the TalkieRAG page/route, simplify Timeline controls by dropping notable-only filtering, improve low-contrast shared typography, add an explicit topbar LLM reconnect action, and retune analyst prompt persona text away from "TalkyBot analysis" phrasing. Intent: Reduce operator confusion, restore readability of faded UI copy, and provide a direct recovery path when model connectivity drops.
 - fix: point the Overview "Recent Transcript Review / Latest TalkyBot Window" panel at `daily_summary`, constrain prompt output to the current latest-day section, and fall back to the newest cached day summary when pipeline output is unavailable. Intent: Ensure operators see the actual current daily summary in that panel instead of a rolling recent-changes digest.
