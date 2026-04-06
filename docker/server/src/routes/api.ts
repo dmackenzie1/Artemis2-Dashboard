@@ -4,12 +4,14 @@ import type { AnalysisService } from "../services/analysisService.js";
 import { serializeUnknownError, serverLogger } from "../utils/logging/serverLogger.js";
 import type { LlmConnectivityStatus } from "../services/llmClient.js";
 import type { StatsService } from "../services/statsService.js";
+import type { TimeWindowSummaryService } from "../services/timeWindowSummaryService.js";
 
 export const createApiRouter = (
   analysisService: AnalysisService,
   getLlmConnectivityStatus: () => LlmConnectivityStatus,
   onIngestionComplete?: () => Promise<void>,
-  getStatsService?: () => StatsService | null
+  getStatsService?: () => StatsService | null,
+  getTimeWindowSummaryService?: () => TimeWindowSummaryService | null
 ): Router => {
   const router = Router();
 
@@ -109,6 +111,27 @@ export const createApiRouter = (
       res.json(payload);
     } catch (error) {
       serverLogger.error("Hourly channel stats request failed", { error: serializeUnknownError(error) });
+      next(error);
+    }
+  });
+
+
+  router.get("/time-window-summary", async (req, res, next) => {
+    try {
+      const query = z.object({ hours: z.coerce.number().int().min(1).max(24) }).parse(req.query);
+      const timeWindowSummaryService = getTimeWindowSummaryService?.();
+
+      if (!timeWindowSummaryService) {
+        res.status(503).json({
+          message: "Time-window summaries require TRANSCRIPTS_DB_ENABLED and an initialized summary service."
+        });
+        return;
+      }
+
+      const payload = await timeWindowSummaryService.generate(query.hours);
+      res.json(payload);
+    } catch (error) {
+      serverLogger.error("Time-window summary request failed", { error: serializeUnknownError(error) });
       next(error);
     }
   });

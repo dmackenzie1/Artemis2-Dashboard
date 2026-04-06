@@ -75,6 +75,26 @@ export type NotableUtterancesResponse = {
   utterances: NotableUtteranceEntry[];
 };
 
+
+export type TimeWindowSummaryData = {
+  generatedAt: string;
+  window: {
+    hours: number;
+    start: string;
+    end: string;
+  };
+  stats: {
+    utterances: number;
+    words: number;
+    channels: number;
+  };
+  summary: string;
+  highlights: Array<{
+    hour: string;
+    summary: string;
+  }>;
+};
+
 export type HealthData = {
   ok: boolean;
   llm: {
@@ -203,6 +223,16 @@ export const fetchStatsHourlyByChannel = async (days = 7): Promise<MissionHourly
   }
 
   return (await response.json()) as MissionHourlyChannelEntry[];
+};
+
+
+export const fetchTimeWindowSummary = async (hours: number): Promise<TimeWindowSummaryData> => {
+  const response = await fetch(`${base}/time-window-summary?hours=${hours}`);
+  if (!response.ok) {
+    throw new Error("Unable to load time-window summary");
+  }
+
+  return (await response.json()) as TimeWindowSummaryData;
 };
 
 export const fetchTimeline = async (): Promise<TimelineDayEntry[]> => {
