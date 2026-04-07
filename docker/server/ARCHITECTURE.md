@@ -8,6 +8,7 @@ This document is the implementation map for `docker/server/src`.
 2. DB-enabled mode initializes MikroORM, schema sync, and pipeline/stats/transcript routes.
 3. Startup ingestion runs transcript ingestion + analysis cache refresh (+ pipeline run when enabled).
 4. Pollers refresh LLM connectivity and scheduled pipeline runs.
+5. `/api/events` streams Server-Sent Events for dashboard/pipeline/stats invalidation and LLM connectivity updates.
 
 ## File-by-file map (`src/`)
 
@@ -28,6 +29,7 @@ This document is the implementation map for `docker/server/src`.
 | `services/statsService.ts` | DB-backed mission statistics query service (summary/day/hour-by-channel). |
 | `services/systemLogsService.ts` | Prompt artifact discovery/read service backing system logs API. |
 | `services/systemLogsService.test.ts` | Unit tests for log listing/read behavior. |
+| `services/liveUpdateBus.ts` | In-process pub/sub bus used by SSE route and runtime services to publish live update events. |
 | `routes/api.ts` | Core `/api` routes (health, ingest, dashboard, timeline, stats, topics, notable utterances, chat). |
 | `routes/pipeline.ts` | `/api/pipeline` routes (dashboard/run/ingest/stats/notable moments). |
 | `routes/transcripts.ts` | `/api/transcripts/context` retrieval route with query validation and formatting options. |

@@ -9,7 +9,7 @@ import { PaneStateMessage } from "./primitives/PaneStateMessage";
 import { StatusBadge } from "./primitives/StatusBadge";
 import { clientLogger } from "../../utils/logging/clientLogger";
 
-const DASHBOARD_POLL_INTERVAL_MS = 5 * 60 * 1000;
+const DASHBOARD_POLL_INTERVAL_MS = 30 * 60 * 1000;
 
 const buildMissionSummary = (dashboardData: DashboardData | null, pipelineData: PipelineDashboardData | null): {
   statusLabel: string;
