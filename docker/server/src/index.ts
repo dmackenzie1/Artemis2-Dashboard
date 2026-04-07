@@ -1,8 +1,9 @@
 import express from "express";
 import cors from "cors";
-import { watch } from "node:fs";
+import { promises as fs, watch } from "node:fs";
 import { RequestContext } from "@mikro-orm/core";
 import { EntityManager, MikroORM } from "@mikro-orm/postgresql";
+import path from "node:path";
 import { env } from "./env.config.js";
 import { LlmClient } from "./services/llmClient.js";
 import { AnalysisService } from "./services/analysisService.js";
@@ -119,6 +120,29 @@ let autoIngestLastReason = "startup";
 let autoIngestLastPath: string | null = null;
 const watchTargets = Array.from(new Set([env.DATA_DIR, env.SOURCE_FILES_DIR]));
 
+type IngestionEventPayload = {
+  trigger: string;
+  status: "success" | "failure";
+  sourcePath: string | null;
+  details: Record<string, unknown>;
+};
+
+const writeIngestionEventLog = async (payload: IngestionEventPayload): Promise<void> => {
+  const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const fileName = `${timestamp}-ingestion-event.json`;
+  const outputPath = path.join(env.PROMPT_SUBMISSIONS_DIR, fileName);
+
+  try {
+    await fs.mkdir(env.PROMPT_SUBMISSIONS_DIR, { recursive: true });
+    await fs.writeFile(outputPath, `${JSON.stringify({ timestamp: new Date().toISOString(), ...payload }, null, 2)}\n`, "utf8");
+  } catch (error) {
+    serverLogger.warn("Failed to write ingestion event log artifact", {
+      outputPath,
+      error: serializeUnknownError(error)
+    });
+  }
+};
+
 const runTranscriptAndPipelineRefresh = async (): Promise<void> => {
   const em = transcriptOrm?.em.fork();
   if (em) {
@@ -156,11 +180,28 @@ const runAutoIngestion = async (): Promise<void> => {
       generatedAt: dashboard.generatedAt,
       totalDays: dashboard.days.length
     });
+    await writeIngestionEventLog({
+      trigger: reason,
+      status: "success",
+      sourcePath,
+      details: {
+        generatedAt: dashboard.generatedAt,
+        totalDays: dashboard.days.length
+      }
+    });
   } catch (error) {
     serverLogger.error("Auto-ingestion failed", {
       reason,
       sourcePath,
       error: serializeUnknownError(error)
+    });
+    await writeIngestionEventLog({
+      trigger: reason,
+      status: "failure",
+      sourcePath,
+      details: {
+        error: serializeUnknownError(error)
+      }
     });
   } finally {
     autoIngestInProgress = false;
@@ -238,6 +279,16 @@ app.use(
   "/api",
   createApiRouter(analysisService, () => llmConnectivityStatus, async () => {
     await runTranscriptAndPipelineRefresh();
+    const cache = analysisService.getCache();
+    await writeIngestionEventLog({
+      trigger: "manual:/api/ingest",
+      status: "success",
+      sourcePath: null,
+      details: {
+        generatedAt: cache?.generatedAt ?? null,
+        totalDays: cache?.days.length ?? null
+      }
+    });
     statsService?.invalidateCaches();
     timeWindowSummaryService?.invalidateCache();
     if (statsService) {
@@ -308,6 +359,15 @@ const runStartupIngestion = async (): Promise<void> => {
 
     const dashboard = await analysisService.ingestAndAnalyze();
     serverLogger.info("Startup ingestion completed", { generatedAt: dashboard.generatedAt, totalDays: dashboard.days.length });
+    await writeIngestionEventLog({
+      trigger: "startup",
+      status: "success",
+      sourcePath: null,
+      details: {
+        generatedAt: dashboard.generatedAt,
+        totalDays: dashboard.days.length
+      }
+    });
 
     const currentPipelineService = pipelineService;
     if (currentPipelineService) {
@@ -317,6 +377,14 @@ const runStartupIngestion = async (): Promise<void> => {
     }
   } catch (error) {
     serverLogger.error("Startup ingestion failed", { error: serializeUnknownError(error) });
+    await writeIngestionEventLog({
+      trigger: "startup",
+      status: "failure",
+      sourcePath: null,
+      details: {
+        error: serializeUnknownError(error)
+      }
+    });
   }
 };
 setInterval(() => {
