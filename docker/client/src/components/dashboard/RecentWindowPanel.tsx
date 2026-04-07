@@ -19,7 +19,7 @@ const renderWindowLabel = (hours: WindowOption): string => {
 };
 
 export const RecentWindowPanel: FunctionComponent<{ refreshToken?: number }> = ({ refreshToken = 0 }) => {
-  const [activeWindowHours, setActiveWindowHours] = useState<WindowOption>(24);
+  const [activeWindowHours, setActiveWindowHours] = useState<WindowOption>(3);
   const [data, setData] = useState<TimeWindowSummaryData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
