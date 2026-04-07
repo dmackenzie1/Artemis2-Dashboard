@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- docs: update frontend/top-level architecture docs to explicitly codify panel-level API ownership and parent-page refresh-notification boundaries for the Overview dashboard. Intent: Keep implementation and onboarding documentation accurate so maintainers preserve component independence and avoid reintroducing centralized data orchestration.
 - fix: harden independently loaded Overview panels with per-request `Promise.allSettled` handling and explicit widget-level error states so partial source failures do not blank unaffected panel data. Intent: Preserve the component-isolated architecture while keeping each widget resilient when one of its own upstream APIs intermittently fails.
 - refactor: isolate Overview dashboard panels into independent data controllers so each widget owns its own async API polling, error handling, and refresh cycle while DashboardPage remains layout/refresh-notification focused. Intent: Enforce component-level isolation so panel failures or slow responses never block unrelated dashboard surfaces.
 - refactor: decouple Overview dashboard data polling so each panel updates from its own request lifecycle (dashboard cache, pipeline prompt output, and stats summary) and keep Transcript Metrics in a true loading state until stats arrive. Intent: Eliminate cross-panel blocking so cached prompt outputs and mission stats render as soon as each source is ready.
