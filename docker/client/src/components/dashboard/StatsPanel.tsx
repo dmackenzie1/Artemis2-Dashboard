@@ -1,27 +1,90 @@
 import type { FunctionComponent } from "react";
-import type { DashboardStat } from "../../pages/dashboard/types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { fetchDashboard, fetchStatsHourlyByChannel, fetchStatsSummary, type MissionStatsSummaryData } from "../../api";
 import sharedStyles from "../../styles/shared.module.css";
 import styles from "./StatsPanel.module.css";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
 import { StatusBadge } from "./primitives/StatusBadge";
+import { clientLogger } from "../../utils/logging/clientLogger";
 
-type StatsPanelProps = {
-  stats: DashboardStat[];
-  timelineHours: number;
-  dailyTranscriptVolume: Array<{
-    day: string;
-    utterances: number;
-    words: number;
-  }>;
-};
+const DASHBOARD_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 const formatMetricValue = (value: number): string => {
   return value.toLocaleString();
 };
 
-export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats, timelineHours, dailyTranscriptVolume }) => {
-  const statusLabel = stats.length > 0 ? "ready" : "loading";
+export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refreshToken = 0 }) => {
+  const [statsSummary, setStatsSummary] = useState<MissionStatsSummaryData | null>(null);
+  const [dailyTranscriptVolume, setDailyTranscriptVolume] = useState<Array<{ day: string; utterances: number; words: number }>>([]);
+  const [timelineHours, setTimelineHours] = useState(0);
+  const [hasError, setHasError] = useState(false);
+
+  const loadStats = useCallback(async (): Promise<void> => {
+    const [statsSummaryResult, dashboardResult, hourlyResult] = await Promise.allSettled([
+      fetchStatsSummary(),
+      fetchDashboard(),
+      fetchStatsHourlyByChannel(30)
+    ]);
+
+    let encounteredFailure = false;
+
+    if (statsSummaryResult.status === "fulfilled") {
+      setStatsSummary(statsSummaryResult.value);
+    } else {
+      encounteredFailure = true;
+      clientLogger.error("Failed to fetch stats summary for stats panel", { error: statsSummaryResult.reason });
+    }
+
+    if (dashboardResult.status === "fulfilled") {
+      setDailyTranscriptVolume(
+        (dashboardResult.value?.days ?? []).map((day) => ({
+          day: day.day,
+          utterances: day.stats.utteranceCount,
+          words: day.stats.wordCount
+        }))
+      );
+    } else {
+      encounteredFailure = true;
+      clientLogger.error("Failed to fetch dashboard cache for stats panel", { error: dashboardResult.reason });
+    }
+
+    if (hourlyResult.status === "fulfilled") {
+      setTimelineHours(new Set(hourlyResult.value.map((entry) => entry.hour)).size);
+    } else {
+      encounteredFailure = true;
+      clientLogger.error("Failed to fetch hourly stats for stats panel", { error: hourlyResult.reason });
+    }
+
+    setHasError(encounteredFailure);
+  }, []);
+
+  useEffect(() => {
+    void loadStats();
+    const pollHandle = window.setInterval(() => {
+      void loadStats();
+    }, DASHBOARD_POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(pollHandle);
+    };
+  }, [loadStats, refreshToken]);
+
+  const stats = useMemo(() => {
+    if (!statsSummary) {
+      return [];
+    }
+
+    return [
+      { label: "Min Day", value: statsSummary.days.minDay ?? "n/a" },
+      { label: "Max Day", value: statsSummary.days.maxDay ?? "n/a" },
+      { label: "Total Utterances", value: `${statsSummary.totals.utterances}` },
+      { label: "Total Words", value: `${statsSummary.totals.words}` },
+      { label: "Distinct Channels", value: `${statsSummary.totals.channels}` }
+    ];
+  }, [statsSummary]);
+
+  const statusLabel = hasError ? "error" : stats.length > 0 ? "ready" : "loading";
   const coverageEntries = [...stats.filter((stat) => stat.label.includes("Day")), { label: "Hours", value: `${timelineHours}` }];
   const groupedStats = [
     {
@@ -46,7 +109,10 @@ export const StatsPanel: FunctionComponent<StatsPanelProps> = ({ stats, timeline
       title="Transcript Metrics"
       headerAccessory={<StatusBadge label={statusLabel} />}
     >
-      {stats.length === 0 ? <PaneStateMessage message="Waiting for mission metrics…" tone="loading" /> : null}
+      {hasError && stats.length === 0 ? (
+        <PaneStateMessage message="Unable to refresh transcript metrics right now. Retrying automatically." tone="error" />
+      ) : null}
+      {stats.length === 0 && !hasError ? <PaneStateMessage message="Waiting for mission metrics…" tone="loading" /> : null}
       {stats.length === 0 ? (
         <div className={styles["stats-skeleton-grid"]} aria-hidden="true">
           <div className={sharedStyles["skeleton-row"]} />
