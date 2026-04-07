@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: resolve App shell socket merge fallout by removing orphaned topbar health/reconnect wiring that referenced deleted state/imports and restoring a compile-safe navigation shell. Intent: Recover a buildable frontend after conflicting socket and reconnect-control branches left `App.tsx` in a partially merged state.
 - feat: add `/api/events` SSE live updates, emit dashboard/pipeline/stats/LLM connectivity invalidation events from backend runtime flows, and wire client Dashboard/App listeners to refresh panels/health from server push with slower fallback polling. Intent: Centralize shared data-refresh orchestration on the server so multiple clients stop duplicating refresh work while still keeping HTTP fetch contracts for data reads and user-unique chat/search requests.
 - fix: remove the topbar disconnected badge and `Reconnect LLM` button, along with their now-unused reconnect state wiring in the app shell. Intent: Reduce operator-facing top navigation clutter per current workflow preferences.
 - fix: make the Daily page empty-state message render with high-contrast panel styling and explicit empty-array handling when no day records exist. Intent: Ensure operators can clearly read the ingestion guidance instead of a faint or missing empty-state message.

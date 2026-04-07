@@ -15,9 +15,6 @@ import { AboutPage } from "./pages/AboutPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 import type { EmsspressobotController } from "./utils/emsspressobot";
 import { installEmsspressobot } from "./utils/emsspressobot";
-import { subscribeToLiveUpdates } from "./utils/live/liveEvents";
-
-const HEALTH_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 export const App: FC = () => {
   const [isAdminRefreshRunning, setIsAdminRefreshRunning] = useState(false);
@@ -26,61 +23,6 @@ export const App: FC = () => {
   const location = useLocation();
   const { componentId, componentUid } = useComponentIdentity("app-shell");
 
-  const refreshHealth = async (): Promise<HealthData | null> => {
-    try {
-      const payload = await fetchHealth();
-      setHealth(payload);
-      return payload;
-    } catch (error) {
-      clientLogger.error("Topbar health poll failed", { error });
-      return null;
-    }
-  };
-
-  useEffect(() => {
-    void refreshHealth();
-    const pollHandle = window.setInterval(() => {
-      void refreshHealth();
-    }, HEALTH_POLL_INTERVAL_MS);
-    const onWindowFocus = (): void => {
-      void refreshHealth();
-    };
-    window.addEventListener("focus", onWindowFocus);
-
-    return () => {
-      window.clearInterval(pollHandle);
-      window.removeEventListener("focus", onWindowFocus);
-    };
-  }, []);
-
-  useEffect(() => {
-    const subscription = subscribeToLiveUpdates((event) => {
-      if (event.type === "llm.connectivity.changed") {
-        void refreshHealth();
-      }
-    });
-
-    return () => {
-      subscription.close();
-    };
-  }, []);
-
-  const connected = useMemo(() => (!health ? true : health.llm.connected), [health]);
-  const reconnectButtonLabel = useMemo(() => {
-    if (reconnectState === "checking") {
-      return "Checking…";
-    }
-
-    if (reconnectState === "reconnecting") {
-      return "Reconnecting…";
-    }
-
-    if (reconnectState === "pipeline-running") {
-      return "Pipeline running…";
-    }
-
-    return "Reconnect LLM";
-  }, [reconnectState]);
   const adminMode = useMemo(() => {
     const adminQueryValue = new URLSearchParams(location.search).get("admin");
     return adminQueryValue === "true";
