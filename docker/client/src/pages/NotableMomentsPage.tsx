@@ -53,6 +53,11 @@ export const NotableMomentsPage: FunctionComponent = () => {
     return (data?.days ?? []).map(parseDayPayload).filter((entry): entry is NotableMomentsDay => Boolean(entry));
   }, [data]);
 
+  const scrollToDay = (day: string): void => {
+    const section = document.getElementById(`notable-day-${day}`);
+    section?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div
       className={`${sharedStyles.stack} ${styles["notable-moments-page"]}`}
@@ -66,13 +71,32 @@ export const NotableMomentsPage: FunctionComponent = () => {
         </p>
       </section>
 
+      {days.length ? (
+        <nav className={sharedStyles["day-shortcuts-nav"]} aria-label="Notable moments day sections">
+          {days.map((dayEntry) => (
+            <button
+              className={sharedStyles["day-shortcuts-nav-button"]}
+              key={`notable-nav-${dayEntry.day}`}
+              onClick={() => scrollToDay(dayEntry.day)}
+              type="button"
+            >
+              Day {dayEntry.day}
+            </button>
+          ))}
+        </nav>
+      ) : null}
+
       {days.length === 0 ? (
         <section className={sharedStyles.panel}>
           <p>No notable moments yet. Run ingestion/pipeline and refresh this page.</p>
         </section>
       ) : (
         days.map((dayEntry) => (
-          <article className={`${sharedStyles.panel} ${styles["notable-moments-day-panel"]}`} key={dayEntry.day}>
+          <article
+            className={`${sharedStyles.panel} ${styles["notable-moments-day-panel"]}`}
+            id={`notable-day-${dayEntry.day}`}
+            key={dayEntry.day}
+          >
             <div className={styles["notable-moment-day-divider"]}>
               <h2>{dayEntry.day}</h2>
             </div>

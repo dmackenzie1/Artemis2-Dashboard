@@ -41,10 +41,10 @@ export const DailyPage: FC = () => {
   return (
     <div className={sharedStyles.stack} data-component-id={componentId} data-component-uid={componentUid}>
       {days.length ? (
-        <nav className={styles["daily-day-nav"]} aria-label="Daily sections">
+        <nav className={sharedStyles["day-shortcuts-nav"]} aria-label="Daily sections">
           {days.map((day) => (
             <button
-              className={styles["daily-day-nav-button"]}
+              className={sharedStyles["day-shortcuts-nav-button"]}
               key={`daily-nav-${day.day}`}
               onClick={() => scrollToDay(day.day)}
               type="button"

@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: add sticky day shortcut buttons to the Notable Moments page and move the day-selector visual treatment into shared style primitives reused by Daily and Notable views. Intent: Let operators jump directly to each day's notable utterances while keeping day navigation styling consistent across pages.
 - feat: add `/api/events` SSE live updates, emit dashboard/pipeline/stats/LLM connectivity invalidation events from backend runtime flows, and wire client Dashboard/App listeners to refresh panels/health from server push with slower fallback polling. Intent: Centralize shared data-refresh orchestration on the server so multiple clients stop duplicating refresh work while still keeping HTTP fetch contracts for data reads and user-unique chat/search requests.
 - fix: remove the topbar disconnected badge and `Reconnect LLM` button, along with their now-unused reconnect state wiring in the app shell. Intent: Reduce operator-facing top navigation clutter per current workflow preferences.
 - fix: make the Daily page empty-state message render with high-contrast panel styling and explicit empty-array handling when no day records exist. Intent: Ensure operators can clearly read the ingestion guidance instead of a faint or missing empty-state message.
