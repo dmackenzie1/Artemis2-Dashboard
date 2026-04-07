@@ -17,6 +17,7 @@
   --ok: #69d59f;
   --warn: #e5b86a;
   --err: #e07b7b;
+  --mission-background-image: url("../assets/backgrounds/background.png");
   font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: radial-gradient(circle at 55% -8%, #173a72 0%, var(--bg-mid) 30%, var(--bg-base) 76%);
   color: var(--text-primary);
@@ -61,7 +62,7 @@ body::after {
 
 body::before {
   z-index: 0;
-  background-image: url("../assets/backgrounds/background.png");
+  background-image: var(--mission-background-image);
   background-size: cover;
   background-position: center 26%;
   opacity: 0.9;
