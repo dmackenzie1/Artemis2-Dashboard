@@ -1,23 +1,49 @@
 import type { FC } from "react";
-import type { MissionHourlyChannelEntry } from "../../api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { fetchStatsHourlyByChannel, type MissionHourlyChannelEntry } from "../../api";
 import styles from "./UtterancesTimelinePanel.module.css";
 import { DashboardPanel } from "./primitives/DashboardPanel";
 import { PaneStateMessage } from "./primitives/PaneStateMessage";
 import { StatusBadge } from "./primitives/StatusBadge";
+import { clientLogger } from "../../utils/logging/clientLogger";
 
-type UtterancesTimelinePanelProps = {
-  histogram: MissionHourlyChannelEntry[];
-};
+const TIMELINE_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
-export const UtterancesTimelinePanel: FC<UtterancesTimelinePanelProps> = ({ histogram }) => {
-  const hourlyTotals = Array.from(
-    histogram.reduce((acc, entry) => {
-      acc.set(entry.hour, (acc.get(entry.hour) ?? 0) + entry.utterances);
-      return acc;
-    }, new Map<string, number>())
-  )
-    .map(([hour, utterances]) => ({ hour, utterances }))
-    .sort((a, b) => a.hour.localeCompare(b.hour));
+export const UtterancesTimelinePanel: FC<{ refreshToken?: number }> = ({ refreshToken = 0 }) => {
+  const [histogram, setHistogram] = useState<MissionHourlyChannelEntry[]>([]);
+
+  const loadTimeline = useCallback(async (): Promise<void> => {
+    try {
+      const hourlyPayload = await fetchStatsHourlyByChannel(30);
+      setHistogram(hourlyPayload);
+    } catch (error) {
+      clientLogger.error("Unable to fetch timeline histogram", { error });
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTimeline();
+    const pollHandle = window.setInterval(() => {
+      void loadTimeline();
+    }, TIMELINE_POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(pollHandle);
+    };
+  }, [loadTimeline, refreshToken]);
+
+  const hourlyTotals = useMemo(
+    () =>
+      Array.from(
+        histogram.reduce((acc, entry) => {
+          acc.set(entry.hour, (acc.get(entry.hour) ?? 0) + entry.utterances);
+          return acc;
+        }, new Map<string, number>())
+      )
+        .map(([hour, utterances]) => ({ hour, utterances }))
+        .sort((a, b) => a.hour.localeCompare(b.hour)),
+    [histogram]
+  );
 
   const maxUtterances = Math.max(...hourlyTotals.map((entry) => entry.utterances), 0);
   const yAxisTicks = [1, 0.75, 0.5, 0.25, 0].map((ratio, index) => ({

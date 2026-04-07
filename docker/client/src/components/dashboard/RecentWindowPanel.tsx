@@ -18,7 +18,7 @@ const renderWindowLabel = (hours: WindowOption): string => {
   return `${hours}h`;
 };
 
-export const RecentWindowPanel: FunctionComponent = () => {
+export const RecentWindowPanel: FunctionComponent<{ refreshToken?: number }> = ({ refreshToken = 0 }) => {
   const [activeWindowHours, setActiveWindowHours] = useState<WindowOption>(24);
   const [data, setData] = useState<TimeWindowSummaryData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +48,7 @@ export const RecentWindowPanel: FunctionComponent = () => {
     return () => {
       window.clearInterval(pollHandle);
     };
-  }, [activeWindowHours, loadWindow]);
+  }, [activeWindowHours, loadWindow, refreshToken]);
 
   const statusLabel = useMemo(() => {
     if (isLoading) {

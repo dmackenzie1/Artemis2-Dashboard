@@ -1,4 +1,6 @@
 import type { FunctionComponent, FormEvent } from "react";
+import { useState } from "react";
+import { chat } from "../../api";
 import styles from "./MissionChatPanel.module.css";
 import type { ChatMessage } from "./types";
 import { DashboardPanel } from "./primitives/DashboardPanel";
@@ -6,23 +8,52 @@ import { LoadingIndicator } from "./primitives/LoadingIndicator";
 import { StatusBadge } from "./primitives/StatusBadge";
 import { useComponentIdentity } from "./primitives/useComponentIdentity";
 import { renderStructuredText } from "../../utils/formatting/renderStructuredText";
+import { clientLogger } from "../../utils/logging/clientLogger";
 
-type MissionChatPanelProps = {
-  chatInput: string;
-  isThinking: boolean;
-  chatMessages: ChatMessage[];
-  onChatInputChange: (value: string) => void;
-  onChatSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-};
+const starterQueries = [
+  "review key developments from the daily page for the latest transcript window",
+  "what changed in Orion ECLSS in the latest reviewed day?",
+  "review timeline risks over the most recent flight day",
+  "show mentions of comm dropouts in transcript context"
+];
 
-export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
-  chatInput,
-  isThinking,
-  chatMessages,
-  onChatInputChange,
-  onChatSubmit
-}) => {
+export const MissionChatPanel: FunctionComponent = () => {
+  const [chatInput, setChatInput] = useState(starterQueries[0]);
+  const [isThinking, setIsThinking] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   useComponentIdentity("mission-chat-panel");
+
+  const onChatSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+
+    const trimmed = chatInput.trim();
+    if (!trimmed || isThinking) {
+      return;
+    }
+
+    setChatMessages((previous) => [...previous, { role: "user", text: trimmed }]);
+    setIsThinking(true);
+
+    try {
+      const result = await chat(trimmed);
+      setChatMessages((previous) => [
+        ...previous,
+        {
+          role: "assistant",
+          text: result.answer,
+          strategy: result.strategy
+        }
+      ]);
+    } catch (error) {
+      clientLogger.error("Chat request failed", { error });
+      setChatMessages((previous) => [
+        ...previous,
+        { role: "assistant", text: "Unable to run chat right now. Please verify LLM connectivity and try again." }
+      ]);
+    } finally {
+      setIsThinking(false);
+    }
+  };
 
   return (
     <DashboardPanel
@@ -30,9 +61,7 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
       className={styles["mission-chat-panel"]}
       kicker="Intelligence Interface"
       title="Query Console"
-      headerAccessory={
-        <StatusBadge label={isThinking ? "Working" : "Ready"} />
-      }
+      headerAccessory={<StatusBadge label={isThinking ? "Working" : "Ready"} />}
     >
       <div className={styles["chat-layout"]}>
         <div className={styles["chat-window"]} role="log" aria-live="polite">
@@ -42,9 +71,7 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
           {chatMessages.map((message, index) => (
             <article
               key={`${message.role}-${index}`}
-              className={`${styles["chat-bubble"]} ${
-                message.role === "user" ? styles["chat-user"] : styles["chat-assistant"]
-              }`}
+              className={`${styles["chat-bubble"]} ${message.role === "user" ? styles["chat-user"] : styles["chat-assistant"]}`}
             >
               <header>{message.role === "user" ? "Operator" : "Mission Analyst"}</header>
               <div className={styles["chat-copy"]}>
@@ -64,7 +91,7 @@ export const MissionChatPanel: FunctionComponent<MissionChatPanelProps> = ({
         <form onSubmit={(event) => void onChatSubmit(event)} className={`${styles["chat-form"]} ${styles["chat-window-form"]}`}>
           <textarea
             value={chatInput}
-            onChange={(event) => onChatInputChange(event.target.value)}
+            onChange={(event) => setChatInput(event.target.value)}
             rows={3}
             placeholder="Ask a question about the transcripts."
           />
