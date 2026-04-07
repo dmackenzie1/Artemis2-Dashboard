@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: make the Daily page empty-state message render with high-contrast panel styling and explicit empty-array handling when no day records exist. Intent: Ensure operators can clearly read the ingestion guidance instead of a faint or missing empty-state message.
 - fix: default the Overview "What's New Right Now" Recent Transcript Review window selector to 3 hours instead of 24 hours. Intent: Align the initial panel scope with operator expectations for near-now transcript changes without requiring a manual window toggle.
 - fix: add `jsdom` at the root workspace devDependencies so frontend Vitest jsdom-environment tests resolve consistently when run from the repo root. Intent: Prevent CI/local workspace install drift from breaking React DOM test execution with `ERR_MODULE_NOT_FOUND` for `jsdom`.
 - feat: emit per-run ingestion event JSON artifacts into the prompt-submissions directory and surface them on the System Logs page alongside prompt request/response traces. Intent: Give operators explicit, file-backed audit entries whenever new data loads run so ingestion activity is visible without tailing container stdout.
