@@ -1,9 +1,7 @@
 import type { FC } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
-import { fetchHealth, triggerPipelineRun } from "./api";
-import type { HealthData } from "./api";
-import { StatusBadge } from "./components/dashboard/primitives/StatusBadge";
+import { triggerPipelineRun } from "./api";
 import { useComponentIdentity } from "./components/dashboard/primitives/useComponentIdentity";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DailyPage } from "./pages/DailyPage";
@@ -18,71 +16,17 @@ import { clientLogger } from "./utils/logging/clientLogger";
 import type { EmsspressobotController } from "./utils/emsspressobot";
 import { installEmsspressobot } from "./utils/emsspressobot";
 
-const HEALTH_POLL_INTERVAL_MS = 60 * 1000;
-
 export const App: FC = () => {
-  const [health, setHealth] = useState<HealthData | null>(null);
-  const [isRefreshingHealth, setIsRefreshingHealth] = useState(false);
-  const [reconnectState, setReconnectState] = useState<"idle" | "checking" | "reconnecting" | "pipeline-running">("idle");
   const [isAdminRefreshRunning, setIsAdminRefreshRunning] = useState(false);
   const [isEspressoBotVisible, setIsEspressoBotVisible] = useState(false);
   const emsspressobotRef = useRef<EmsspressobotController | null>(null);
   const location = useLocation();
   const { componentId, componentUid } = useComponentIdentity("app-shell");
 
-  const refreshHealth = async (): Promise<HealthData | null> => {
-    try {
-      const payload = await fetchHealth();
-      setHealth(payload);
-      return payload;
-    } catch (error) {
-      clientLogger.error("Topbar health poll failed", { error });
-      return null;
-    }
-  };
-
-  useEffect(() => {
-    void refreshHealth();
-    const pollHandle = window.setInterval(() => {
-      void refreshHealth();
-    }, HEALTH_POLL_INTERVAL_MS);
-    const onWindowFocus = (): void => {
-      void refreshHealth();
-    };
-    window.addEventListener("focus", onWindowFocus);
-
-    return () => {
-      window.clearInterval(pollHandle);
-      window.removeEventListener("focus", onWindowFocus);
-    };
-  }, []);
-
-  const connected = useMemo(() => (!health ? true : health.llm.connected), [health]);
-  const reconnectButtonLabel = useMemo(() => {
-    if (reconnectState === "checking") {
-      return "Checking…";
-    }
-
-    if (reconnectState === "reconnecting") {
-      return "Reconnecting…";
-    }
-
-    if (reconnectState === "pipeline-running") {
-      return "Pipeline running…";
-    }
-
-    return "Reconnect LLM";
-  }, [reconnectState]);
   const adminMode = useMemo(() => {
     const adminQueryValue = new URLSearchParams(location.search).get("admin");
     return adminQueryValue === "true";
   }, [location.search]);
-
-  useEffect(() => {
-    if (connected && reconnectState === "pipeline-running") {
-      setReconnectState("idle");
-    }
-  }, [connected, reconnectState]);
 
   useEffect(() => {
     if (isEspressoBotVisible) {
@@ -116,34 +60,6 @@ export const App: FC = () => {
     }
   };
 
-  const onReconnectClick = async (): Promise<void> => {
-    if (isRefreshingHealth) {
-      return;
-    }
-
-    setIsRefreshingHealth(true);
-    setReconnectState("checking");
-    try {
-      const latestHealth = await refreshHealth();
-      if (latestHealth?.llm.connected) {
-        setReconnectState("idle");
-        return;
-      }
-
-      setReconnectState("reconnecting");
-      const result = await triggerPipelineRun();
-      if (result.status === "already-running") {
-        setReconnectState("pipeline-running");
-      }
-      await refreshHealth();
-    } catch (error) {
-      clientLogger.error("LLM reconnect request failed", { error });
-      setReconnectState("idle");
-    } finally {
-      setIsRefreshingHealth(false);
-    }
-  };
-
   return (
     <div className={styles["app-shell"]} data-component-id={componentId} data-component-uid={componentUid}>
       <header className={styles.topbar}>
@@ -164,26 +80,6 @@ export const App: FC = () => {
           <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer">
             TalkyBot
           </a>
-          <div className={styles["topbar-status"]} title={connected ? "LLM connected" : "LLM disconnected"}>
-            <StatusBadge label={connected ? "connected" : "disconnected"} />
-          </div>
-          {!connected ? (
-            <button
-              type="button"
-              className={styles["reconnect-button"]}
-              onClick={() => {
-                void onReconnectClick();
-              }}
-              disabled={isRefreshingHealth}
-              title={
-                reconnectState === "pipeline-running"
-                  ? "Pipeline run is already in progress; click to recheck LLM health."
-                  : "Retry LLM health check and trigger pipeline refresh"
-              }
-            >
-              {reconnectButtonLabel}
-            </button>
-          ) : null}
           <button
             type="button"
             className={styles["espresso-toggle-button"]}
