@@ -19,6 +19,7 @@ import { SystemLogsService } from "./services/systemLogsService.js";
 import { createSystemLogsRouter } from "./routes/systemLogs.js";
 import { TimeWindowSummaryService } from "./services/timeWindowSummaryService.js";
 import { RedisLlmCache } from "./services/redisLlmCache.js";
+import { liveUpdateBus } from "./services/liveUpdateBus.js";
 
 const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
   await orm.em.getConnection().execute(`
@@ -70,6 +71,27 @@ const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<
 const app = express();
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json({ limit: "4mb" }));
+app.get("/api/events", (_req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+  res.write(`event: ready\ndata: ${JSON.stringify({ ok: true, connectedAt: new Date().toISOString() })}\n\n`);
+
+  const unsubscribe = liveUpdateBus.subscribe((event) => {
+    res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+  });
+
+  const keepAliveHandle = setInterval(() => {
+    res.write(": keepalive\n\n");
+  }, 25_000);
+
+  _req.on("close", () => {
+    clearInterval(keepAliveHandle);
+    unsubscribe();
+    res.end();
+  });
+});
 
 const redisLlmCache = env.REDIS_CACHE_ENABLED ? new RedisLlmCache(env.REDIS_URL) : null;
 if (redisLlmCache) {
@@ -152,7 +174,9 @@ const runTranscriptAndPipelineRefresh = async (): Promise<void> => {
 
   const currentPipelineService = pipelineService;
   if (currentPipelineService) {
+    liveUpdateBus.publish({ type: "pipeline.run.started", payload: { trigger: "ingestion-refresh" } });
     await currentPipelineService.runPipelineCycle();
+    liveUpdateBus.publish({ type: "pipeline.run.completed", payload: { trigger: "ingestion-refresh" } });
     serverLogger.info("Prompt workflow completed after ingestion");
   }
 };
@@ -174,6 +198,12 @@ const runAutoIngestion = async (): Promise<void> => {
     });
     const dashboard = await analysisService.ingestAndAnalyze();
     await runTranscriptAndPipelineRefresh();
+    liveUpdateBus.publish({
+      type: "dashboard.cache.updated",
+      payload: { trigger: "auto-ingestion", generatedAt: dashboard.generatedAt, totalDays: dashboard.days.length }
+    });
+    liveUpdateBus.publish({ type: "stats.updated", payload: { trigger: "auto-ingestion" } });
+    liveUpdateBus.publish({ type: "time-window-summary.updated", payload: { trigger: "auto-ingestion" } });
     serverLogger.info("Auto-ingestion completed", {
       reason,
       sourcePath,
@@ -253,8 +283,14 @@ const startPipelineSchedule = (): void => {
   const intervalMs = env.PIPELINE_INTERVAL_HOURS * 60 * 60 * 1000;
 
   setInterval(() => {
-    scheduledPipelineService.runPipelineCycle().catch(() => {
-      // no-op: failure is persisted in prompt_executions table
+    liveUpdateBus.publish({ type: "pipeline.run.started", payload: { trigger: "schedule" } });
+    scheduledPipelineService.runPipelineCycle().then(() => {
+      liveUpdateBus.publish({ type: "pipeline.run.completed", payload: { trigger: "schedule" } });
+    }).catch((error) => {
+      liveUpdateBus.publish({
+        type: "pipeline.run.failed",
+        payload: { trigger: "schedule", error: serializeUnknownError(error) }
+      });
     });
   }, intervalMs);
 };
@@ -298,6 +334,12 @@ app.use(
         });
       });
     }
+    liveUpdateBus.publish({
+      type: "dashboard.cache.updated",
+      payload: { trigger: "manual:/api/ingest", generatedAt: cache?.generatedAt ?? null, totalDays: cache?.days.length ?? null }
+    });
+    liveUpdateBus.publish({ type: "stats.updated", payload: { trigger: "manual:/api/ingest" } });
+    liveUpdateBus.publish({ type: "time-window-summary.updated", payload: { trigger: "manual:/api/ingest" } });
   }, () => statsService, () => timeWindowSummaryService)
 );
 
@@ -371,10 +413,18 @@ const runStartupIngestion = async (): Promise<void> => {
 
     const currentPipelineService = pipelineService;
     if (currentPipelineService) {
+      liveUpdateBus.publish({ type: "pipeline.run.started", payload: { trigger: "startup" } });
       await currentPipelineService.runPipelineCycle();
+      liveUpdateBus.publish({ type: "pipeline.run.completed", payload: { trigger: "startup" } });
       serverLogger.info("Startup prompt workflow completed");
       startPipelineSchedule();
     }
+    liveUpdateBus.publish({
+      type: "dashboard.cache.updated",
+      payload: { trigger: "startup", generatedAt: dashboard.generatedAt, totalDays: dashboard.days.length }
+    });
+    liveUpdateBus.publish({ type: "stats.updated", payload: { trigger: "startup" } });
+    liveUpdateBus.publish({ type: "time-window-summary.updated", payload: { trigger: "startup" } });
   } catch (error) {
     serverLogger.error("Startup ingestion failed", { error: serializeUnknownError(error) });
     await writeIngestionEventLog({
@@ -389,7 +439,23 @@ const runStartupIngestion = async (): Promise<void> => {
 };
 setInterval(() => {
   llmClient.checkConnectivity().then((status) => {
+    const statusChanged =
+      status.connected !== llmConnectivityStatus.connected ||
+      status.model !== llmConnectivityStatus.model ||
+      status.baseUrl !== llmConnectivityStatus.baseUrl ||
+      status.error !== llmConnectivityStatus.error;
     llmConnectivityStatus = status;
+    if (statusChanged) {
+      liveUpdateBus.publish({
+        type: "llm.connectivity.changed",
+        payload: {
+          connected: status.connected,
+          model: status.model,
+          baseUrl: status.baseUrl,
+          error: status.error
+        }
+      });
+    }
   }).catch(() => {
     // no-op
   });

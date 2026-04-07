@@ -12,7 +12,7 @@ import styles from "./RecentWindowPanel.module.css";
 const WINDOW_OPTIONS = [3, 6, 12, 24] as const;
 type WindowOption = (typeof WINDOW_OPTIONS)[number];
 
-const WINDOW_POLL_INTERVAL_MS = 5 * 60 * 1000;
+const WINDOW_POLL_INTERVAL_MS = 30 * 60 * 1000;
 
 const renderWindowLabel = (hours: WindowOption): string => {
   return `${hours}h`;

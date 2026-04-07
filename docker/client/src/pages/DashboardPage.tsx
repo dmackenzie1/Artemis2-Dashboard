@@ -8,6 +8,7 @@ import { UtterancesTimelinePanel } from "../components/dashboard/UtterancesTimel
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import styles from "./DashboardPage.module.css";
 import { useLocation } from "react-router-dom";
+import { subscribeToLiveUpdates } from "../utils/live/liveEvents";
 
 export const DashboardPage: FunctionComponent = () => {
   const { componentId, componentUid } = useComponentIdentity("dashboard-page");
@@ -28,6 +29,24 @@ export const DashboardPage: FunctionComponent = () => {
     window.addEventListener("dashboard-admin-refresh-requested", handleAdminRefresh);
     return () => {
       window.removeEventListener("dashboard-admin-refresh-requested", handleAdminRefresh);
+    };
+  }, []);
+
+  useEffect(() => {
+    const subscription = subscribeToLiveUpdates((event) => {
+      if (
+        event.type === "dashboard.cache.updated" ||
+        event.type === "stats.updated" ||
+        event.type === "time-window-summary.updated" ||
+        event.type === "pipeline.run.completed"
+      ) {
+        setRefreshToken((previous) => previous + 1);
+        setLastRefreshAt(event.emittedAt);
+      }
+    });
+
+    return () => {
+      subscription.close();
     };
   }, []);
 

@@ -17,8 +17,9 @@ import { AboutPage } from "./pages/AboutPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 import type { EmsspressobotController } from "./utils/emsspressobot";
 import { installEmsspressobot } from "./utils/emsspressobot";
+import { subscribeToLiveUpdates } from "./utils/live/liveEvents";
 
-const HEALTH_POLL_INTERVAL_MS = 60 * 1000;
+const HEALTH_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 export const App: FC = () => {
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -54,6 +55,18 @@ export const App: FC = () => {
     return () => {
       window.clearInterval(pollHandle);
       window.removeEventListener("focus", onWindowFocus);
+    };
+  }, []);
+
+  useEffect(() => {
+    const subscription = subscribeToLiveUpdates((event) => {
+      if (event.type === "llm.connectivity.changed") {
+        void refreshHealth();
+      }
+    });
+
+    return () => {
+      subscription.close();
     };
   }, []);
 
