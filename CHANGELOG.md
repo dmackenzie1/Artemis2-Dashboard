@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: add a dedicated About page with Artemis II/TalkyBot data-source context and a visible in-app software version readout from client package metadata. Intent: Give operators a single place to verify data provenance and confirm exactly which dashboard build/version they are using.
 - fix: clear stale Signal Chat answer/evidence state on new submits, and add jsdom-backed Signal Chat page tests covering success and failure paths. Intent: Ensure both the chat page and ranked-search evidence flow present only current request results and stay verifiably reliable during regressions.
 - docs: update frontend/top-level architecture docs to explicitly codify panel-level API ownership and parent-page refresh-notification boundaries for the Overview dashboard. Intent: Keep implementation and onboarding documentation accurate so maintainers preserve component independence and avoid reintroducing centralized data orchestration.
 - feat: randomize the shared mission background selection at client boot so each page load uses one image from the full bundled background set. Intent: Use newly added background assets to keep the dashboard shell visually fresh without changing page-specific layout or content behavior.
