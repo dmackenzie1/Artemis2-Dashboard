@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: add `jsdom` at the root workspace devDependencies so frontend Vitest jsdom-environment tests resolve consistently when run from the repo root. Intent: Prevent CI/local workspace install drift from breaking React DOM test execution with `ERR_MODULE_NOT_FOUND` for `jsdom`.
 - feat: add a dedicated About page with Artemis II/TalkyBot data-source context and a visible in-app software version readout from client package metadata. Intent: Give operators a single place to verify data provenance and confirm exactly which dashboard build/version they are using.
 - fix: clear stale Signal Chat answer/evidence state on new submits, and add jsdom-backed Signal Chat page tests covering success and failure paths. Intent: Ensure both the chat page and ranked-search evidence flow present only current request results and stay verifiably reliable during regressions.
 - docs: update frontend/top-level architecture docs to explicitly codify panel-level API ownership and parent-page refresh-notification boundaries for the Overview dashboard. Intent: Keep implementation and onboarding documentation accurate so maintainers preserve component independence and avoid reintroducing centralized data orchestration.
