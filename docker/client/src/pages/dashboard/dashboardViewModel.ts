@@ -41,12 +41,16 @@ const toPromptView = (
 };
 
 const toStats = (statsSummary: MissionStatsSummaryData | null): DashboardStat[] => {
+  if (!statsSummary) {
+    return [];
+  }
+
   return [
-    { label: "Min Day", value: statsSummary?.days.minDay ?? "n/a" },
-    { label: "Max Day", value: statsSummary?.days.maxDay ?? "n/a" },
-    { label: "Total Utterances", value: `${statsSummary?.totals.utterances ?? 0}` },
-    { label: "Total Words", value: `${statsSummary?.totals.words ?? 0}` },
-    { label: "Distinct Channels", value: `${statsSummary?.totals.channels ?? 0}` }
+    { label: "Min Day", value: statsSummary.days.minDay ?? "n/a" },
+    { label: "Max Day", value: statsSummary.days.maxDay ?? "n/a" },
+    { label: "Total Utterances", value: `${statsSummary.totals.utterances}` },
+    { label: "Total Words", value: `${statsSummary.totals.words}` },
+    { label: "Distinct Channels", value: `${statsSummary.totals.channels}` }
   ];
 };
 

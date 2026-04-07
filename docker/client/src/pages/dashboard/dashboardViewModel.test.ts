@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DashboardData, PipelineDashboardData } from "../../api";
+import type { DashboardData, MissionStatsSummaryData, PipelineDashboardData } from "../../api";
 import { buildDashboardViewModel } from "./dashboardViewModel";
 
 const createDashboardData = (missionSummary: string): DashboardData => ({
@@ -132,4 +132,39 @@ describe("buildDashboardViewModel", () => {
     expect(viewModel.dailySummary.statusLabel).toBe("ready");
     expect(viewModel.dailySummary.text).toBe("latest day summary from dashboard cache");
   });
+
+  it("keeps transcript metrics in loading state until stats summary payload arrives", () => {
+    const dashboardData = createDashboardData("Mission summary from ingestion cache");
+
+    const viewModel = buildDashboardViewModel(dashboardData, null, null);
+
+    expect(viewModel.stats).toEqual([]);
+  });
+
+  it("renders transcript metrics when stats summary payload is available", () => {
+    const dashboardData = createDashboardData("Mission summary from ingestion cache");
+    const statsSummary: MissionStatsSummaryData = {
+      generatedAt: "2026-04-06T00:00:00Z",
+      days: {
+        minDay: "2026-04-01",
+        maxDay: "2026-04-06"
+      },
+      totals: {
+        utterances: 1234,
+        words: 5678,
+        channels: 9
+      }
+    };
+
+    const viewModel = buildDashboardViewModel(dashboardData, null, statsSummary);
+
+    expect(viewModel.stats).toEqual([
+      { label: "Min Day", value: "2026-04-01" },
+      { label: "Max Day", value: "2026-04-06" },
+      { label: "Total Utterances", value: "1234" },
+      { label: "Total Words", value: "5678" },
+      { label: "Distinct Channels", value: "9" }
+    ]);
+  });
+
 });
