@@ -10,6 +10,7 @@ import { clientLogger } from "../utils/logging/clientLogger";
 export const DailyPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const { componentId, componentUid } = useComponentIdentity("daily-page");
+  const days = data?.days ?? [];
 
   useEffect(() => {
     let isMounted = true;
@@ -39,9 +40,9 @@ export const DailyPage: FC = () => {
 
   return (
     <div className={sharedStyles.stack} data-component-id={componentId} data-component-uid={componentUid}>
-      {data?.days.length ? (
+      {days.length ? (
         <nav className={styles["daily-day-nav"]} aria-label="Daily sections">
-          {data.days.map((day) => (
+          {days.map((day) => (
             <button
               className={styles["daily-day-nav-button"]}
               key={`daily-nav-${day.day}`}
@@ -53,30 +54,34 @@ export const DailyPage: FC = () => {
           ))}
         </nav>
       ) : null}
-      {data?.days.map((day) => (
-        <article
-          className={sharedStyles.panel}
-          id={`daily-day-${day.day}`}
-          key={day.day}
-          data-component-id="daily-day-panel"
-          data-component-uid={`${componentUid}-${day.day}`}
-        >
-          <h2>{day.day}</h2>
-          <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(day.summary, sharedStyles["formatted-list"])}</div>
-          <p>
-            Utterances: {day.stats.utteranceCount} | Words: {day.stats.wordCount} | Channels: {day.stats.channelCount}
-          </p>
-          <h3>Hourly Highlights</h3>
-          <div className={styles["hourly-highlight-grid"]}>
-            {Object.entries(day.hourly).map(([hour, summary]) => (
-              <section className={styles["hourly-highlight-card"]} key={hour}>
-                <p className={styles["hourly-highlight-hour"]}>{hour}</p>
-                <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(summary, sharedStyles["formatted-list"])}</div>
-              </section>
-            ))}
-          </div>
-        </article>
-      )) ?? <p>No data yet. Trigger ingestion on Overview page.</p>}
+      {days.length ? (
+        days.map((day) => (
+          <article
+            className={sharedStyles.panel}
+            id={`daily-day-${day.day}`}
+            key={day.day}
+            data-component-id="daily-day-panel"
+            data-component-uid={`${componentUid}-${day.day}`}
+          >
+            <h2>{day.day}</h2>
+            <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(day.summary, sharedStyles["formatted-list"])}</div>
+            <p>
+              Utterances: {day.stats.utteranceCount} | Words: {day.stats.wordCount} | Channels: {day.stats.channelCount}
+            </p>
+            <h3>Hourly Highlights</h3>
+            <div className={styles["hourly-highlight-grid"]}>
+              {Object.entries(day.hourly).map(([hour, summary]) => (
+                <section className={styles["hourly-highlight-card"]} key={hour}>
+                  <p className={styles["hourly-highlight-hour"]}>{hour}</p>
+                  <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(summary, sharedStyles["formatted-list"])}</div>
+                </section>
+              ))}
+            </div>
+          </article>
+        ))
+      ) : (
+        <p className={styles["daily-empty"]}>No data yet. Trigger ingestion on Overview page.</p>
+      )}
     </div>
   );
 };
