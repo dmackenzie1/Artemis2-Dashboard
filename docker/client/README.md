@@ -6,7 +6,8 @@ React 19 + Vite client for the TalkyBot Transcript Review Dashboard.
 
 This workspace owns:
 - Page routing and mission-review UX
-- Dashboard panel composition and page-level state orchestration
+- Dashboard panel composition with component-owned API/poll/error/result state
+- Parent-page refresh notification wiring (admin refresh signal only, no centralized overview fetch controller)
 - Typed API client wrappers for `/api/*`
 - Shared frontend formatting/logging helpers
 

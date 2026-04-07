@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- docs: update frontend/top-level architecture docs to explicitly codify panel-level API ownership and parent-page refresh-notification boundaries for the Overview dashboard. Intent: Keep implementation and onboarding documentation accurate so maintainers preserve component independence and avoid reintroducing centralized data orchestration.
 - feat: randomize the shared mission background selection at client boot so each page load uses one image from the full bundled background set. Intent: Use newly added background assets to keep the dashboard shell visually fresh without changing page-specific layout or content behavior.
 - fix: harden independently loaded Overview panels with per-request `Promise.allSettled` handling and explicit widget-level error states so partial source failures do not blank unaffected panel data. Intent: Preserve the component-isolated architecture while keeping each widget resilient when one of its own upstream APIs intermittently fails.
 - refactor: isolate Overview dashboard panels into independent data controllers so each widget owns its own async API polling, error handling, and refresh cycle while DashboardPage remains layout/refresh-notification focused. Intent: Enforce component-level isolation so panel failures or slow responses never block unrelated dashboard surfaces.

@@ -26,6 +26,12 @@ TalkyBot source system: https://talkybot.fit.nasa.gov/
 - Backend implementation map: `docker/server/README.md` and `docker/server/ARCHITECTURE.md`.
 - UI visual direction and guardrails: `docs/ui-design-guidance.md`.
 
+### Dashboard component ownership contract
+
+- Overview panel components are intentionally independent: each panel performs its own API calls, tracks its own loading/error/result state, and owns its own polling cadence.
+- `DashboardPage` is intentionally thin and only coordinates cross-panel refresh notifications (admin-triggered refresh token), not shared data orchestration.
+- This separation is required so one panel failure or slow API response does not block unrelated dashboard components.
+
 ## Quick start (Docker)
 
 1. Generate local env file from `env.config.ts`:
