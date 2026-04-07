@@ -1,0 +1,21 @@
+.about-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.about-panel h3 {
+  margin: 0.35rem 0 0;
+}
+
+.about-panel p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.about-panel strong {
+  color: var(--text-primary);
+}
+
+.about-panel a {
+  color: rgba(143, 218, 255, 0.96);
+}

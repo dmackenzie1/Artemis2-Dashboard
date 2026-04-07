@@ -13,6 +13,7 @@ import { TopicPage } from "./pages/TopicPage";
 import { NotableMomentsPage } from "./pages/NotableMomentsPage";
 import { SystemLogsPage } from "./pages/SystemLogsPage";
 import { SignalChatPage } from "./pages/SignalChatPage";
+import { AboutPage } from "./pages/AboutPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 import type { EmsspressobotController } from "./utils/emsspressobot";
 import { installEmsspressobot } from "./utils/emsspressobot";
@@ -159,6 +160,7 @@ export const App: FC = () => {
           <NavLink to="/notable">Notable</NavLink>
           <NavLink to="/chat">Chat</NavLink>
           <NavLink to="/system-logs">System Logs</NavLink>
+          <NavLink to="/about">About</NavLink>
           <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer">
             TalkyBot
           </a>
@@ -221,6 +223,7 @@ export const App: FC = () => {
           <Route path="/talkierag" element={<Navigate to="/" replace />} />
           <Route path="/chat" element={<SignalChatPage />} />
           <Route path="/system-logs" element={<SystemLogsPage />} />
+          <Route path="/about" element={<AboutPage />} />
           <Route path="/topics/:title" element={<TopicPage />} />
         </Routes>
       </main>
