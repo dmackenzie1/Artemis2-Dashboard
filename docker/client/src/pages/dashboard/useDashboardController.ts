@@ -38,25 +38,46 @@ export const useDashboardController = (): DashboardController => {
   const [chatInput, setChatInput] = useState(starterQueries[0]);
   const [isThinking, setIsThinking] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [hasLoadFailure, setHasLoadFailure] = useState(false);
+  const [dashboardLoadFailed, setDashboardLoadFailed] = useState(false);
+  const [pipelineLoadFailed, setPipelineLoadFailed] = useState(false);
+  const [statsSummaryLoadFailed, setStatsSummaryLoadFailed] = useState(false);
 
-  const loadData = useCallback(async (): Promise<void> => {
+  const loadDashboardCache = useCallback(async (): Promise<void> => {
     try {
-      const [dashboardPayload, pipelinePayload, statsSummaryPayload] = await Promise.all([
-        fetchDashboard(),
-        fetchPipelineDashboard(),
-        fetchStatsSummary()
-      ]);
-
+      const dashboardPayload = await fetchDashboard();
       setData(dashboardPayload);
-      setPipeline(pipelinePayload);
-      setStatsSummary(statsSummaryPayload);
-      setHasLoadFailure(false);
+      setDashboardLoadFailed(false);
     } catch (error) {
-      setHasLoadFailure(true);
-      clientLogger.error("Dashboard polling failed", { error });
+      setDashboardLoadFailed(true);
+      clientLogger.error("Dashboard cache polling failed", { error });
     }
   }, []);
+
+  const loadPipelineDashboard = useCallback(async (): Promise<void> => {
+    try {
+      const pipelinePayload = await fetchPipelineDashboard();
+      setPipeline(pipelinePayload);
+      setPipelineLoadFailed(false);
+    } catch (error) {
+      setPipelineLoadFailed(true);
+      clientLogger.error("Pipeline dashboard polling failed", { error });
+    }
+  }, []);
+
+  const loadStatsSummary = useCallback(async (): Promise<void> => {
+    try {
+      const statsSummaryPayload = await fetchStatsSummary();
+      setStatsSummary(statsSummaryPayload);
+      setStatsSummaryLoadFailed(false);
+    } catch (error) {
+      setStatsSummaryLoadFailed(true);
+      clientLogger.error("Stats summary polling failed", { error });
+    }
+  }, []);
+
+  const loadData = useCallback(async (): Promise<void> => {
+    await Promise.allSettled([loadDashboardCache(), loadPipelineDashboard(), loadStatsSummary()]);
+  }, [loadDashboardCache, loadPipelineDashboard, loadStatsSummary]);
 
   useEffect(() => {
     void loadData();
@@ -104,6 +125,7 @@ export const useDashboardController = (): DashboardController => {
   const viewModel = useMemo(() => {
     return buildDashboardViewModel(data, pipeline, statsSummary);
   }, [data, pipeline, statsSummary]);
+  const hasLoadFailure = dashboardLoadFailed || pipelineLoadFailed || statsSummaryLoadFailed;
 
   return {
     viewModel,
