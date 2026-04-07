@@ -7,7 +7,7 @@ import { PaneStateMessage } from "./primitives/PaneStateMessage";
 import { StatusBadge } from "./primitives/StatusBadge";
 import { clientLogger } from "../../utils/logging/clientLogger";
 
-const TIMELINE_POLL_INTERVAL_MS = 5 * 60 * 1000;
+const TIMELINE_POLL_INTERVAL_MS = 30 * 60 * 1000;
 
 export const UtterancesTimelinePanel: FC<{ refreshToken?: number }> = ({ refreshToken = 0 }) => {
   const [histogram, setHistogram] = useState<MissionHourlyChannelEntry[]>([]);

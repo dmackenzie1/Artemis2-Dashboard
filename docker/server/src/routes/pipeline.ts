@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { PipelineService } from "../services/pipelineService.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
+import { liveUpdateBus } from "../services/liveUpdateBus.js";
 
 export const createPipelineRouter = (pipelineService: PipelineService): Router => {
   const router = Router();
@@ -28,7 +29,14 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
     try {
       const wasAlreadyRunning = pipelineService.isPipelineRunInProgress();
       if (!wasAlreadyRunning) {
-        void pipelineService.runPipelineCycle().catch((error: unknown) => {
+        liveUpdateBus.publish({ type: "pipeline.run.started", payload: { trigger: "manual:/api/pipeline/run" } });
+        void pipelineService.runPipelineCycle().then(() => {
+          liveUpdateBus.publish({ type: "pipeline.run.completed", payload: { trigger: "manual:/api/pipeline/run" } });
+        }).catch((error: unknown) => {
+          liveUpdateBus.publish({
+            type: "pipeline.run.failed",
+            payload: { trigger: "manual:/api/pipeline/run", error: error instanceof Error ? error.message : "Unknown error" }
+          });
           serverLogger.error("Pipeline run failed after async trigger", {
             error: error instanceof Error ? error.message : "Unknown error"
           });
