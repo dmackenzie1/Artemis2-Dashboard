@@ -1,9 +1,7 @@
 import type { FC } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
-import { fetchHealth, triggerPipelineRun } from "./api";
-import type { HealthData } from "./api";
-import { StatusBadge } from "./components/dashboard/primitives/StatusBadge";
+import { triggerPipelineRun } from "./api";
 import { useComponentIdentity } from "./components/dashboard/primitives/useComponentIdentity";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DailyPage } from "./pages/DailyPage";
@@ -22,9 +20,6 @@ import { subscribeToLiveUpdates } from "./utils/live/liveEvents";
 const HEALTH_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 export const App: FC = () => {
-  const [health, setHealth] = useState<HealthData | null>(null);
-  const [isRefreshingHealth, setIsRefreshingHealth] = useState(false);
-  const [reconnectState, setReconnectState] = useState<"idle" | "checking" | "reconnecting" | "pipeline-running">("idle");
   const [isAdminRefreshRunning, setIsAdminRefreshRunning] = useState(false);
   const [isEspressoBotVisible, setIsEspressoBotVisible] = useState(false);
   const emsspressobotRef = useRef<EmsspressobotController | null>(null);
@@ -92,12 +87,6 @@ export const App: FC = () => {
   }, [location.search]);
 
   useEffect(() => {
-    if (connected && reconnectState === "pipeline-running") {
-      setReconnectState("idle");
-    }
-  }, [connected, reconnectState]);
-
-  useEffect(() => {
     if (isEspressoBotVisible) {
       emsspressobotRef.current = installEmsspressobot();
       return () => {
@@ -129,34 +118,6 @@ export const App: FC = () => {
     }
   };
 
-  const onReconnectClick = async (): Promise<void> => {
-    if (isRefreshingHealth) {
-      return;
-    }
-
-    setIsRefreshingHealth(true);
-    setReconnectState("checking");
-    try {
-      const latestHealth = await refreshHealth();
-      if (latestHealth?.llm.connected) {
-        setReconnectState("idle");
-        return;
-      }
-
-      setReconnectState("reconnecting");
-      const result = await triggerPipelineRun();
-      if (result.status === "already-running") {
-        setReconnectState("pipeline-running");
-      }
-      await refreshHealth();
-    } catch (error) {
-      clientLogger.error("LLM reconnect request failed", { error });
-      setReconnectState("idle");
-    } finally {
-      setIsRefreshingHealth(false);
-    }
-  };
-
   return (
     <div className={styles["app-shell"]} data-component-id={componentId} data-component-uid={componentUid}>
       <header className={styles.topbar}>
@@ -177,26 +138,6 @@ export const App: FC = () => {
           <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer">
             TalkyBot
           </a>
-          <div className={styles["topbar-status"]} title={connected ? "LLM connected" : "LLM disconnected"}>
-            <StatusBadge label={connected ? "connected" : "disconnected"} />
-          </div>
-          {!connected ? (
-            <button
-              type="button"
-              className={styles["reconnect-button"]}
-              onClick={() => {
-                void onReconnectClick();
-              }}
-              disabled={isRefreshingHealth}
-              title={
-                reconnectState === "pipeline-running"
-                  ? "Pipeline run is already in progress; click to recheck LLM health."
-                  : "Retry LLM health check and trigger pipeline refresh"
-              }
-            >
-              {reconnectButtonLabel}
-            </button>
-          ) : null}
           <button
             type="button"
             className={styles["espresso-toggle-button"]}

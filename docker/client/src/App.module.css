@@ -88,10 +88,6 @@
   box-shadow: 0 0 14px rgba(72, 156, 238, 0.24);
 }
 
-.topbar-status {
-  margin-left: 0.18rem;
-}
-
 .espresso-toggle-button {
   width: 1.9rem;
   height: 1.9rem;
@@ -118,13 +114,6 @@
   line-height: 1;
   font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
   justify-self: auto;
-}
-
-.reconnect-button {
-  letter-spacing: 0.08em;
-  padding: 0.34rem 0.72rem;
-  border-radius: 999px;
-  font-size: 0.65rem;
 }
 
 @media (max-width: 920px) {
