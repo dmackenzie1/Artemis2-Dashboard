@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: add `jsdom` at the root workspace devDependencies so frontend Vitest jsdom-environment tests resolve consistently when run from the repo root. Intent: Prevent CI/local workspace install drift from breaking React DOM test execution with `ERR_MODULE_NOT_FOUND` for `jsdom`.
 - feat: emit per-run ingestion event JSON artifacts into the prompt-submissions directory and surface them on the System Logs page alongside prompt request/response traces. Intent: Give operators explicit, file-backed audit entries whenever new data loads run so ingestion activity is visible without tailing container stdout.
 - feat: add a dedicated About page with Artemis II/TalkyBot data-source context and a visible in-app software version readout from client package metadata. Intent: Give operators a single place to verify data provenance and confirm exactly which dashboard build/version they are using.
 - fix: clear stale Signal Chat answer/evidence state on new submits, and add jsdom-backed Signal Chat page tests covering success and failure paths. Intent: Ensure both the chat page and ranked-search evidence flow present only current request results and stay verifiably reliable during regressions.
