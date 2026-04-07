@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: randomize the shared mission background selection at client boot so each page load uses one image from the full bundled background set. Intent: Use newly added background assets to keep the dashboard shell visually fresh without changing page-specific layout or content behavior.
 - fix: harden independently loaded Overview panels with per-request `Promise.allSettled` handling and explicit widget-level error states so partial source failures do not blank unaffected panel data. Intent: Preserve the component-isolated architecture while keeping each widget resilient when one of its own upstream APIs intermittently fails.
 - refactor: isolate Overview dashboard panels into independent data controllers so each widget owns its own async API polling, error handling, and refresh cycle while DashboardPage remains layout/refresh-notification focused. Intent: Enforce component-level isolation so panel failures or slow responses never block unrelated dashboard surfaces.
 - refactor: decouple Overview dashboard data polling so each panel updates from its own request lifecycle (dashboard cache, pipeline prompt output, and stats summary) and keep Transcript Metrics in a true loading state until stats arrive. Intent: Eliminate cross-panel blocking so cached prompt outputs and mission stats render as soon as each source is ready.
