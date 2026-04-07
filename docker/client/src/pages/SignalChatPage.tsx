@@ -27,6 +27,8 @@ export const SignalChatPage: FunctionComponent = () => {
     }
 
     setError(null);
+    setSearchResponse(null);
+    setChatResponse(null);
     setIsThinking(true);
 
     try {
@@ -35,6 +37,8 @@ export const SignalChatPage: FunctionComponent = () => {
       setChatResponse(chatPayload);
     } catch (requestError) {
       clientLogger.error("Signal chat request failed", { error: requestError, mode });
+      setSearchResponse(null);
+      setChatResponse(null);
       setError("Unable to retrieve Signal Chat results right now.");
     } finally {
       setIsThinking(false);
