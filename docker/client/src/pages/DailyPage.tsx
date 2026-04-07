@@ -5,13 +5,31 @@ import { useComponentIdentity } from "../components/dashboard/primitives/useComp
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./DailyPage.module.css";
 import { renderStructuredText } from "../utils/formatting/renderStructuredText";
+import { clientLogger } from "../utils/logging/clientLogger";
 
 export const DailyPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const { componentId, componentUid } = useComponentIdentity("daily-page");
 
   useEffect(() => {
-    void fetchDashboard().then((payload) => setData(payload));
+    let isMounted = true;
+
+    const loadDailyDashboard = async (): Promise<void> => {
+      try {
+        const payload = await fetchDashboard();
+        if (isMounted) {
+          setData(payload);
+        }
+      } catch (error) {
+        clientLogger.error("Failed to load daily dashboard", { error });
+      }
+    };
+
+    void loadDailyDashboard();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const scrollToDay = (day: string): void => {
