@@ -92,6 +92,16 @@ type ParsedDailySummarySection = {
   summary: string;
 };
 
+type SourceDocumentSyncResult = {
+  changedDocuments: number;
+  changedDayKeys: string[];
+};
+
+type PromptDefinitionSyncResult = {
+  changedPrompts: number;
+  changedPromptKeys: string[];
+};
+
 export class PipelineService {
   private runInProgress = false;
   private missionStatsCache: { computedAtMs: number; payload: MissionStatsView } | null = null;
@@ -558,12 +568,28 @@ export class PipelineService {
     await em.flush();
   }
 
-  async syncSourceDocuments(): Promise<number> {
+  private filterSourceContextByDayKeys(sourceContext: SourceContextDocument[], dayKeys: Set<string>): SourceContextDocument[] {
+    if (dayKeys.size === 0) {
+      return sourceContext;
+    }
+
+    return sourceContext.filter((document) => dayKeys.has(this.deriveDayKey(document.path)));
+  }
+
+  private buildDailySummaryOutputFromCache(daySummaries: DailySummary[]): string {
+    return daySummaries
+      .sort((left, right) => left.day.localeCompare(right.day))
+      .map((summary) => `## ${summary.day}\n\n${summary.summary}`)
+      .join("\n\n");
+  }
+
+  async syncSourceDocuments(): Promise<SourceDocumentSyncResult> {
     const em = this.getEntityManager();
     const entries = await fs.readdir(this.config.sourceFilesDir, { withFileTypes: true });
     const files = entries.filter((entry) => entry.isFile()).map((entry) => entry.name).sort();
     const now = dayjs().utc().toDate();
     let changedCount = 0;
+    const changedDayKeys = new Set<string>();
 
     for (const fileName of files) {
       const relativePath = fileName;
@@ -584,6 +610,7 @@ export class PipelineService {
 
         em.persist(created);
         changedCount += 1;
+        changedDayKeys.add(this.deriveDayKey(relativePath));
         continue;
       }
 
@@ -593,14 +620,18 @@ export class PipelineService {
         existing.fileModifiedAt = stat.mtime;
         existing.ingestedAt = now;
         changedCount += 1;
+        changedDayKeys.add(this.deriveDayKey(relativePath));
       }
     }
 
     await em.flush();
-    return changedCount;
+    return {
+      changedDocuments: changedCount,
+      changedDayKeys: [...changedDayKeys].sort((left, right) => left.localeCompare(right))
+    };
   }
 
-  async syncPromptDefinitions(): Promise<void> {
+  async syncPromptDefinitions(): Promise<PromptDefinitionSyncResult> {
     const em = this.getEntityManager();
     const entries = await fs.readdir(this.config.promptsDir, { withFileTypes: true });
     const promptFiles = entries
@@ -609,6 +640,7 @@ export class PipelineService {
       .sort();
 
     const now = dayjs().utc().toDate();
+    const changedPromptKeys = new Set<string>();
 
     for (const fileName of promptFiles) {
       const promptText = await fs.readFile(path.join(this.config.promptsDir, fileName), "utf8");
@@ -623,6 +655,7 @@ export class PipelineService {
           updatedAt: now
         });
         em.persist(created);
+        changedPromptKeys.add(key);
         continue;
       }
 
@@ -630,10 +663,15 @@ export class PipelineService {
         existing.content = promptText;
         existing.key = key;
         existing.updatedAt = now;
+        changedPromptKeys.add(key);
       }
     }
 
     await em.flush();
+    return {
+      changedPrompts: changedPromptKeys.size,
+      changedPromptKeys: [...changedPromptKeys].sort((left, right) => left.localeCompare(right))
+    };
   }
 
   async runPipelineCycle(): Promise<void> {
@@ -644,9 +682,13 @@ export class PipelineService {
     this.runInProgress = true;
     try {
       await this.markStaleRunningExecutionsAsFailed();
-      await this.syncSourceDocuments();
-      await this.syncPromptDefinitions();
-      await this.executePromptsSequentially();
+      const sourceSyncResult = await this.syncSourceDocuments();
+      const promptSyncResult = await this.syncPromptDefinitions();
+      await this.executePromptsSequentially({
+        changedDayKeys: new Set(sourceSyncResult.changedDayKeys),
+        changedPromptKeys: new Set(promptSyncResult.changedPromptKeys),
+        sourceDocumentsChanged: sourceSyncResult.changedDocuments > 0
+      });
       this.missionStatsCache = null;
     } finally {
       this.runInProgress = false;
@@ -677,7 +719,11 @@ export class PipelineService {
     });
   }
 
-  async executePromptsSequentially(): Promise<void> {
+  async executePromptsSequentially(options?: {
+    changedDayKeys?: Set<string>;
+    changedPromptKeys?: Set<string>;
+    sourceDocumentsChanged?: boolean;
+  }): Promise<void> {
     const em = this.getEntityManager();
     const allPrompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
     const prompts = this.buildPromptQueue(allPrompts);
@@ -688,11 +734,35 @@ export class PipelineService {
       checksum: doc.checksum,
       content: doc.content
     }));
+    const changedDayKeys = options?.changedDayKeys ?? new Set<string>();
+    const changedPromptKeys = options?.changedPromptKeys ?? new Set<string>();
+    const sourceDocumentsChanged = options?.sourceDocumentsChanged ?? true;
     let latestDailySummaryOutput: string | null = null;
 
     for (const prompt of prompts) {
+      const promptChanged = changedPromptKeys.has(prompt.key);
+      const shouldRunPrompt =
+        prompt.key === "mission_summary"
+          ? sourceDocumentsChanged || promptChanged || latestDailySummaryOutput !== null
+          : sourceDocumentsChanged || promptChanged;
+      if (!shouldRunPrompt) {
+        continue;
+      }
+
       const startedAt = dayjs().utc().toDate();
-      const submittedText = await this.buildPromptSubmission(prompt, sourceContext);
+      const promptSourceContext =
+        prompt.key === "daily_summary" && changedDayKeys.size > 0 && !promptChanged
+          ? this.filterSourceContextByDayKeys(sourceContext, changedDayKeys)
+          : sourceContext;
+      if ((prompt.key === "daily_summary" || prompt.key === "notable_moments") && promptSourceContext.length === 0) {
+        continue;
+      }
+
+      const submittedText = await this.buildPromptSubmission(prompt, promptSourceContext);
+      if (prompt.key === "mission_summary" && !latestDailySummaryOutput) {
+        const existingDailySummaries = await em.find(DailySummary, {}, { orderBy: { day: "asc" } });
+        latestDailySummaryOutput = this.buildDailySummaryOutputFromCache(existingDailySummaries);
+      }
       const missionSubmittedText: string =
         prompt.key === "mission_summary" && latestDailySummaryOutput
           ? JSON.stringify(
@@ -729,9 +799,9 @@ export class PipelineService {
       try {
         const output =
           prompt.key === "daily_summary"
-            ? await this.generateDailySummaryOutput(prompt, sourceContext)
+            ? await this.generateDailySummaryOutput(prompt, promptSourceContext)
             : prompt.key === "notable_moments"
-              ? await this.generateNotableMomentsOutput(prompt, sourceContext)
+              ? await this.generateNotableMomentsOutput(prompt, promptSourceContext)
             : await this.config.llmClient.generateText({
                 systemPrompt: prompt.content,
                 userPrompt: missionSubmittedText,
@@ -745,7 +815,7 @@ export class PipelineService {
         execution.finishedAt = dayjs().utc().toDate();
         if (prompt.key === "daily_summary") {
           latestDailySummaryOutput = output;
-          await this.persistDailySummaries(output, sourceContext);
+          await this.persistDailySummaries(output, promptSourceContext);
         }
         serverLogger.info("Prompt response received", {
           promptKey: prompt.key,
@@ -807,10 +877,13 @@ export class PipelineService {
   }
 
   async runManualReingest(): Promise<{ changedDocuments: number }> {
-    const changedDocuments = await this.syncSourceDocuments();
-    serverLogger.info("Source documents reingested", { changedDocuments });
+    const result = await this.syncSourceDocuments();
+    serverLogger.info("Source documents reingested", {
+      changedDocuments: result.changedDocuments,
+      changedDays: result.changedDayKeys
+    });
     this.missionStatsCache = null;
-    return { changedDocuments };
+    return { changedDocuments: result.changedDocuments };
   }
 
   async getMissionStatsView(): Promise<MissionStatsView> {
