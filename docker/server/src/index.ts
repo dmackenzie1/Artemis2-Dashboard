@@ -364,7 +364,13 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
     sourceFilesDir: env.SOURCE_FILES_DIR,
     promptsDir: env.PROMPTS_DIR,
     llmClient,
-    promptSubmissionsDir: env.PROMPT_SUBMISSIONS_DIR
+    promptSubmissionsDir: env.PROMPT_SUBMISSIONS_DIR,
+    notableMoments: {
+      baselinePerDay: env.NOTABLE_MOMENTS_BASELINE_PER_DAY,
+      minPerDay: env.NOTABLE_MOMENTS_MIN_PER_DAY,
+      highSignalPerDay: env.NOTABLE_MOMENTS_HIGH_SIGNAL_PER_DAY,
+      maxPerDay: env.NOTABLE_MOMENTS_MAX_PER_DAY
+    }
   });
 
   app.use("/api/pipeline", createPipelineRouter(pipelineService));

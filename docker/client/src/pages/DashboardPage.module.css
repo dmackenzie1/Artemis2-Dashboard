@@ -2,22 +2,38 @@
   display: grid;
   gap: 0.58rem;
   height: calc(100vh - 78px);
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 0.76fr);
   grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) minmax(160px, 0.8fr);
+  grid-template-areas:
+    "text stats"
+    "text chat"
+    "bottom bottom";
 }
 
-.dashboard-top-row,
-.dashboard-mid-row {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(320px, 0.76fr);
-  gap: 0.58rem;
+.dashboard-text-pane,
+.dashboard-stats-pane,
+.dashboard-chat-pane,
+.dashboard-bottom-row {
   min-height: 0;
+}
+
+.dashboard-text-pane {
+  grid-area: text;
+}
+
+.dashboard-stats-pane {
+  grid-area: stats;
+}
+
+.dashboard-chat-pane {
+  grid-area: chat;
 }
 
 .dashboard-bottom-row {
+  grid-area: bottom;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0.58rem;
-  min-height: 0;
 }
 
 .dashboard-admin-hint {
@@ -30,12 +46,12 @@
 @media (max-width: 1220px) {
   .dashboard-layout {
     height: auto;
-    grid-template-rows: auto;
-  }
-
-  .dashboard-top-row,
-  .dashboard-mid-row,
-  .dashboard-bottom-row {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas:
+      "text"
+      "stats"
+      "chat"
+      "bottom";
   }
 }

@@ -26,6 +26,7 @@ const parseDayPayload = (rawDay: string): NotableMomentsDay | null => {
 
 export const NotableMomentsPage: FunctionComponent = () => {
   const [data, setData] = useState<NotableMomentsData | null>(null);
+  const [showReasoning, setShowReasoning] = useState(false);
   const { componentId, componentUid } = useComponentIdentity("notable-moments-page");
 
   useEffect(() => {
@@ -67,8 +68,16 @@ export const NotableMomentsPage: FunctionComponent = () => {
       <section className={sharedStyles.panel}>
         <h2 className={styles["notable-moments-title"]}>Notable Moments</h2>
         <p className={sharedStyles.subtle}>
-          Top {data?.targetMomentsPerDay ?? 10} utterances per day selected by the notable moments prompt pipeline.
+          Quote-forward daily highlights with a baseline target of {data?.targetMomentsPerDay ?? 10}, scaled up for high-signal days.
         </p>
+        <label className={styles["reason-toggle"]}>
+          <input
+            checked={showReasoning}
+            onChange={(event) => setShowReasoning(event.target.checked)}
+            type="checkbox"
+          />
+          Show analysis rationale under each quote
+        </label>
       </section>
 
       {days.length ? (
@@ -101,15 +110,15 @@ export const NotableMomentsPage: FunctionComponent = () => {
               <h2>{dayEntry.day}</h2>
             </div>
             <div className={styles["notable-moment-grid"]}>
-              {dayEntry.moments.map((moment, momentIndex) => (
+              {dayEntry.moments.map((moment) => (
                 <section
-                  className={`${styles["notable-moment-card"]} ${styles[`notable-moment-card-${momentIndex % 6}`]}`}
+                  className={styles["notable-moment-card"]}
                   key={`${dayEntry.day}-${moment.rank}-${moment.title}`}
                 >
                   <p className={styles["notable-moment-rank"]}>#{moment.rank}</p>
                   <h3>{moment.title}</h3>
                   <blockquote className={styles["notable-moment-quote"]}>{moment.quote}</blockquote>
-                  <p>{moment.reason}</p>
+                  {showReasoning && moment.reason.trim().length > 0 ? <p>{moment.reason}</p> : null}
                   <p className={styles["notable-moment-meta"]}>
                     {moment.timestamp ?? "timestamp n/a"} • {moment.channel ?? "channel n/a"}
                   </p>

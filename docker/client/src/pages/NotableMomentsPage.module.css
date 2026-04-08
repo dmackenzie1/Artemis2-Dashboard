@@ -11,6 +11,15 @@
   gap: 0.72rem;
 }
 
+.reason-toggle {
+  margin-top: 0.62rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
 .notable-moment-day-divider {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -38,13 +47,6 @@
   background: linear-gradient(180deg, rgba(10, 24, 44, 0.5), rgba(8, 16, 32, 0.44));
   min-height: 172px;
 }
-
-.notable-moment-card-0 { transform: translateX(-8px); }
-.notable-moment-card-1 { transform: translateX(6px); }
-.notable-moment-card-2 { transform: translateX(0); }
-.notable-moment-card-3 { transform: translateX(8px); }
-.notable-moment-card-4 { transform: translateX(-5px); }
-.notable-moment-card-5 { transform: translateX(4px); }
 
 .notable-moment-card h3 {
   margin: 0.28rem 0 0.38rem;
@@ -87,15 +89,6 @@
 @media (max-width: 1180px) {
   .notable-moment-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .notable-moment-card-0,
-  .notable-moment-card-1,
-  .notable-moment-card-2,
-  .notable-moment-card-3,
-  .notable-moment-card-4,
-  .notable-moment-card-5 {
-    transform: none;
   }
 }
 

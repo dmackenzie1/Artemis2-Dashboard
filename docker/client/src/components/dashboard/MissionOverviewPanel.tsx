@@ -96,7 +96,7 @@ export const MissionOverviewPanel: FunctionComponent<{ refreshToken?: number }> 
         <PaneStateMessage message="Unable to refresh mission review summary right now. Retrying automatically." tone="error" />
       ) : null}
       {hasSummary ? (
-        <div className={styles["summary-scroll-copy"]}>
+        <div className={sharedStyles["panel-scroll-copy"]}>
           <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(panelState.summaryText, sharedStyles["formatted-list"])}</div>
         </div>
       ) : !hasError ? (

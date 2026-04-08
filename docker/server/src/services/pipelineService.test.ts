@@ -19,7 +19,13 @@ const createPipelineService = (): PipelineService => {
     sourceFilesDir: "/tmp/source-files",
     promptsDir: "/tmp/prompts",
     promptSubmissionsDir: "/tmp/prompt-submissions",
-    llmClient: llmClient as unknown as LlmClient
+    llmClient: llmClient as unknown as LlmClient,
+    notableMoments: {
+      baselinePerDay: 10,
+      minPerDay: 4,
+      highSignalPerDay: 15,
+      maxPerDay: 24
+    }
   });
 };
 

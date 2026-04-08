@@ -24,7 +24,11 @@ const EnvSchema = z.object({
   REDIS_URL: z.string().default("redis://redis:6379"),
   REDIS_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 60),
   REDIS_CACHE_STALE_TTL_SECONDS: z.coerce.number().int().nonnegative().default(60 * 60),
-  REDIS_CACHE_ENABLED: z.coerce.boolean().default(true)
+  REDIS_CACHE_ENABLED: z.coerce.boolean().default(true),
+  NOTABLE_MOMENTS_BASELINE_PER_DAY: z.coerce.number().int().min(1).max(24).default(10),
+  NOTABLE_MOMENTS_MIN_PER_DAY: z.coerce.number().int().min(1).max(24).default(4),
+  NOTABLE_MOMENTS_HIGH_SIGNAL_PER_DAY: z.coerce.number().int().min(1).max(24).default(15),
+  NOTABLE_MOMENTS_MAX_PER_DAY: z.coerce.number().int().min(1).max(24).default(24)
 });
 
 export const env = EnvSchema.parse(process.env);

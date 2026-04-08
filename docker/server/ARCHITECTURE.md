@@ -38,6 +38,7 @@ This document is the implementation map for `docker/server/src`.
 | `entities/SourceDocument.ts` | Source document persistence model used by prompts. |
 | `entities/PromptDefinition.ts` | Prompt definition persistence model for tracked prompt files. |
 | `entities/PromptExecution.ts` | Prompt execution history/cache persistence model. |
+| `entities/DailySummary.ts` | Persisted day-level summary artifact store (summary + generated metadata + per-day counts). |
 | `lib/csvIngest.ts` | Low-level CSV parsing + row normalization helpers. |
 | `lib/csvIngest.test.ts` | CSV parsing/edge-case unit tests. |
 | `lib/dayjs.ts` | Shared UTC-configured dayjs singleton bootstrap. |
@@ -49,3 +50,8 @@ This document is the implementation map for `docker/server/src`.
 
 - No orphaned route modules or services were found in `src/`; all route factories are mounted from `index.ts`.
 - `ts-prune` currently reports only type exports used in-module (false positives) for server files; no confirmed dead runtime exports were removed.
+
+## Pipeline storage update (April 8, 2026)
+
+- Daily summary prompt output is now parsed and upserted into `daily_summaries` with metadata (`generatedAt`, `wordCount`, `utteranceCount`, `sourceDocumentCount`) for deterministic reuse.
+- Notable moments daily targets are now configurable by environment and can scale up for high-signal days.
