@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chat, fetchDashboard, fetchHealth, fetchStatsSummary, searchUtterances, triggerIngest } from "./api";
+import { chat, fetchDashboard, fetchHealth, fetchStatsSummary, searchUtterances } from "./api";
 
 const mockFetch = vi.fn<typeof fetch>();
 
@@ -19,13 +19,6 @@ describe("api helpers", () => {
 
     await expect(fetchDashboard()).resolves.toEqual(payload);
     expect(mockFetch).toHaveBeenCalledWith("/api/dashboard");
-  });
-
-  it("throws if ingest endpoint fails", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 } as Response);
-
-    await expect(triggerIngest()).rejects.toThrow("Unable to ingest data");
-    expect(mockFetch).toHaveBeenCalledWith("/api/ingest", { method: "POST" });
   });
 
   it("sends chat request with body", async () => {

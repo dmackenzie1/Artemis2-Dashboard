@@ -61,7 +61,7 @@ export const TopicPage: FC = () => {
       <h2>{topic.title}</h2>
       <p>{topic.description}</p>
       <p>First seen day: {topic.day.day}</p>
-      <p>Channels: {topic.channels.join(", ") || "TBD by model"}</p>
+      <p>Channels: {topic.channels.join(", ") || "No channel metadata available yet"}</p>
       <ul>
         {topic.mentionTimestamps.map((timestamp) => (
           <li key={timestamp}>

@@ -231,12 +231,12 @@ export class LlmClient {
       await mkdir(directionDirectoryPath, { recursive: true });
 
       if (!this.debugDirectoryInitialized) {
-        const todoFilePath = path.join(this.debugPromptsDir, "README-TODO-DELETE-ME.txt");
+        const todoFilePath = path.join(this.debugPromptsDir, "README-DEBUG-ARTIFACTS.txt");
         await writeFile(
           todoFilePath,
           [
             "Temporary debug artifacts for LLM prompts/responses.",
-            "TODO: Delete this directory and disable LLM_DEBUG_PROMPTS_DIR after debugging is complete."
+            "Disable LLM_DEBUG_PROMPTS_DIR when debug artifact capture is no longer needed."
           ].join("\n"),
           "utf8"
         );

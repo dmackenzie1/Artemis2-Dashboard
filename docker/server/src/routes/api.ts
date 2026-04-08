@@ -50,19 +50,6 @@ export const createApiRouter = (
     res.json(timeline);
   });
 
-  router.get("/stats", (_req, res) => {
-    const cache = analysisService.getCache();
-    const stats =
-      cache?.days.map((day) => ({
-        day: day.day,
-        utterances: day.stats.utteranceCount,
-        words: day.stats.wordCount,
-        channels: day.stats.channelCount
-      })) ?? [];
-
-    res.json(stats);
-  });
-
   router.get("/stats/summary", async (_req, res, next) => {
     try {
       serverLogger.info("Stats summary requested");
@@ -76,23 +63,6 @@ export const createApiRouter = (
       res.json(payload);
     } catch (error) {
       serverLogger.error("Stats summary request failed", { error: serializeUnknownError(error) });
-      next(error);
-    }
-  });
-
-  router.get("/stats/days", async (_req, res, next) => {
-    try {
-      serverLogger.info("Daily stats requested");
-      const statsService = getStatsService?.();
-      if (!statsService) {
-        res.status(503).json({ message: "Stats DB is disabled. Enable TRANSCRIPTS_DB_ENABLED for database-backed stats." });
-        return;
-      }
-
-      const payload = await statsService.getStatsByDay();
-      res.json(payload);
-    } catch (error) {
-      serverLogger.error("Daily stats request failed", { error: serializeUnknownError(error) });
       next(error);
     }
   });
