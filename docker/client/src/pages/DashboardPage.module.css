@@ -1,9 +1,9 @@
 .dashboard-layout {
   display: grid;
   gap: 0.58rem;
-  height: calc(100vh - 78px);
+  height: calc(100vh - 78px - 1.16rem);
   grid-template-columns: minmax(0, 1fr) minmax(330px, 0.58fr);
-  grid-template-rows: minmax(0, 1fr) minmax(160px, 0.8fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas:
     "text side"
     "bottom bottom";
@@ -38,6 +38,7 @@
 
 .dashboard-bottom-row {
   grid-area: bottom;
+  align-self: end;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0.58rem;

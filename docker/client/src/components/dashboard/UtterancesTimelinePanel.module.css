@@ -4,9 +4,13 @@
 
 .timeline-strip-panel :global(.panel-body) {
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .timeline-chart-shell {
+  height: 100%;
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
   align-items: stretch;
