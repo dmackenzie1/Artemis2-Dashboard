@@ -108,3 +108,33 @@ describe("PipelineService prompt queue ordering", () => {
     expect(orderedPrompts.map((prompt) => prompt.key)).toEqual(["daily_summary", "mission_summary", "top_topics"]);
   });
 });
+
+describe("PipelineService incremental daily targeting", () => {
+  it("filters source documents to only changed day keys", () => {
+    const service = createPipelineService();
+    const sourceContext: SourceContextDocument[] = [
+      {
+        path: "2026-04-07_summary.csv",
+        checksum: "checksum-1",
+        content: "day-7-content"
+      },
+      {
+        path: "2026-04-08_summary.csv",
+        checksum: "checksum-2",
+        content: "day-8-content"
+      }
+    ];
+
+    const filtered = (service as unknown as {
+      filterSourceContextByDayKeys: (documents: SourceContextDocument[], dayKeys: Set<string>) => SourceContextDocument[];
+    }).filterSourceContextByDayKeys(sourceContext, new Set(["2026-04-08"]));
+
+    expect(filtered).toEqual([
+      {
+        path: "2026-04-08_summary.csv",
+        checksum: "checksum-2",
+        content: "day-8-content"
+      }
+    ]);
+  });
+});
