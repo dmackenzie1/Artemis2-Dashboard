@@ -96,7 +96,7 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
       entries: stats.filter((stat) => stat.label.includes("Total"))
     },
     {
-      title: "Scope",
+      title: "Full Scope",
       entries: stats.filter((stat) => stat.label.includes("Distinct"))
     }
   ].filter((group) => group.entries.length > 0);
