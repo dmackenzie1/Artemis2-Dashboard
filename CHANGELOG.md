@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- refactor: remove unused legacy API surfaces (`/api/stats`, `/api/stats/days`, `/api/pipeline/ingest`, `/api/pipeline/stats`), retire stale planning artifacts, and align fallback metadata/debug copy (`unknown-component`, non-TODO debug marker text, and clearer topic channel empty-state wording). Intent: Reduce maintenance overhead by trimming unconsumed endpoints and operator-facing placeholder debt while keeping runtime behavior focused on active workflows.
 - feat: unify the Overview long-form text experience into one double-height Mission Text Workspace (3h/6h/12h/Complete), persist daily summary artifacts in a dedicated database table with run metadata/counts, and retune notable moments/timeline density plus quote-card layout controls. Intent: Simplify operator scanning to one primary transcript intelligence pane while making reusable summary storage and high-signal quote surfacing production-ready.
 - fix: resolve App shell socket merge fallout by removing orphaned topbar health/reconnect wiring that referenced deleted state/imports and restoring a compile-safe navigation shell. Intent: Recover a buildable frontend after conflicting socket and reconnect-control branches left `App.tsx` in a partially merged state.
 - feat: add sticky day shortcut buttons to the Notable Moments page and move the day-selector visual treatment into shared style primitives reused by Daily and Notable views. Intent: Let operators jump directly to each day's notable utterances while keeping day navigation styling consistent across pages.

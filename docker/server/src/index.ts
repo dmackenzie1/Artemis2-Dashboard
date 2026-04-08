@@ -45,7 +45,7 @@ const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<
   `);
   await orm.em.getConnection().execute(`
     update "prompt_executions"
-    set "component_id" = 'legacy'
+    set "component_id" = 'unknown-component'
     where "component_id" is null;
   `);
   await orm.em.getConnection().execute(`

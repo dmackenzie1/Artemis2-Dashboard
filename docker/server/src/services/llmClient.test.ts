@@ -132,7 +132,7 @@ describe("LlmClient.generateText", () => {
       const querySetFiles = await readdir(querySetDir);
       const queryReceiveFiles = await readdir(queryReceiveDir);
       const debugPayloadFiles = [...querySetFiles, ...queryReceiveFiles];
-      expect(files).toContain("README-TODO-DELETE-ME.txt");
+      expect(files).toContain("README-DEBUG-ARTIFACTS.txt");
       expect(files).toContain("query-set");
       expect(files).toContain("query-receive");
       expect(debugPayloadFiles.length).toBe(2);

@@ -189,19 +189,6 @@ export const fetchDashboard = async (): Promise<DashboardData | null> => {
   return (await response.json()) as DashboardData | null;
 };
 
-export const triggerIngest = async (): Promise<DashboardData> => {
-  clientLogger.info("Requesting ingest run from client");
-  const response = await fetch(`${base}/ingest`, { method: "POST" });
-  if (!response.ok) {
-    clientLogger.error("Ingest request failed", { status: response.status });
-    throw new Error("Unable to ingest data");
-  }
-
-  const payload = (await response.json()) as DashboardData;
-  clientLogger.info("Ingest request completed", { generatedAt: payload.generatedAt, totalDays: payload.days.length });
-
-  return payload;
-};
 
 export const fetchPipelineDashboard = async (): Promise<PipelineDashboardData | null> => {
   const response = await fetch(`${base}/pipeline/dashboard`);

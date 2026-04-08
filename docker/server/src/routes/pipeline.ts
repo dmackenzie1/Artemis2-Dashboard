@@ -16,15 +16,6 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
     }
   });
 
-  router.post("/ingest", async (_req, res, next) => {
-    try {
-      const result = await pipelineService.runManualReingest();
-      res.json(result);
-    } catch (error) {
-      next(error);
-    }
-  });
-
   router.post("/run", async (_req, res, next) => {
     try {
       const wasAlreadyRunning = pipelineService.isPipelineRunInProgress();
@@ -46,15 +37,6 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
         accepted: !wasAlreadyRunning,
         status: wasAlreadyRunning ? "already-running" : "started"
       });
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  router.get("/stats", async (_req, res, next) => {
-    try {
-      const payload = await pipelineService.getMissionStatsView();
-      res.json(payload);
     } catch (error) {
       next(error);
     }
