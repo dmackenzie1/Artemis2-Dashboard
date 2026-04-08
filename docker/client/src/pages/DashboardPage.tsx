@@ -54,12 +54,14 @@ export const DashboardPage: FunctionComponent = () => {
       <section className={styles["dashboard-text-pane"]} data-component-id="dashboard-text-pane" data-component-uid={`${componentUid}-text`}>
         <RecentWindowPanel refreshToken={refreshToken} />
       </section>
-      <section className={styles["dashboard-stats-pane"]} data-component-id="dashboard-stats-pane" data-component-uid={`${componentUid}-stats`}>
-        <StatsPanel refreshToken={refreshToken} />
-      </section>
+      <section className={styles["dashboard-side-pane"]} data-component-id="dashboard-side-pane" data-component-uid={`${componentUid}-side`}>
+        <section className={styles["dashboard-stats-pane"]} data-component-id="dashboard-stats-pane" data-component-uid={`${componentUid}-stats`}>
+          <StatsPanel refreshToken={refreshToken} />
+        </section>
 
-      <section className={styles["dashboard-chat-pane"]} data-component-id="dashboard-chat-pane" data-component-uid={`${componentUid}-chat`}>
-        <MissionChatPanel />
+        <section className={styles["dashboard-chat-pane"]} data-component-id="dashboard-chat-pane" data-component-uid={`${componentUid}-chat`}>
+          <MissionChatPanel />
+        </section>
       </section>
 
       <section className={styles["dashboard-bottom-row"]} data-component-id="dashboard-bottom-row" data-component-uid={`${componentUid}-bottom`}>

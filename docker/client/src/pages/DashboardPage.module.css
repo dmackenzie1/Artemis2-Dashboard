@@ -2,15 +2,15 @@
   display: grid;
   gap: 0.58rem;
   height: calc(100vh - 78px);
-  grid-template-columns: minmax(0, 2fr) minmax(320px, 0.76fr);
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) minmax(160px, 0.8fr);
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 0.58fr);
+  grid-template-rows: minmax(0, 1fr) minmax(160px, 0.8fr);
   grid-template-areas:
-    "text stats"
-    "text chat"
+    "text side"
     "bottom bottom";
 }
 
 .dashboard-text-pane,
+.dashboard-side-pane,
 .dashboard-stats-pane,
 .dashboard-chat-pane,
 .dashboard-bottom-row {
@@ -21,13 +21,20 @@
   grid-area: text;
 }
 
-.dashboard-stats-pane {
-  grid-area: stats;
+.dashboard-side-pane {
+  grid-area: side;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.58rem;
 }
 
+.dashboard-stats-pane,
 .dashboard-chat-pane {
-  grid-area: chat;
+  min-height: 0;
+  overflow: hidden;
 }
+
 
 .dashboard-bottom-row {
   grid-area: bottom;
@@ -50,8 +57,11 @@
     grid-template-rows: auto;
     grid-template-areas:
       "text"
-      "stats"
-      "chat"
+      "side"
       "bottom";
+  }
+
+  .dashboard-side-pane {
+    grid-template-rows: auto;
   }
 }
