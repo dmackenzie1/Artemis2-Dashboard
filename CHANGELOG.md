@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: rename Transcript Metrics "Scope" to "Full Scope" and make the stats panel stretch to full rail height so overflow content can scroll inside the panel body. Intent: Ensure operators can see the complete full-scope section and access lower metrics without clipping in constrained right-rail layouts.
 - fix: anchor the Overview transcript-activity histogram to the bottom row and let Mission Text Workspace consume the remaining vertical space between the header and histogram. Intent: Remove dead vertical gaps so operators can continuously scan mission text while keeping timeline activity fixed at the page bottom.
 - feat: run the pipeline incrementally by tracking changed source-day keys and prompt-definition edits, then regenerate day-scoped `daily_summary`/`notable_moments` outputs and skip unchanged prompt runs while still allowing mission synthesis from cached daily summaries. Intent: Avoid full-history recomputation when only the latest one or two source-day files are corrected so operators can update data faster with lower LLM/runtime cost.
 - fix: restructure the Overview layout so the left Recent Transcript Review pane owns the full primary column while the right rail stacks Transcript Metrics above Query Console without panel overlap. Intent: Match operator scan expectations and prevent right-rail chat content from colliding with stats content on constrained viewports.

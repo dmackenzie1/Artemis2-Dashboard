@@ -1,5 +1,8 @@
 .stats-panel {
   min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .stats-groups {
