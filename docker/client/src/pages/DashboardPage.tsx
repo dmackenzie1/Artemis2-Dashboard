@@ -1,7 +1,6 @@
 import type { FunctionComponent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { MissionChatPanel } from "../components/dashboard/MissionChatPanel";
-import { MissionOverviewPanel } from "../components/dashboard/MissionOverviewPanel";
 import { RecentWindowPanel } from "../components/dashboard/RecentWindowPanel";
 import { StatsPanel } from "../components/dashboard/StatsPanel";
 import { UtterancesTimelinePanel } from "../components/dashboard/UtterancesTimelinePanel";
@@ -52,13 +51,14 @@ export const DashboardPage: FunctionComponent = () => {
 
   return (
     <div className={styles["dashboard-layout"]} data-component-id={componentId} data-component-uid={componentUid}>
-      <section className={styles["dashboard-top-row"]} data-component-id="dashboard-top-row" data-component-uid={`${componentUid}-top`}>
+      <section className={styles["dashboard-text-pane"]} data-component-id="dashboard-text-pane" data-component-uid={`${componentUid}-text`}>
         <RecentWindowPanel refreshToken={refreshToken} />
+      </section>
+      <section className={styles["dashboard-stats-pane"]} data-component-id="dashboard-stats-pane" data-component-uid={`${componentUid}-stats`}>
         <StatsPanel refreshToken={refreshToken} />
       </section>
 
-      <section className={styles["dashboard-mid-row"]} data-component-id="dashboard-mid-row" data-component-uid={`${componentUid}-mid`}>
-        <MissionOverviewPanel refreshToken={refreshToken} />
+      <section className={styles["dashboard-chat-pane"]} data-component-id="dashboard-chat-pane" data-component-uid={`${componentUid}-chat`}>
         <MissionChatPanel />
       </section>
 

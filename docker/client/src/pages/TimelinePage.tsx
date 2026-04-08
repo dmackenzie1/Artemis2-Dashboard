@@ -44,7 +44,8 @@ const MAX_TOPICS_PER_DAY = 8;
 const MAX_SUMMARY_HIGHLIGHTS_PER_DAY = 4;
 const MAX_NOTABLE_UTTERANCES = 160;
 const MAX_NOTABLE_UTTERANCES_PER_DAY = 8;
-const MAX_NOTABLE_MOMENTS_PER_DAY = 4;
+const MIN_NOTABLE_MOMENTS_PER_DAY = 3;
+const MAX_NOTABLE_MOMENTS_PER_DAY = 24;
 
 type NotableMomentsDay = {
   day: string;
@@ -144,8 +145,12 @@ const buildTimelineItems = (
 
   const sortedDays = [...days].sort((left, right) => left.day.localeCompare(right.day));
   const contentItems: TimelineDisplayItem[] = [];
+  const resolveMomentLimit = (moments: NotableMoment[]): number => {
+    const suggestedLimit = Math.max(Math.floor(moments.length / 2), MIN_NOTABLE_MOMENTS_PER_DAY);
+    return Math.min(MAX_NOTABLE_MOMENTS_PER_DAY, suggestedLimit);
+  };
   const notableMomentsByDay = new Map<string, NotableMoment[]>(
-    notableMomentsDays.map((dayEntry) => [dayEntry.day, dayEntry.moments.slice(0, MAX_NOTABLE_MOMENTS_PER_DAY)])
+    notableMomentsDays.map((dayEntry) => [dayEntry.day, dayEntry.moments.slice(0, resolveMomentLimit(dayEntry.moments))])
   );
 
   sortedDays.forEach((dayEntry, dayIndex) => {

@@ -25,7 +25,7 @@ This document is the implementation map for `docker/client/src`.
 | `utils/logging/clientLogger.ts` | Structured client logging facade (info/warn/error). |
 | `utils/formatting/renderStructuredText.tsx` | Structured text renderer for multiline LLM output blocks. |
 | `utils/live/liveEvents.ts` | EventSource (`/api/events`) subscription helper for server-published invalidation/health events. |
-| `pages/DashboardPage.tsx` | Main overview route composing summary/stats/chat/timeline panels and passing only refresh notifications (`refreshToken`) into panel components. |
+| `pages/DashboardPage.tsx` | Main overview route composing a single large Mission Text Workspace panel (3h/6h/12h/Complete), stats rail, chat rail, and timeline strip while passing only refresh notifications (`refreshToken`) into panel components. |
 | `pages/DailyPage.tsx` | Per-day review route parsing prompt payload + daily details display. |
 | `pages/TimelinePage.tsx` | Long-form timeline view with mission chronology presentation logic. |
 | `pages/NotableMomentsPage.tsx` | Notable moments route parsing daily JSON payload from pipeline output. |
@@ -37,8 +37,8 @@ This document is the implementation map for `docker/client/src`.
 | `pages/dashboard/useDashboardController.ts` | Legacy controller from older centralized dashboard orchestration; retained for historical reference/tests and no longer used by `DashboardPage`. |
 | `components/dashboard/types.ts` | Shared dashboard component prop/data contracts. |
 | `components/dashboard/promptDisplay.ts` | Prompt status/value helper utilities for pane rendering. |
-| `components/dashboard/MissionOverviewPanel.tsx` | Mission summary panel UI. |
-| `components/dashboard/DailySummaryPanel.tsx` | Last-24-hours/daily summary panel UI. |
+| `components/dashboard/MissionOverviewPanel.tsx` | Legacy standalone mission summary panel UI (kept for reference; mission summary is now selected via the unified workspace panel). |
+| `components/dashboard/DailySummaryPanel.tsx` | Legacy daily summary panel UI. |
 | `components/dashboard/StatsPanel.tsx` | Mission metrics table + daily volume chart panel UI. |
 | `components/dashboard/MissionChatPanel.tsx` | Query Console chat interaction panel UI. |
 | `components/dashboard/UtterancesTimelinePanel.tsx` | Mission hourly histogram/timeline panel UI. |
@@ -55,6 +55,12 @@ This document is the implementation map for `docker/client/src`.
 - `DashboardPage` must stay focused on layout and cross-panel notifications (`dashboard-admin-refresh-requested` -> `refreshToken`).
 - `DashboardPage` also listens for server live-update events and maps them into `refreshToken` bumps so panel ownership remains local.
 - Panels may accept `refreshToken` to refetch on parent notification, but should not consume sibling panel data or shared page controllers for API results.
+
+## Dashboard workspace update (April 8, 2026)
+
+- The previous dual long-text dashboard panes were collapsed into one "Mission Text Workspace" panel.
+- Mode selection is constrained to `3h`, `6h`, `12h`, and `Complete`.
+- `3h/6h/12h` modes are DB-backed rolling-window summaries; `Complete` uses mission-level synthesis output.
 
 ## Dead-code and hygiene notes (April 6, 2026)
 

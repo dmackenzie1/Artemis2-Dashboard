@@ -6,6 +6,7 @@ import { dayjs } from "../lib/dayjs.js";
 import { PromptDefinition } from "../entities/PromptDefinition.js";
 import { PromptExecution } from "../entities/PromptExecution.js";
 import { SourceDocument } from "../entities/SourceDocument.js";
+import { DailySummary } from "../entities/DailySummary.js";
 import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 
@@ -16,6 +17,12 @@ type PipelineConfig = {
   promptsDir: string;
   llmClient: LlmClient;
   promptSubmissionsDir: string;
+  notableMoments: {
+    baselinePerDay: number;
+    minPerDay: number;
+    highSignalPerDay: number;
+    maxPerDay: number;
+  };
 };
 
 type PromptDashboardEntry = {
@@ -62,7 +69,6 @@ const dailySummaryTargetWords = {
   max: 10_000
 } as const;
 const dailySummaryChunkCharacterLimit = 220_000;
-const notableMomentsPerDay = 10;
 const missionStatsCacheTtlMs = 5 * 60 * 1000;
 
 type SourceContextDocument = {
@@ -79,6 +85,11 @@ type DailyDocumentGroup = {
 type DailyDocumentVariant = {
   canonicalPath: string;
   isPartial: boolean;
+};
+
+type ParsedDailySummarySection = {
+  day: string;
+  summary: string;
 };
 
 export class PipelineService {
@@ -254,7 +265,7 @@ export class PipelineService {
               path: document.path,
               checksum: document.checksum
             })),
-            targetMoments: notableMomentsPerDay
+            targetMoments: this.config.notableMoments.baselinePerDay
           }))
         },
         null,
@@ -395,17 +406,18 @@ export class PipelineService {
     const dayOutputs: string[] = [];
     serverLogger.info("Starting notable moments generation", {
       groupedDayCount: dayGroups.length,
-      notableMomentsPerDay
+      target: this.config.notableMoments
     });
 
     for (const group of dayGroups) {
+      const targetMoments = this.resolveTargetNotableMoments(group.documents);
       const output = await this.config.llmClient.generateText({
         systemPrompt: prompt.content,
         userPrompt: JSON.stringify(
           {
             mode: "daily-notable-moments",
             day: group.day,
-            targetMoments: notableMomentsPerDay,
+            targetMoments,
             sourceDocuments: group.documents.map((document) => ({
               path: document.path,
               content: document.content
@@ -423,7 +435,7 @@ export class PipelineService {
     return JSON.stringify(
       {
         generatedAt: dayjs().utc().toISOString(),
-        targetMomentsPerDay: notableMomentsPerDay,
+        targetMomentsPerDay: this.config.notableMoments.baselinePerDay,
         days: dayOutputs
       },
       null,
@@ -454,6 +466,96 @@ export class PipelineService {
 
         return left.key.localeCompare(right.key);
       });
+  }
+
+  private countNonEmptyLines(content: string): number {
+    return content
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0).length;
+  }
+
+  private resolveTargetNotableMoments(documents: SourceContextDocument[]): number {
+    const estimatedUtterances = documents.reduce((total, document) => total + this.countNonEmptyLines(document.content), 0);
+    const hasHighSignalMoment = documents.some((document) =>
+      /exit(ing)? lunar|other side of the moon|president|breakthrough|critical|anomaly|dock|undock|burn/iu.test(document.content)
+    );
+
+    if (hasHighSignalMoment || estimatedUtterances >= 1_800) {
+      return this.config.notableMoments.maxPerDay;
+    }
+
+    if (estimatedUtterances >= 900) {
+      return this.config.notableMoments.highSignalPerDay;
+    }
+
+    return Math.max(this.config.notableMoments.minPerDay, this.config.notableMoments.baselinePerDay);
+  }
+
+  private parseDailySummarySections(output: string): ParsedDailySummarySection[] {
+    const sections: ParsedDailySummarySection[] = [];
+    const sectionPattern = /^##\s+(.+?)\n+([\s\S]*?)(?=^##\s+.+?$|$)/gmu;
+    let match = sectionPattern.exec(output);
+
+    while (match) {
+      const day = match[1]?.trim();
+      const summary = match[2]?.trim() ?? "";
+      if (day && summary) {
+        sections.push({ day, summary });
+      }
+      match = sectionPattern.exec(output);
+    }
+
+    return sections;
+  }
+
+  private countWords(text: string): number {
+    const trimmed = text.trim();
+    if (trimmed.length === 0) {
+      return 0;
+    }
+    return trimmed.split(/\s+/u).length;
+  }
+
+  private async persistDailySummaries(output: string, sourceContext: SourceContextDocument[]): Promise<void> {
+    const em = this.getEntityManager();
+    const dayGroupsByDay = new Map(this.buildDailyGroups(sourceContext).map((group) => [group.day, group]));
+    const parsedSections = this.parseDailySummarySections(output);
+    const generatedAt = dayjs().utc().toDate();
+
+    for (const section of parsedSections) {
+      const group = dayGroupsByDay.get(section.day);
+      const utteranceCount = group?.documents.reduce(
+        (total, document) => total + this.countNonEmptyLines(document.content),
+        0
+      ) ?? 0;
+      const sourceDocumentCount = group?.documents.length ?? 0;
+      const existing = await em.findOne(DailySummary, { day: section.day });
+
+      if (!existing) {
+        em.persist(
+          em.create(DailySummary, {
+            day: section.day,
+            summary: section.summary,
+            generatedAt,
+            updatedAt: generatedAt,
+            wordCount: this.countWords(section.summary),
+            utteranceCount,
+            sourceDocumentCount
+          })
+        );
+        continue;
+      }
+
+      existing.summary = section.summary;
+      existing.generatedAt = generatedAt;
+      existing.updatedAt = generatedAt;
+      existing.wordCount = this.countWords(section.summary);
+      existing.utteranceCount = utteranceCount;
+      existing.sourceDocumentCount = sourceDocumentCount;
+    }
+
+    await em.flush();
   }
 
   async syncSourceDocuments(): Promise<number> {
@@ -643,6 +745,7 @@ export class PipelineService {
         execution.finishedAt = dayjs().utc().toDate();
         if (prompt.key === "daily_summary") {
           latestDailySummaryOutput = output;
+          await this.persistDailySummaries(output, sourceContext);
         }
         serverLogger.info("Prompt response received", {
           promptKey: prompt.key,

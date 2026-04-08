@@ -146,6 +146,13 @@ main {
   color: rgba(224, 235, 248, 0.9);
 }
 
+.panel-scroll-copy {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.2rem;
+}
+
 .subtle {
   color: var(--text-secondary);
 }
