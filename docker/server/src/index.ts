@@ -23,6 +23,7 @@ import { RedisLlmCache } from "./services/redisLlmCache.js";
 import { liveUpdateBus } from "./services/liveUpdateBus.js";
 import { TranscriptUtterance } from "./entities/TranscriptUtterance.js";
 import { DailySummary } from "./entities/DailySummary.js";
+import { loadTranscriptCandidates } from "./services/transcriptCandidateService.js";
 
 const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
   await orm.em.getConnection().execute(`
@@ -68,6 +69,19 @@ const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<
   await orm.em.getConnection().execute(`
     alter table "prompt_executions"
     alter column "cache_hit" set not null;
+  `);
+};
+
+const ensureTranscriptSearchIndexes = async (orm: MikroORM): Promise<void> => {
+  await orm.em.getConnection().execute(`
+    create index if not exists "idx_transcript_utterances_tokens_gin"
+      on "transcript_utterances"
+      using gin ("tokens");
+  `);
+
+  await orm.em.getConnection().execute(`
+    create index if not exists "idx_transcript_utterances_channel_lower"
+      on "transcript_utterances" (lower("channel"));
   `);
 };
 
@@ -124,6 +138,7 @@ const llmClient = new LlmClient(
   env.REDIS_CACHE_STALE_TTL_SECONDS
 );
 let llmConnectivityStatus = await llmClient.checkConnectivity();
+const IN_MEMORY_UTTERANCE_LIMIT = 50_000;
 
 const analysisService = new AnalysisService({
   promptsDir: env.PROMPTS_DIR,
@@ -135,8 +150,13 @@ const analysisService = new AnalysisService({
       return [];
     }
 
-    const rows = await transcriptOrm.em.fork().find(TranscriptUtterance, {}, { orderBy: { timestamp: "asc" } });
-    return rows.map((row) => ({
+    const rows = await transcriptOrm.em.fork().find(
+      TranscriptUtterance,
+      {},
+      { orderBy: { timestamp: "desc" }, limit: IN_MEMORY_UTTERANCE_LIMIT }
+    );
+    const sortedRows = [...rows].sort((left, right) => left.timestamp.getTime() - right.timestamp.getTime());
+    return sortedRows.map((row) => ({
       id: String(row.id),
       timestamp: dayjs(row.timestamp).utc().toISOString(),
       day: dayjs(row.timestamp).utc().format("YYYY-MM-DD"),
@@ -150,6 +170,13 @@ const analysisService = new AnalysisService({
       filename: row.filename,
       sourceFile: row.sourceFile
     }));
+  },
+  loadTranscriptCandidates: async (query, options) => {
+    if (!transcriptOrm) {
+      return [];
+    }
+
+    return loadTranscriptCandidates(transcriptOrm.em.fork(), query, options);
   },
   loadDailySummaryForDay: async (day) => {
     if (!transcriptOrm) {
@@ -424,6 +451,7 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
   });
   await orm.getSchemaGenerator().updateSchema();
   await ensurePromptExecutionSubmittedTextColumn(orm);
+  await ensureTranscriptSearchIndexes(orm);
   app.use((req, res, next) => RequestContext.create(orm.em, next));
   const getEntityManager = (): EntityManager => (RequestContext.getEntityManager() as EntityManager | undefined) ?? orm.em.fork();
   app.use("/api/transcripts", createTranscriptRouter(getEntityManager));

@@ -1,0 +1,52 @@
+You are implementing a single-PR backend retrieval hardening change for Artemis2-Dashboard.
+
+## Mission
+Implement Option B (normalization + alias corrections) and DB candidate retrieval/indexing to scale transcript search/chat beyond in-memory full-corpus scans.
+
+## Intent
+- Preserve ground-truth transcript text exactly as ingested.
+- Improve ASR/jargon retrieval quality with a maintainable correction dictionary.
+- Reduce memory pressure by avoiding full-corpus in-memory retrieval for search/chat.
+- Keep existing overlap ranking logic as the second-pass relevance scorer.
+
+## Required outcomes
+1. Add an editable correction dictionary artifact (JSON preferred) that maps recurring ASR misspellings/aliases to canonical tokens.
+2. Normalize + alias tokens in the shared tokenizer pipeline so both:
+   - ingest-time token storage
+   - query-time search tokenization
+   use the same normalization behavior.
+3. Add DB candidate retrieval for search/chat:
+   - fetch top candidates via token overlap in Postgres,
+   - support optional channel filter,
+   - cap candidate fetch size (default around 2000, safe clamp bounds).
+4. Add DB indexes for candidate retrieval performance:
+   - GIN index on transcript tokens array,
+   - case-insensitive channel helper index if channel filtering is used.
+5. Keep overlap-based ranking as pass two using existing scoring.
+6. Increase final search result cap to 80.
+7. Re-ingest flow should regenerate stored tokens with new normalization.
+8. Keep implementation in one PR and update:
+   - CHANGELOG `[Unreleased]` with an Intent clause,
+   - docs/branch-notes entry including “What Did Not Work” if applicable.
+
+## Constraints
+- Do not mutate or overwrite ground-truth transcript `text`.
+- Prefer minimal API contract churn.
+- Preserve existing behavior for non-search features unless required by scale constraints.
+- Keep code TypeScript strict-safe and lint/test clean.
+
+## Suggested implementation points
+- `docker/server/src/lib/tokenizer.ts` (normalization + alias application)
+- `docker/server/src/config/asr-corrections.json` (dictionary artifact)
+- new service for DB candidate selection (e.g., `transcriptCandidateService.ts`)
+- `docker/server/src/services/analysisService.ts` search/chat flow update to use DB candidates
+- `docker/server/src/index.ts` startup index creation + candidate loader wiring
+- `docker/server/src/routes/api.ts` search limit max 80
+- tests covering tokenizer normalization and retrieval behavior
+
+## Quality checks
+- `npm run lint -w backend`
+- `npm run test -w backend`
+
+## Notes
+If a clearly better implementation is discovered during coding (while preserving intent and constraints), it is acceptable to adopt that improvement and document why in branch notes.
