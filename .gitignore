@@ -15,3 +15,5 @@ screenshot.png
 .local/query-receive/*
 !.local/query-set/.gitkeep
 !.local/query-receive/.gitkeep
+/source_files
+/.ssl
