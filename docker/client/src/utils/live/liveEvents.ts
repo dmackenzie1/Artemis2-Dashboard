@@ -8,7 +8,11 @@ export type LiveUpdateEvent = {
     | "pipeline.run.started"
     | "pipeline.run.completed"
     | "pipeline.run.failed"
-    | "llm.connectivity.changed";
+    | "llm.connectivity.changed"
+    | "day.ingested"
+    | "day.llm.loaded"
+    | "day.notable-queries.updated"
+    | "date.updated";
   emittedAt: string;
   payload?: Record<string, unknown>;
 };
@@ -46,7 +50,11 @@ export const subscribeToLiveUpdates = (
     "pipeline.run.started",
     "pipeline.run.completed",
     "pipeline.run.failed",
-    "llm.connectivity.changed"
+    "llm.connectivity.changed",
+    "day.ingested",
+    "day.llm.loaded",
+    "day.notable-queries.updated",
+    "date.updated"
   ];
 
   for (const eventType of eventTypes) {

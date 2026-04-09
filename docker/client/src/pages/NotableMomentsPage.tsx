@@ -28,7 +28,12 @@ export const NotableMomentsPage: FunctionComponent = () => {
     }, 60000);
 
     const liveUpdatesSubscription = subscribeToLiveUpdates((event) => {
-      if (event.type === "pipeline.run.completed" || event.type === "dashboard.cache.updated") {
+      if (
+        event.type === "pipeline.run.completed" ||
+        event.type === "dashboard.cache.updated" ||
+        event.type === "date.updated" ||
+        event.type === "day.notable-queries.updated"
+      ) {
         void loadNotableMoments();
       }
     });
