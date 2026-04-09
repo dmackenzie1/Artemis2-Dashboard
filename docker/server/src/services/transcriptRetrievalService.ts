@@ -19,6 +19,8 @@ type RetrievalResult = {
 };
 
 const HIGH_SIGNAL_PATTERN = /\b(anomaly|issue|risk|warning|fault|fail|leak|urgent|degraded|concern)\b/i;
+const CREW_CHANNEL_PATTERN = /\b(oe1|oe2|1oe|2oe|xpl\s*1\s*0\/?oe|spaceoe)\b/i;
+const FLIGHT_COORDINATION_CHANNEL_PATTERN = /\b(flight director|flight|iss|manager|orion|mer|fdo|gnc|eclss|eec)\b/i;
 
 const toRankedUtterance = (utterance: TranscriptUtterance, score: number): RankedUtterance => ({
   timestamp: utterance.timestamp,
@@ -36,6 +38,18 @@ const clampLimit = (limit: number, defaultLimit = 8): number => {
   }
 
   return Math.min(Math.max(Math.trunc(limit), 1), 80);
+};
+
+const scoreChannelPriority = (channel: string): number => {
+  if (CREW_CHANNEL_PATTERN.test(channel)) {
+    return 0.16;
+  }
+
+  if (FLIGHT_COORDINATION_CHANNEL_PATTERN.test(channel)) {
+    return 0.08;
+  }
+
+  return 0;
 };
 
 const rankUtterances = (queryTokens: string[], utterances: TranscriptUtterance[]): Array<{ utterance: TranscriptUtterance; score: number }> => {
@@ -59,7 +73,7 @@ const rankUtterances = (queryTokens: string[], utterances: TranscriptUtterance[]
       const overlapScore = overlapCount / queryTokens.length;
       const coverageScore = overlapCount / utteranceTokens.length;
       const signalBoost = HIGH_SIGNAL_PATTERN.test(utterance.text) ? 0.12 : 0;
-      const channelBoost = /flight|manager|eclss|fdo|gnc/i.test(utterance.channel) ? 0.08 : 0;
+      const channelBoost = scoreChannelPriority(utterance.channel);
       const recencyBoost = Math.max(0, 1 - dayjs().utc().diff(dayjs(utterance.timestamp), "day") / 30) * 0.06;
 
       const score = overlapScore * 0.64 + coverageScore * 0.24 + signalBoost + channelBoost + recencyBoost;

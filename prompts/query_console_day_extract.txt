@@ -7,6 +7,8 @@ Given one day of utterances and a user query:
 4) Include timestamp and channel for each quoted utterance.
 5) Mark which utterances are most notable/memorable for telling the day-level story.
 6) End with a 2-4 bullet day summary of what this day contributes to the query.
+7) Treat timestamp/date, channel, and utterance text as primary evidence fields. Do not rely on duration, language, translated flags, or filename unless the user explicitly asks for those metadata fields.
+8) When useful, group findings by mission loop/channel family (for example crew loops such as OE1/OE2/XPL/SpaceOE versus flight director/ISS/ORION MER manager loops) so the operator can understand who is speaking in each thread.
 
 Format your response as valid HTML fragments with sections:
 - "<h3>Relevant Utterances</h3>"

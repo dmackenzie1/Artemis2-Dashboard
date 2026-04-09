@@ -66,6 +66,7 @@ Regardless of the repository (`coda`, `talky-bot`, `aegis`, `maestro`, `logs`), 
 - **API Types:** Use standard TypeScript interfaces or custom DTOs for returning records via the API.
 - **Time/Date:** Exclusively use `dayjs` extended with the `utc` plugin. Never use raw `Date` objects or `moment`.
 - **Environment:** NEVER read from `process.env` directly inside business logic.
+- **Transcript Retrieval Focus:** For transcript query/search flows, prioritize timestamp/date, channel, and transcript text as primary evidence. Treat duration/language/translated/filename metadata as optional unless explicitly requested, and preserve loop/channel-group context (crew loops vs flight-control loops) in outputs.
 
 ### Python (AI/ML)
 - **Type Hinting:** Every function signature must have complete type hints (`def process(data: dict) -> list[str]:`).
