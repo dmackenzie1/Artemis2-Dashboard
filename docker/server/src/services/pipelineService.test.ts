@@ -137,3 +137,26 @@ describe("PipelineService incremental daily targeting", () => {
     ]);
   });
 });
+
+describe("PipelineService daily chunking fidelity", () => {
+  it("splits large documents on line boundaries only", () => {
+    const service = createPipelineService();
+    const repeatedTokenLine = Array.from({ length: 400 }, (_, index) => `token${index}`).join(" ");
+    const sourceDocument: SourceContextDocument = {
+      path: "2026-04-09_summary.csv",
+      checksum: "checksum-fidelity",
+      content: Array.from({ length: 30 }, (_, index) => `line-${index + 1},${repeatedTokenLine}`).join("\n")
+    };
+
+    const chunks = (service as unknown as {
+      splitDayDocumentsIntoChunks: (documents: SourceContextDocument[]) => SourceContextDocument[][];
+    }).splitDayDocumentsIntoChunks([sourceDocument]);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    const originalLines = sourceDocument.content.split("\n");
+    const chunkLines = chunks.flatMap((chunk) => chunk.flatMap((document) => document.content.split("\n")));
+
+    expect(chunkLines).toEqual(originalLines);
+    expect(chunkLines.every((line) => /^line-\d+,/u.test(line))).toBe(true);
+  });
+});

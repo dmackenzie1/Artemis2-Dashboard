@@ -4,6 +4,7 @@ import { normalizeTokenWithAsrCorrections } from "./asrCorrections.js";
 
 const tokenizer = winkTokenizer();
 const MIN_TOKEN_LENGTH = 3;
+const budgetTokenTags = new Set(["word", "number", "punctuation", "symbol", "emoji", "emoticon", "hashtag", "mention"]);
 
 const normalizeText = (text: string): string => text.normalize("NFKC").toLowerCase();
 
@@ -49,3 +50,8 @@ const tokenize = (text: string): string[] => {
 export const tokenizeQuery = (text: string): string[] => tokenize(text);
 
 export const tokenizeUtterance = (text: string): string[] => tokenize(text);
+
+export const countTextTokens = (text: string): number =>
+  tokenizer
+    .tokenize(normalizeText(text))
+    .filter((token) => budgetTokenTags.has(token.tag) && token.value.trim().length > 0).length;

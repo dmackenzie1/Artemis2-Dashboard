@@ -20,6 +20,15 @@ type TimeWindowUtteranceRow = {
   wordCount: string;
 };
 
+type HourlySampleEntry = {
+  timestamp: string;
+  channel: string;
+  text: string;
+  filename: string;
+  sourceFile: string;
+  wordCount: string;
+};
+
 export type TimeWindowSummary = {
   generatedAt: string;
   window: {
@@ -43,6 +52,81 @@ const llmOutputSchema = z.object({
   summary: z.string().min(1),
   highlights: z.array(z.object({ hour: z.string().min(1), summary: z.string().min(1) })).default([])
 });
+
+const anomalySignalPattern = /\b(abort|anomaly|warning|error|issue|off[-\s]?nominal|hold|scrub|fail(?:ed|ure)?|loss)\b/iu;
+
+export const selectStratifiedHourlySample = (utterances: HourlySampleEntry[], maxSampleSize = 12): HourlySampleEntry[] => {
+  if (utterances.length <= maxSampleSize) {
+    return utterances;
+  }
+
+  const normalizedSampleSize = Math.max(Math.floor(maxSampleSize), 1);
+  const selectedIndexes = new Set<number>();
+  const maxIndex = utterances.length - 1;
+  const channelCounts = utterances.reduce<Map<string, number>>((counts, utterance) => {
+    const channel = utterance.channel.trim().toLowerCase();
+    if (channel.length === 0) {
+      return counts;
+    }
+    counts.set(channel, (counts.get(channel) ?? 0) + 1);
+    return counts;
+  }, new Map<string, number>());
+
+  const addIndex = (index: number): void => {
+    if (selectedIndexes.size >= normalizedSampleSize) {
+      return;
+    }
+    selectedIndexes.add(Math.max(Math.min(index, maxIndex), 0));
+  };
+
+  addIndex(0);
+  addIndex(Math.floor(maxIndex / 2));
+  addIndex(maxIndex);
+
+  for (const ratio of [0.2, 0.4, 0.6, 0.8]) {
+    addIndex(Math.round(maxIndex * ratio));
+  }
+
+  const anomalyRankedIndexes = utterances
+    .map((utterance, index) => {
+      const channelKey = utterance.channel.trim().toLowerCase();
+      const channelFrequency = channelKey.length > 0 ? (channelCounts.get(channelKey) ?? 1) : 1;
+      const anomalySignalBonus = anomalySignalPattern.test(utterance.text) ? 200 : 0;
+      const wordCount = Number(utterance.wordCount);
+      const parsedWordCount = Number.isFinite(wordCount) ? wordCount : 0;
+      const rarityBonus = Math.round(120 / channelFrequency);
+      const score = anomalySignalBonus + parsedWordCount + rarityBonus;
+      return { index, score, timestamp: utterance.timestamp };
+    })
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      if (left.timestamp !== right.timestamp) {
+        return left.timestamp.localeCompare(right.timestamp);
+      }
+      return left.index - right.index;
+    })
+    .map((entry) => entry.index);
+
+  for (const index of anomalyRankedIndexes) {
+    addIndex(index);
+    if (selectedIndexes.size >= normalizedSampleSize) {
+      break;
+    }
+  }
+
+  if (selectedIndexes.size < normalizedSampleSize) {
+    for (const index of utterances.keys()) {
+      addIndex(index);
+      if (selectedIndexes.size >= normalizedSampleSize) {
+        break;
+      }
+    }
+  }
+
+  return [...selectedIndexes].sort((left, right) => left - right).map((index) => utterances[index]).filter(Boolean);
+};
 
 
 export class TimeWindowSummaryService {
@@ -133,7 +217,7 @@ export class TimeWindowSummaryService {
       utteranceCount: utterances.length,
       wordCount: utterances.reduce((sum, utterance) => sum + Number(utterance.wordCount), 0),
       channels: [...new Set(utterances.map((utterance) => utterance.channel).filter((channel) => channel.trim().length > 0))],
-      sample: utterances.slice(0, 12).map((utterance) => ({
+      sample: selectStratifiedHourlySample(utterances, 12).map((utterance) => ({
         timestamp: utterance.timestamp,
         channel: utterance.channel,
         text: utterance.text,

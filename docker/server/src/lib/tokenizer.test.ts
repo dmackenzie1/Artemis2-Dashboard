@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tokenizeQuery } from "./tokenizer.js";
+import { countTextTokens, tokenizeQuery } from "./tokenizer.js";
 
 describe("tokenizeQuery", () => {
   it("applies ASR correction aliases", () => {
@@ -16,5 +16,11 @@ describe("tokenizeQuery", () => {
 
     expect(tokens).toContain("sw-3");
     expect(tokens).toContain("otc-3");
+  });
+
+  it("counts text tokens for chunking budgets", () => {
+    const tokenCount = countTextTokens("Flight, copy. OTC3 status is go!");
+
+    expect(tokenCount).toBeGreaterThan(4);
   });
 });

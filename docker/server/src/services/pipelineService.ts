@@ -11,6 +11,7 @@ import { TranscriptUtterance } from "../entities/TranscriptUtterance.js";
 import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 import { liveUpdateBus } from "./liveUpdateBus.js";
+import { countTextTokens } from "../lib/tokenizer.js";
 
 type EntityManagerProvider = () => EntityManager;
 
@@ -70,7 +71,7 @@ const dailySummaryTargetWords = {
   min: 5_000,
   max: 10_000
 } as const;
-const dailySummaryChunkCharacterLimit = 220_000;
+const dailySummaryChunkTokenLimit = 8_000;
 const missionStatsCacheTtlMs = 5 * 60 * 1000;
 const canonicalChannelGroup = "*";
 const dailyFullSummaryType = "daily_full";
@@ -312,7 +313,7 @@ export class PipelineService {
         generatedAt: dayjs().utc().toISOString(),
         strategy: "daily-layer-first",
         chunking: {
-          maxCharactersPerChunk: dailySummaryChunkCharacterLimit
+          maxTokensPerChunk: dailySummaryChunkTokenLimit
         },
         dayGroups
       },
@@ -385,42 +386,83 @@ export class PipelineService {
   private splitDayDocumentsIntoChunks(documents: SourceContextDocument[]): SourceContextDocument[][] {
     const chunks: SourceContextDocument[][] = [];
     let currentChunk: SourceContextDocument[] = [];
-    let currentCharacterCount = 0;
+    let currentChunkTokenCount = 0;
+    const pushCurrentChunk = (): void => {
+      if (currentChunk.length === 0) {
+        return;
+      }
+      chunks.push(currentChunk);
+      currentChunk = [];
+      currentChunkTokenCount = 0;
+    };
+
+    const splitDocumentIntoLineBoundedParts = (document: SourceContextDocument): SourceContextDocument[] => {
+      const lines = document.content.split(/\r?\n/u);
+      if (lines.length <= 1) {
+        return [document];
+      }
+
+      const documentParts: SourceContextDocument[] = [];
+      let partLines: string[] = [];
+      let partTokenCount = 0;
+      let partStartLine = 1;
+      const pushDocumentPart = (partEndLine: number): void => {
+        if (partLines.length === 0) {
+          return;
+        }
+        documentParts.push({
+          ...document,
+          path: `${document.path}#lines-${partStartLine}-${partEndLine}`,
+          content: partLines.join("\n")
+        });
+        partLines = [];
+        partTokenCount = 0;
+        partStartLine = partEndLine + 1;
+      };
+
+      for (const [lineIndex, line] of lines.entries()) {
+        const lineTokenCount = Math.max(countTextTokens(line), 1);
+        if (partLines.length > 0 && partTokenCount + lineTokenCount > dailySummaryChunkTokenLimit) {
+          pushDocumentPart(lineIndex);
+        }
+
+        if (lineTokenCount > dailySummaryChunkTokenLimit) {
+          documentParts.push({
+            ...document,
+            path: `${document.path}#lines-${lineIndex + 1}-${lineIndex + 1}`,
+            content: line
+          });
+          partStartLine = lineIndex + 2;
+          continue;
+        }
+
+        partLines.push(line);
+        partTokenCount += lineTokenCount;
+      }
+
+      pushDocumentPart(lines.length);
+      return documentParts;
+    };
 
     for (const document of documents) {
-      const documentCharacters = document.content.length;
-      if (currentChunk.length > 0 && currentCharacterCount + documentCharacters > dailySummaryChunkCharacterLimit) {
-        chunks.push(currentChunk);
-        currentChunk = [];
-        currentCharacterCount = 0;
-      }
-
-      if (documentCharacters > dailySummaryChunkCharacterLimit) {
-        const parts = Math.max(Math.ceil(documentCharacters / dailySummaryChunkCharacterLimit), 1);
-        const partSize = Math.ceil(documentCharacters / parts);
-
-        for (let partIndex = 0; partIndex < parts; partIndex += 1) {
-          const start = partIndex * partSize;
-          const end = Math.min(start + partSize, documentCharacters);
-          const partContent = document.content.slice(start, end);
-          chunks.push([
-            {
-              ...document,
-              path: `${document.path}#part-${partIndex + 1}`,
-              content: partContent
-            }
-          ]);
+      const normalizedParts = splitDocumentIntoLineBoundedParts(document);
+      for (const part of normalizedParts) {
+        const partTokenCount = Math.max(countTextTokens(part.content), 1);
+        if (currentChunk.length > 0 && currentChunkTokenCount + partTokenCount > dailySummaryChunkTokenLimit) {
+          pushCurrentChunk();
         }
-        continue;
+
+        if (partTokenCount > dailySummaryChunkTokenLimit) {
+          chunks.push([part]);
+          continue;
+        }
+
+        currentChunk.push(part);
+        currentChunkTokenCount += partTokenCount;
       }
-
-      currentChunk.push(document);
-      currentCharacterCount += documentCharacters;
     }
 
-    if (currentChunk.length > 0) {
-      chunks.push(currentChunk);
-    }
+    pushCurrentChunk();
 
     return chunks;
   }
@@ -451,7 +493,7 @@ export class PipelineService {
               chunk: {
                 index: chunkIndex + 1,
                 total: documentChunks.length,
-                maxCharacters: dailySummaryChunkCharacterLimit
+                maxTokens: dailySummaryChunkTokenLimit
               },
               instructions: {
                 focus:

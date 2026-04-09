@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: replace hourly prompt context `slice(0,12)` sampling with deterministic stratified anomaly-weighted picks and switch daily-summary chunking from character slicing to tokenizer/line-aware boundaries. Intent: Prevent transcript evidence loss from skewed sampling and mid-utterance chunk cuts so prompt context remains representative and semantically intact.
 - fix: switch Overview Daily Transcript Volume to request/display all available days by default (while keeping optional `days` query support for bounded API calls). Intent: Ensure operators see complete day-level transcript coverage instead of a truncated last-5-day snapshot.
 - refactor: remove prompt-execution startup SQL backfill helper and rely on normal schema/index startup flow only (`updateSchema` + transcript search indexes). Intent: Eliminate one-off runtime DDL/backfill side effects now that all required `prompt_executions` columns already exist in deployed environments.
 - refactor: replace client window-level live-update `CustomEvent` fanout/listeners with a React `LiveUpdatesProvider` context + hook, and migrate page refresh/event consumers to typed reactive context state. Intent: Align live-update propagation with React lifecycle semantics so pages subscribe declaratively without manual DOM listener bookkeeping.
