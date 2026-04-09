@@ -126,8 +126,8 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
       const notableMomentsPrompt = payload.prompts.find((entry) => entry.key === "notable_moments");
       const parsedSchema = z.object({
         generatedAt: z.string(),
-        targetMomentsPerDay: z.number().int().min(1),
-        days: z.array(z.string())
+        targetMomentsPerDay: z.number().int().min(1).optional(),
+        days: z.array(z.unknown())
       });
 
       if (!notableMomentsPrompt?.output) {

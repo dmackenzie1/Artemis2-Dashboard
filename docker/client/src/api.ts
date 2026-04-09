@@ -9,7 +9,13 @@ export type DashboardData = {
     summary: string;
     hourly: Record<string, string>;
     topics: Array<{ title: string; description: string }>;
-    stats: { utteranceCount: number; wordCount: number; channelCount: number; hourlyUtterances: Record<string, number> };
+    stats: {
+      utteranceCount: number;
+      wordCount: number;
+      channelCount: number;
+      hourlyUtterances: Record<string, number>;
+      hourlyChannelLeads?: Record<string, string[]>;
+    };
   }>;
 };
 
