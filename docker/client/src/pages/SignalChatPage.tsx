@@ -11,7 +11,7 @@ const DEFAULT_QUERY = "Summarize communication risks in the latest transcript wi
 
 export const SignalChatPage: FunctionComponent = () => {
   const [query, setQuery] = useState(DEFAULT_QUERY);
-  const [mode, setMode] = useState<ChatMode>("rag");
+  const [mode, setMode] = useState<ChatMode>("rag_chat");
   const [isThinking, setIsThinking] = useState(false);
   const [chatResponse, setChatResponse] = useState<ChatResponse | null>(null);
   const [searchResponse, setSearchResponse] = useState<UtteranceSearchResponse | null>(null);
@@ -71,8 +71,8 @@ export const SignalChatPage: FunctionComponent = () => {
               Mode
             </label>
             <select id="signal-chat-mode" value={mode} onChange={(event) => setMode(event.target.value as ChatMode)}>
-              <option value="rag">rag</option>
-              <option value="all">all</option>
+              <option value="rag_chat">RAG Chat</option>
+              <option value="llm_chat">LLM Chat</option>
             </select>
             <button type="submit" disabled={isThinking || query.trim().length === 0}>
               {isThinking ? "Thinking…" : "Submit"}
@@ -116,7 +116,7 @@ export const SignalChatPage: FunctionComponent = () => {
                   <strong>{entry.timestamp}</strong>
                   <span>{entry.channel}</span>
                 </header>
-                <p>{entry.text}</p>
+                <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(entry.text, sharedStyles["formatted-list"])}</div>
                 <small>
                   day={entry.day} • score={entry.score.toFixed(4)} • file={entry.filename} • source={entry.source}
                 </small>

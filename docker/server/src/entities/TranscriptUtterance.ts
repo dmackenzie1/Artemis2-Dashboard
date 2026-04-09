@@ -7,6 +7,7 @@ export class TranscriptUtterance {
   channel!: string;
   durationSec!: number;
   wordCount!: number;
+  tokens!: string[];
   language!: string;
   translated!: boolean;
   text!: string;
@@ -42,6 +43,7 @@ export class TranscriptUtterance {
       channel: row.channel.trim(),
       durationSec,
       wordCount,
+      tokens: [],
       language: row.language.trim(),
       translated: row.translated.trim().toLowerCase() === "yes",
       text: row.text.trim(),
@@ -60,6 +62,7 @@ export const TranscriptUtteranceSchema = new EntitySchema<TranscriptUtterance>({
     channel: { type: "string", length: 200, index: true },
     durationSec: { type: "number" },
     wordCount: { type: "number" },
+    tokens: { type: "array", nullable: false, defaultRaw: "'{}'" },
     language: { type: "string", length: 16 },
     translated: { type: "boolean" },
     text: { type: "text" },

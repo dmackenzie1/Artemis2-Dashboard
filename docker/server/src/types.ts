@@ -8,6 +8,7 @@ export type TranscriptUtterance = {
   language: string;
   translated: string;
   text: string;
+  tokens?: string[];
   filename: string;
   sourceFile: string;
 };
