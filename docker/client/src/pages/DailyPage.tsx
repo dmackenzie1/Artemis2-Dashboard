@@ -1,57 +1,94 @@
 import type { FC } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { fetchDashboard, fetchPipelineSummaries, type DashboardData, type PipelineSummariesData } from "../api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  fetchDashboard,
+  fetchNotableMoments,
+  fetchPipelineSummaries,
+  type DashboardData,
+  type NotableMoment,
+  type NotableMomentsData
+} from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./DailyPage.module.css";
 import { renderStructuredText } from "../utils/formatting/renderStructuredText";
 import { clientLogger } from "../utils/logging/clientLogger";
+import { subscribeToLiveUpdates } from "../utils/live/liveEvents";
 
 export const DailyPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [pipelineSummaries, setPipelineSummaries] = useState<PipelineSummariesData | null>(null);
+  const [pipelineSummaryByDay, setPipelineSummaryByDay] = useState<Map<string, string>>(new Map());
+  const [notableMoments, setNotableMoments] = useState<NotableMomentsData | null>(null);
   const { componentId, componentUid } = useComponentIdentity("daily-page");
   const days = data?.days ?? [];
 
-  const pipelineSummaryByDay = useMemo(
-    () =>
-      new Map(
-        (pipelineSummaries?.summaries ?? [])
-          .filter((entry) => entry.summaryType === "daily_full" && entry.channelGroup === "*")
-          .map((entry) => [entry.day, entry.summary])
-      ),
-    [pipelineSummaries]
+  const notableMomentsByDay = useMemo(
+    () => new Map((notableMoments?.days ?? []).map((entry) => [entry.day, entry.moments])),
+    [notableMoments]
   );
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadDailyDashboard = useCallback(async (): Promise<void> => {
+    try {
+      const dashboardPayload = await fetchDashboard();
+      const dayEntries = dashboardPayload?.days ?? [];
 
-    const loadDailyDashboard = async (): Promise<void> => {
-      try {
-        const [dashboardPayload, pipelineDailyPayload] = await Promise.all([
-          fetchDashboard(),
-          fetchPipelineSummaries({ summaryType: "daily_full", channelGroup: "*" })
-        ]);
-        if (isMounted) {
-          setData(dashboardPayload);
-          setPipelineSummaries(pipelineDailyPayload);
+      const daySummaryResponses = await Promise.all(
+        dayEntries.map(async (dayEntry) => {
+          const daySummaryPayload = await fetchPipelineSummaries({
+            summaryType: "daily_full",
+            channelGroup: "*",
+            day: dayEntry.day
+          });
+          const canonicalDaySummary = daySummaryPayload?.summaries.find(
+            (summaryEntry) => summaryEntry.summaryType === "daily_full" && summaryEntry.channelGroup === "*" && summaryEntry.day === dayEntry.day
+          );
+          return {
+            day: dayEntry.day,
+            summary: canonicalDaySummary?.summary
+          };
+        })
+      );
+
+      const daySummaryMap = new Map<string, string>();
+      for (const daySummaryEntry of daySummaryResponses) {
+        if (daySummaryEntry.summary && daySummaryEntry.summary.trim().length > 0) {
+          daySummaryMap.set(daySummaryEntry.day, daySummaryEntry.summary);
         }
-      } catch (error) {
-        clientLogger.error("Failed to load daily dashboard", { error });
       }
-    };
 
+      const notableMomentsPayload = await fetchNotableMoments();
+      setData(dashboardPayload);
+      setPipelineSummaryByDay(daySummaryMap);
+      setNotableMoments(notableMomentsPayload);
+    } catch (error) {
+      clientLogger.error("Failed to load daily dashboard", { error });
+    }
+  }, []);
+
+  useEffect(() => {
     void loadDailyDashboard();
+
     const onGlobalRefresh = (): void => {
       void loadDailyDashboard();
     };
+
     window.addEventListener("global-data-refresh-requested", onGlobalRefresh);
+    const refreshIntervalHandle = window.setInterval(() => {
+      void loadDailyDashboard();
+    }, 60000);
+
+    const liveUpdatesSubscription = subscribeToLiveUpdates((event) => {
+      if (event.type === "pipeline.run.completed" || event.type === "dashboard.cache.updated") {
+        void loadDailyDashboard();
+      }
+    });
 
     return () => {
-      isMounted = false;
       window.removeEventListener("global-data-refresh-requested", onGlobalRefresh);
+      window.clearInterval(refreshIntervalHandle);
+      liveUpdatesSubscription.close();
     };
-  }, []);
+  }, [loadDailyDashboard]);
 
   const scrollToDay = (day: string): void => {
     const section = document.getElementById(`daily-day-${day}`);
@@ -75,38 +112,68 @@ export const DailyPage: FC = () => {
         </nav>
       ) : null}
       {days.length ? (
-        days.map((day) => (
-          <article
-            className={sharedStyles.panel}
-            id={`daily-day-${day.day}`}
-            key={day.day}
-            data-component-id="daily-day-panel"
-            data-component-uid={`${componentUid}-${day.day}`}
-          >
-            <h2>{day.day}</h2>
-            <div className={sharedStyles["formatted-copy"]}>
-              {renderStructuredText(
-                pipelineSummaryByDay.get(day.day) ?? day.summary,
-                sharedStyles["formatted-list"]
-              )}
-            </div>
-            <p>
-              Utterances: {day.stats.utteranceCount} | Words: {day.stats.wordCount} | Channels: {day.stats.channelCount}
-            </p>
-            <h3>Hourly Highlights</h3>
-            <div className={styles["hourly-highlight-grid"]}>
-              {Object.entries(day.hourly).map(([hour, summary]) => (
-                <section className={styles["hourly-highlight-card"]} key={hour}>
-                  <p className={styles["hourly-highlight-hour"]}>{hour}</p>
+        days.map((day) => {
+          const dayNotableMoments: NotableMoment[] = notableMomentsByDay.get(day.day) ?? [];
+          const canonicalDailySummary = pipelineSummaryByDay.get(day.day);
+
+          return (
+            <article
+              className={sharedStyles.panel}
+              id={`daily-day-${day.day}`}
+              key={day.day}
+              data-component-id="daily-day-panel"
+              data-component-uid={`${componentUid}-${day.day}`}
+            >
+              <h2>{day.day}</h2>
+              <div className={sharedStyles["formatted-copy"]}>
+                {canonicalDailySummary ? (
+                  renderStructuredText(canonicalDailySummary, sharedStyles["formatted-list"])
+                ) : (
                   <p className={sharedStyles.subtle}>
-                    Channels: {(day.stats.hourlyChannelLeads?.[hour] ?? []).join(" • ") || "No dominant channels detected"}
+                    Daily full summary is not ready for this day yet. Run pipeline and refresh once `daily_full` completes.
                   </p>
-                  <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(summary, sharedStyles["formatted-list"])}</div>
-                </section>
-              ))}
-            </div>
-          </article>
-        ))
+                )}
+              </div>
+              <p>
+                Utterances: {day.stats.utteranceCount} | Words: {day.stats.wordCount} | Channels: {day.stats.channelCount}
+              </p>
+
+
+              <section className={styles["daily-notable-section"]}>
+                <h3>Notable Moments</h3>
+                {dayNotableMoments.length ? (
+                  <div className={styles["daily-notable-grid"]}>
+                    {dayNotableMoments.map((moment) => (
+                      <article className={styles["daily-notable-card"]} key={`${day.day}-${moment.rank}-${moment.title}`}>
+                        <p className={styles["daily-notable-rank"]}>#{moment.rank}</p>
+                        <h4>{moment.title}</h4>
+                        <blockquote>{moment.quote}</blockquote>
+                        <p className={sharedStyles.subtle}>{moment.timestamp ?? "timestamp n/a"} • {moment.channel ?? "channel n/a"}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={sharedStyles.subtle}>Notable moments are not available yet for this day.</p>
+                )}
+              </section>
+
+              <h3>Hourly Highlights</h3>
+              <div className={styles["hourly-highlight-grid"]}>
+                {Object.entries(day.hourly)
+                  .sort(([leftHour], [rightHour]) => leftHour.localeCompare(rightHour))
+                  .map(([hour, summary]) => (
+                    <section className={styles["hourly-highlight-card"]} key={hour}>
+                      <p className={styles["hourly-highlight-hour"]}>{hour}</p>
+                      <p className={sharedStyles.subtle}>
+                        Channels: {(day.stats.hourlyChannelLeads?.[hour] ?? []).join(" • ") || "No dominant channels detected"}
+                      </p>
+                      <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(summary, sharedStyles["formatted-list"])}</div>
+                    </section>
+                  ))}
+              </div>
+            </article>
+          );
+        })
       ) : (
         <p className={styles["daily-empty"]}>No data yet. Trigger ingestion on Overview page.</p>
       )}
