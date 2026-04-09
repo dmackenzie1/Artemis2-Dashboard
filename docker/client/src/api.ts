@@ -269,7 +269,7 @@ export const fetchHealth = async (): Promise<HealthData> => {
 };
 
 export const fetchNotableMoments = async (): Promise<NotableMomentsData | null> => {
-  const response = await fetch(`${base}/pipeline/notable-moments`);
+  const response = await fetch(`${base}/pipeline/notable-moments`, { cache: "no-store" });
   if (!response.ok) {
     clientLogger.warn("Notable moments unavailable", { status: response.status });
     return null;
