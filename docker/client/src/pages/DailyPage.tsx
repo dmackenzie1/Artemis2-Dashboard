@@ -13,13 +13,14 @@ import sharedStyles from "../styles/shared.module.css";
 import styles from "./DailyPage.module.css";
 import { renderStructuredText } from "../utils/formatting/renderStructuredText";
 import { clientLogger } from "../utils/logging/clientLogger";
-import { subscribeToBroadcastLiveUpdates } from "../utils/live/liveEvents";
+import { useLiveUpdates } from "../context/LiveUpdatesContext";
 
 export const DailyPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [pipelineSummaryByDay, setPipelineSummaryByDay] = useState<Map<string, string>>(new Map());
   const [notableMoments, setNotableMoments] = useState<NotableMomentsData | null>(null);
   const { componentId, componentUid } = useComponentIdentity("daily-page");
+  const { globalRefreshVersion, lastEvent } = useLiveUpdates();
   const days = data?.days ?? [];
 
   const notableMomentsByDay = useMemo(
@@ -67,28 +68,29 @@ export const DailyPage: FC = () => {
 
   useEffect(() => {
     void loadDailyDashboard();
-
-    const onGlobalRefresh = (): void => {
-      void loadDailyDashboard();
-    };
-
-    window.addEventListener("global-data-refresh-requested", onGlobalRefresh);
     const refreshIntervalHandle = window.setInterval(() => {
       void loadDailyDashboard();
     }, 60000);
 
-    const liveUpdatesSubscription = subscribeToBroadcastLiveUpdates((event) => {
-      if (event.type === "pipeline.run.completed" || event.type === "dashboard.cache.updated") {
-        void loadDailyDashboard();
-      }
-    });
-
     return () => {
-      window.removeEventListener("global-data-refresh-requested", onGlobalRefresh);
       window.clearInterval(refreshIntervalHandle);
-      liveUpdatesSubscription.close();
     };
   }, [loadDailyDashboard]);
+
+  useEffect(() => {
+    if (!lastEvent) {
+      return;
+    }
+    if (lastEvent.type === "pipeline.run.completed" || lastEvent.type === "dashboard.cache.updated") {
+      void loadDailyDashboard();
+    }
+  }, [lastEvent, loadDailyDashboard]);
+
+  useEffect(() => {
+    if (globalRefreshVersion > 0) {
+      void loadDailyDashboard();
+    }
+  }, [globalRefreshVersion, loadDailyDashboard]);
 
   const scrollToDay = (day: string): void => {
     const section = document.getElementById(`daily-day-${day}`);

@@ -5,11 +5,12 @@ import { useComponentIdentity } from "../components/dashboard/primitives/useComp
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./NotableMomentsPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
-import { subscribeToBroadcastLiveUpdates } from "../utils/live/liveEvents";
+import { useLiveUpdates } from "../context/LiveUpdatesContext";
 
 export const NotableMomentsPage: FunctionComponent = () => {
   const [data, setData] = useState<NotableMomentsData | null>(null);
   const [showReasoning, setShowReasoning] = useState(false);
+  const { globalRefreshVersion, lastEvent } = useLiveUpdates();
   const { componentId, componentUid } = useComponentIdentity("notable-moments-page");
 
   const loadNotableMoments = useCallback(async (): Promise<void> => {
@@ -27,22 +28,30 @@ export const NotableMomentsPage: FunctionComponent = () => {
       void loadNotableMoments();
     }, 60000);
 
-    const liveUpdatesSubscription = subscribeToBroadcastLiveUpdates((event) => {
-      if (
-        event.type === "pipeline.run.completed" ||
-        event.type === "dashboard.cache.updated" ||
-        event.type === "date.updated" ||
-        event.type === "day.notable-queries.updated"
-      ) {
-        void loadNotableMoments();
-      }
-    });
-
     return () => {
       window.clearInterval(refreshIntervalHandle);
-      liveUpdatesSubscription.close();
     };
   }, [loadNotableMoments]);
+
+  useEffect(() => {
+    if (!lastEvent) {
+      return;
+    }
+    if (
+      lastEvent.type === "pipeline.run.completed" ||
+      lastEvent.type === "dashboard.cache.updated" ||
+      lastEvent.type === "date.updated" ||
+      lastEvent.type === "day.notable-queries.updated"
+    ) {
+      void loadNotableMoments();
+    }
+  }, [lastEvent, loadNotableMoments]);
+
+  useEffect(() => {
+    if (globalRefreshVersion > 0) {
+      void loadNotableMoments();
+    }
+  }, [globalRefreshVersion, loadNotableMoments]);
 
   const days = useMemo(() => {
     return data?.days ?? [];

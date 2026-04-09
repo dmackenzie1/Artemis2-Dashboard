@@ -10,6 +10,7 @@ import background6 from "./assets/backgrounds/art002e009288orig.jpg";
 import background7 from "./assets/backgrounds/art002e009299~large.jpg";
 import background8 from "./assets/backgrounds/art002e009301~large.jpg";
 import { App } from "./App";
+import { LiveUpdatesProvider } from "./context/LiveUpdatesContext";
 import "./styles/shared.module.css";
 
 const BACKGROUNDS: readonly string[] = [
@@ -29,7 +30,9 @@ document.documentElement.style.setProperty("--mission-background-image", `url("$
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <LiveUpdatesProvider>
+        <App />
+      </LiveUpdatesProvider>
     </BrowserRouter>
   </React.StrictMode>
 );

@@ -26,7 +26,6 @@ export type LiveUpdateEvent = {
   payload?: Record<string, unknown>;
 };
 
-export const LIVE_UPDATE_DOM_EVENT_PREFIX = "live-update:";
 export const LIVE_UPDATE_EVENT_TYPES: LiveUpdateEvent["type"][] = [
   "dashboard.cache.updated",
   "stats.updated",
@@ -49,36 +48,6 @@ export const LIVE_UPDATE_EVENT_TYPES: LiveUpdateEvent["type"][] = [
   "prompt.received",
   "prompt.error"
 ];
-
-export const broadcastLiveUpdateToDom = (event: LiveUpdateEvent): void => {
-  window.dispatchEvent(new CustomEvent<LiveUpdateEvent>(`${LIVE_UPDATE_DOM_EVENT_PREFIX}${event.type}`, { detail: event }));
-};
-
-export const subscribeToBroadcastLiveUpdates = (
-  onEvent: (event: LiveUpdateEvent) => void
-): { close: () => void } => {
-  const listeners = LIVE_UPDATE_EVENT_TYPES.map((eventType) => {
-    const handler = (event: Event): void => {
-      const customEvent = event as CustomEvent<LiveUpdateEvent>;
-      if (!customEvent.detail) {
-        return;
-      }
-
-      onEvent(customEvent.detail);
-    };
-
-    window.addEventListener(`${LIVE_UPDATE_DOM_EVENT_PREFIX}${eventType}`, handler);
-    return { eventType, handler };
-  });
-
-  return {
-    close: () => {
-      for (const listener of listeners) {
-        window.removeEventListener(`${LIVE_UPDATE_DOM_EVENT_PREFIX}${listener.eventType}`, listener.handler);
-      }
-    }
-  };
-};
 
 export const subscribeToLiveUpdates = (
   onEvent: (event: LiveUpdateEvent) => void

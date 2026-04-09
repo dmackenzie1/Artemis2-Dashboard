@@ -6,6 +6,7 @@ import { LoadingIndicator } from "../components/dashboard/primitives/LoadingIndi
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./WindowedDailyPage.module.css";
 import { renderStructuredText } from "../utils/formatting/renderStructuredText";
+import { useLiveUpdates } from "../context/LiveUpdatesContext";
 
 type WindowedDailyPageProps = {
   componentKey: string;
@@ -17,6 +18,7 @@ export const WindowedDailyPage: FC<WindowedDailyPageProps> = ({ componentKey, pa
   const [data, setData] = useState<TimeWindowSummaryData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { globalRefreshVersion } = useLiveUpdates();
   const { componentId, componentUid } = useComponentIdentity(componentKey);
 
   useEffect(() => {
@@ -34,15 +36,8 @@ export const WindowedDailyPage: FC<WindowedDailyPageProps> = ({ componentKey, pa
     };
 
     void load();
-    const onGlobalRefresh = (): void => {
-      void load();
-    };
-    window.addEventListener("global-data-refresh-requested", onGlobalRefresh);
 
-    return () => {
-      window.removeEventListener("global-data-refresh-requested", onGlobalRefresh);
-    };
-  }, [windowHours]);
+  }, [globalRefreshVersion, windowHours]);
 
   return (
     <div className={sharedStyles.stack} data-component-id={componentId} data-component-uid={componentUid}>

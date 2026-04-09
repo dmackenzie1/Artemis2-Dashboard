@@ -16,7 +16,7 @@ import { useComponentIdentity } from "../components/dashboard/primitives/useComp
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./SystemLogsPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
-import { subscribeToBroadcastLiveUpdates, type LiveUpdateEvent } from "../utils/live/liveEvents";
+import { useLiveUpdates } from "../context/LiveUpdatesContext";
 
 const formatTimestamp = (value: string): string => {
   const timestamp = Date.parse(value);
@@ -63,7 +63,7 @@ export const SystemLogsPage: FunctionComponent = () => {
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [isAdminActionRunning, setIsAdminActionRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [socketEvents, setSocketEvents] = useState<LiveUpdateEvent[]>([]);
+  const { globalRefreshVersion, lastEvent, recentEvents } = useLiveUpdates();
   const { componentId, componentUid } = useComponentIdentity("system-logs-page");
   const adminMode = useMemo(() => new URLSearchParams(location.search).get("admin") === "true", [location.search]);
 
@@ -102,24 +102,17 @@ export const SystemLogsPage: FunctionComponent = () => {
   useEffect(() => {
     void loadLogs();
     void loadPromptMatrix();
-    const onGlobalRefresh = (): void => {
-      void loadLogs();
-      void loadPromptMatrix();
-    };
-    window.addEventListener("global-data-refresh-requested", onGlobalRefresh);
-
-    return () => {
-      window.removeEventListener("global-data-refresh-requested", onGlobalRefresh);
-    };
   }, [loadLogs, loadPromptMatrix]);
 
   useEffect(() => {
-    const MAX_SOCKET_EVENTS = 150;
-    let reloadTimer: number | null = null;
-    const addSocketEvent = (event: LiveUpdateEvent): void => {
-      setSocketEvents((previous) => [event, ...previous].slice(0, MAX_SOCKET_EVENTS));
-    };
+    if (globalRefreshVersion > 0) {
+      void loadLogs();
+      void loadPromptMatrix();
+    }
+  }, [globalRefreshVersion, loadLogs, loadPromptMatrix]);
 
+  useEffect(() => {
+    let reloadTimer: number | null = null;
     const queuePromptMatrixReload = (): void => {
       if (reloadTimer !== null) {
         window.clearTimeout(reloadTimer);
@@ -130,26 +123,23 @@ export const SystemLogsPage: FunctionComponent = () => {
       }, 300);
     };
 
-    const subscription = subscribeToBroadcastLiveUpdates((event) => {
-      addSocketEvent(event);
-      if (
-        event.type === "prompt.sent" ||
-        event.type === "prompt.received" ||
-        event.type === "prompt.error" ||
-        event.type === "sql.jobs.completed" ||
-        event.type === "date.updated"
-      ) {
-        queuePromptMatrixReload();
-      }
-    });
+    if (
+      lastEvent &&
+      (lastEvent.type === "prompt.sent" ||
+        lastEvent.type === "prompt.received" ||
+        lastEvent.type === "prompt.error" ||
+        lastEvent.type === "sql.jobs.completed" ||
+        lastEvent.type === "date.updated")
+    ) {
+      queuePromptMatrixReload();
+    }
 
     return () => {
       if (reloadTimer !== null) {
         window.clearTimeout(reloadTimer);
       }
-      subscription.close();
     };
-  }, [loadPromptMatrix]);
+  }, [lastEvent, loadPromptMatrix]);
 
   const onClearCacheClick = async (): Promise<void> => {
     if (isAdminActionRunning) {
@@ -352,10 +342,10 @@ export const SystemLogsPage: FunctionComponent = () => {
       </section>
 
       <section className={sharedStyles.panel}>
-        <h3>Live Socket Event Stream ({socketEvents.length})</h3>
-        {socketEvents.length === 0 ? <p className={sharedStyles.subtle}>Waiting for socket events…</p> : null}
+        <h3>Live Socket Event Stream ({recentEvents.length})</h3>
+        {recentEvents.length === 0 ? <p className={sharedStyles.subtle}>Waiting for socket events…</p> : null}
         <ul className={styles["system-logs-list"]}>
-          {socketEvents.map((event, index) => (
+          {recentEvents.map((event, index) => (
             <li key={`${event.type}-${event.emittedAt}-${index}`}>
               <div className={styles["system-logs-item"]}>
                 <span>{event.type}</span>
