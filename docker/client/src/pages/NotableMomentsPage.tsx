@@ -1,10 +1,11 @@
 import type { FunctionComponent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchNotableMoments, type NotableMoment, type NotableMomentsData } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./NotableMomentsPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
+import { subscribeToLiveUpdates } from "../utils/live/liveEvents";
 
 type NotableMomentsDay = {
   day: string;
@@ -29,26 +30,32 @@ export const NotableMomentsPage: FunctionComponent = () => {
   const [showReasoning, setShowReasoning] = useState(false);
   const { componentId, componentUid } = useComponentIdentity("notable-moments-page");
 
+  const loadNotableMoments = useCallback(async (): Promise<void> => {
+    try {
+      const payload = await fetchNotableMoments();
+      setData(payload);
+    } catch (error: unknown) {
+      clientLogger.error("Failed to load notable moments", { error });
+    }
+  }, []);
+
   useEffect(() => {
-    let isMounted = true;
-
-    const loadNotableMoments = async (): Promise<void> => {
-      try {
-        const payload = await fetchNotableMoments();
-        if (isMounted) {
-          setData(payload);
-        }
-      } catch (error: unknown) {
-        clientLogger.error("Failed to load notable moments", { error });
-      }
-    };
-
     void loadNotableMoments();
+    const refreshIntervalHandle = window.setInterval(() => {
+      void loadNotableMoments();
+    }, 60000);
+
+    const liveUpdatesSubscription = subscribeToLiveUpdates((event) => {
+      if (event.type === "pipeline.run.completed" || event.type === "dashboard.cache.updated") {
+        void loadNotableMoments();
+      }
+    });
 
     return () => {
-      isMounted = false;
+      window.clearInterval(refreshIntervalHandle);
+      liveUpdatesSubscription.close();
     };
-  }, []);
+  }, [loadNotableMoments]);
 
   const days = useMemo(() => {
     return (data?.days ?? []).map(parseDayPayload).filter((entry): entry is NotableMomentsDay => Boolean(entry));
