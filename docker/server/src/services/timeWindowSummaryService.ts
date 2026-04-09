@@ -87,6 +87,10 @@ export class TimeWindowSummaryService {
     this.cache.clear();
   }
 
+  inspectCache(): ReturnType<ExpiringCache<TimeWindowSummary>["inspect"]> {
+    return this.cache.inspect();
+  }
+
   private async computeAndCacheWindowSummary(cacheKey: string, safeHours: number): Promise<TimeWindowSummary> {
     const windowEnd = dayjs().utc();
     const windowStart = windowEnd.subtract(safeHours, "hour");

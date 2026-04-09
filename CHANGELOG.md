@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: add server-side cache diagnostics/clear endpoints, set no-store headers on API responses, invalidate/prewarm stats caches after auto-ingestion, and switch admin refresh to full ingest+pipeline rebuild while forcing the Mission Text Workspace panel to fill the full overview column height. Intent: Ensure newly ingested day files reliably propagate to notable moments/min-max stats without stale cache artifacts and keep the primary text workspace visually stable even when content is temporarily empty.
 - fix: make the Notable Moments page auto-refresh from SSE pipeline/dashboard events with a 60-second polling fallback, and bypass browser caching for `/api/pipeline/notable-moments` fetches. Intent: Ensure operators see newly regenerated notable quote output shortly after ingestion/pipeline runs without requiring a manual page reload.
 - fix: rename Transcript Metrics "Scope" to "Full Scope" and make the stats panel stretch to full rail height so overflow content can scroll inside the panel body. Intent: Ensure operators can see the complete full-scope section and access lower metrics without clipping in constrained right-rail layouts.
 - fix: anchor the Overview transcript-activity histogram to the bottom row and let Mission Text Workspace consume the remaining vertical space between the header and histogram. Intent: Remove dead vertical gaps so operators can continuously scan mission text while keeping timeline activity fixed at the page bottom.

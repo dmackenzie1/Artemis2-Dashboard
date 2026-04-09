@@ -150,6 +150,18 @@ export class StatsService {
     this.hourlyCache.clear();
   }
 
+  inspectCaches(): {
+    summary: ReturnType<ExpiringCache<MissionStatsSummary>["inspect"]>;
+    daily: ReturnType<ExpiringCache<MissionStatsByDayEntry[]>["inspect"]>;
+    hourly: ReturnType<ExpiringCache<MissionHourlyChannelEntry[]>["inspect"]>;
+  } {
+    return {
+      summary: this.summaryCache.inspect(),
+      daily: this.dailyCache.inspect(),
+      hourly: this.hourlyCache.inspect()
+    };
+  }
+
   async primeCoreCaches(): Promise<void> {
     await Promise.all([this.getSummary(), this.getStatsByDay()]);
   }

@@ -161,6 +161,8 @@ export type TriggerPipelineRunResponse = {
   status: "already-running" | "started";
 }
 
+export type TriggerIngestResponse = DashboardData;
+
 export type NotableMoment = {
   rank: number;
   title: string;
@@ -208,6 +210,16 @@ export const triggerPipelineRun = async (): Promise<TriggerPipelineRunResponse> 
   }
 
   return (await response.json()) as TriggerPipelineRunResponse;
+};
+
+export const triggerIngest = async (): Promise<TriggerIngestResponse> => {
+  const response = await fetch(`${base}/ingest`, { method: "POST", cache: "no-store" });
+  if (!response.ok) {
+    clientLogger.error("Ingest request failed", { status: response.status });
+    throw new Error("Unable to trigger ingest");
+  }
+
+  return (await response.json()) as TriggerIngestResponse;
 };
 
 export const fetchStatsSummary = async (): Promise<MissionStatsSummaryData | null> => {

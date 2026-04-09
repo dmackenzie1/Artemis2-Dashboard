@@ -19,6 +19,12 @@
 
 .dashboard-text-pane {
   grid-area: text;
+  display: grid;
+  min-height: 0;
+}
+
+.dashboard-text-pane > * {
+  height: 100%;
 }
 
 .dashboard-side-pane {
@@ -33,6 +39,11 @@
 .dashboard-chat-pane {
   min-height: 0;
   overflow: hidden;
+}
+
+.dashboard-stats-pane > *,
+.dashboard-chat-pane > * {
+  height: 100%;
 }
 
 
