@@ -457,7 +457,13 @@ Return valid HTML fragments only using tags such as <h3>, <p>, <ul>, and <li>. D
           mode,
           query,
           queryTokens: ragRetrieval.queryTokens,
-          evidence: evidenceForPrompt.slice(0, 12)
+          evidence: evidenceForPrompt.slice(0, 12).map((entry) => ({
+            timestamp: entry.timestamp,
+            day: entry.day,
+            channel: entry.channel,
+            text: entry.text,
+            score: entry.score
+          }))
         }),
         componentId: `analysis/chat/${mode}`,
         cacheEnabled: false
