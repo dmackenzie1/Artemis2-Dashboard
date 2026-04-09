@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chat, fetchDashboard, fetchHealth, fetchStatsSummary, searchUtterances } from "./api";
+import { chat, fetchDashboard, fetchHealth, fetchStatsDailyVolume, fetchStatsSummary, searchUtterances } from "./api";
 
 const mockFetch = vi.fn<typeof fetch>();
 
@@ -99,5 +99,16 @@ describe("api helpers", () => {
 
     await expect(fetchStatsSummary()).resolves.toEqual(payload);
     expect(mockFetch).toHaveBeenCalledWith("/api/stats/summary");
+  });
+
+  it("loads database-backed daily transcript volume", async () => {
+    const payload = {
+      generatedAt: "2026-04-09T12:00:00Z",
+      days: [{ day: "2026-04-09", utterances: 120, words: 1300, channels: 8 }]
+    };
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => payload } as Response);
+
+    await expect(fetchStatsDailyVolume(5)).resolves.toEqual(payload);
+    expect(mockFetch).toHaveBeenCalledWith("/api/stats/daily-volume?days=5");
   });
 });

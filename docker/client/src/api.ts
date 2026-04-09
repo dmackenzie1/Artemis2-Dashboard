@@ -88,6 +88,16 @@ export type MissionHourlyChannelEntry = {
   utterances: number;
 };
 
+export type MissionDailyVolumeData = {
+  generatedAt: string;
+  days: Array<{
+    day: string;
+    utterances: number;
+    words: number;
+    channels: number;
+  }>;
+};
+
 export type TimelineDayEntry = {
   day: string;
   summary: string;
@@ -320,6 +330,16 @@ export const fetchStatsHourlyByChannel = async (days = 7): Promise<MissionHourly
   }
 
   return (await response.json()) as MissionHourlyChannelEntry[];
+};
+
+export const fetchStatsDailyVolume = async (days = 5): Promise<MissionDailyVolumeData | null> => {
+  const response = await fetch(`${base}/stats/daily-volume?days=${days}`);
+  if (!response.ok) {
+    clientLogger.warn("Daily transcript volume unavailable", { status: response.status, days });
+    return null;
+  }
+
+  return (await response.json()) as MissionDailyVolumeData;
 };
 
 
