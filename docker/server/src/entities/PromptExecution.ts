@@ -7,7 +7,10 @@ export class PromptExecution {
   componentId!: string;
   cacheKey!: string;
   cacheHit!: boolean;
+  responseDay!: string | null;
   startedAt!: Date;
+  sentAt!: Date;
+  receivedAt!: Date | null;
   finishedAt!: Date | null;
   status!: "running" | "success" | "failed";
   submittedText!: string;
@@ -24,7 +27,10 @@ export const PromptExecutionSchema = new EntitySchema<PromptExecution>({
     componentId: { type: "string", length: 128, index: true },
     cacheKey: { type: "string", length: 64, index: true },
     cacheHit: { type: "boolean", default: false, index: true },
+    responseDay: { type: "string", length: 64, index: true, nullable: true },
     startedAt: { type: "datetime", index: true },
+    sentAt: { type: "datetime", index: true },
+    receivedAt: { type: "datetime", nullable: true, index: true },
     finishedAt: { type: "datetime", nullable: true, index: true },
     status: { type: "string", length: 16, index: true },
     submittedText: { type: "text", default: "" },

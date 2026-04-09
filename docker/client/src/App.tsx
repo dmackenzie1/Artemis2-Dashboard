@@ -101,7 +101,9 @@ export const App: FC = () => {
         event.type === "sql.file.load.completed" ||
         event.type === "sql.jobs.completed" ||
         event.type === "llm.day.processing.completed" ||
-        event.type === "llm.days.completed"
+        event.type === "llm.days.completed" ||
+        event.type === "prompt.received" ||
+        event.type === "prompt.error"
       ) {
         window.dispatchEvent(new Event("global-data-refresh-requested"));
       }
@@ -147,7 +149,7 @@ export const App: FC = () => {
           <NavLink to="/timeline">Timeline</NavLink>
           <NavLink to="/notable">Notable</NavLink>
           <NavLink to="/chat">Chat</NavLink>
-          <NavLink to="/system-logs">System Logs</NavLink>
+          <NavLink to="/system-logs">System Status</NavLink>
           <NavLink to="/about">About</NavLink>
           <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer">
             TalkyBot

@@ -80,6 +80,20 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
     }
   });
 
+  router.get("/prompt-matrix-state", async (req, res, next) => {
+    try {
+      const query = z
+        .object({
+          days: z.coerce.number().int().min(1).max(20).optional()
+        })
+        .parse(req.query);
+      const payload = await pipelineService.getPromptMatrixState(query.days ?? 11);
+      res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get("/summaries", async (req, res, next) => {
     try {
       const query = z

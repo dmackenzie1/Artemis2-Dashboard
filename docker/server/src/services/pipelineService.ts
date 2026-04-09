@@ -6,9 +6,11 @@ import { dayjs } from "../lib/dayjs.js";
 import { PromptDefinition } from "../entities/PromptDefinition.js";
 import { PromptExecution } from "../entities/PromptExecution.js";
 import { SummaryArtifact } from "../entities/SummaryArtifact.js";
+import { IngestionSourceFile } from "../entities/IngestionSourceFile.js";
 import { TranscriptUtterance } from "../entities/TranscriptUtterance.js";
 import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
+import { liveUpdateBus } from "./liveUpdateBus.js";
 
 type EntityManagerProvider = () => EntityManager;
 
@@ -114,6 +116,24 @@ type SummaryArtifactView = {
   sourceDocumentCount: number;
 };
 
+type PromptMatrixCellState = "none" | "sent" | "received" | "error";
+
+type PromptMatrixCell = {
+  day: string;
+  state: PromptMatrixCellState;
+  sentAt: string | null;
+  receivedAt: string | null;
+  responseDay: string | null;
+  executionId: number | null;
+  errorMessage: string | null;
+};
+
+type PromptMatrixRow = {
+  key: string;
+  componentId: string;
+  cells: PromptMatrixCell[];
+};
+
 export class PipelineService {
   private runInProgress = false;
   private missionStatsCache: { computedAtMs: number; payload: MissionStatsView } | null = null;
@@ -143,6 +163,63 @@ export class PipelineService {
     }
 
     return `${joined.slice(0, maxChars)}…`;
+  }
+
+  private mapPromptExecutionStatusToMatrixState(status: PromptExecution["status"]): PromptMatrixCellState {
+    if (status === "success") {
+      return "received";
+    }
+    if (status === "failed") {
+      return "error";
+    }
+    return "sent";
+  }
+
+  private async listTranscriptDays(limit: number): Promise<string[]> {
+    const em = this.getEntityManager();
+    try {
+      const rows = (await em.getConnection().execute(
+        `
+          select to_char((timestamp at time zone 'UTC')::date, 'YYYY-MM-DD') as day
+          from transcript_utterances
+          group by 1
+          order by 1 desc
+          limit ?
+        `,
+        [limit]
+      )) as Array<{ day?: unknown }>;
+      return rows
+        .map((row) => (typeof row.day === "string" ? row.day : null))
+        .filter((dayKey): dayKey is string => Boolean(dayKey));
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  private derivePromptResponseDay(sourceContext: SourceContextDocument[]): string | null {
+    if (sourceContext.length === 0) {
+      return null;
+    }
+
+    const uniqueDays = Array.from(new Set(sourceContext.map((document) => this.deriveDayKey(document.path)))).filter(
+      (day) => day !== "unspecified-day"
+    );
+
+    if (uniqueDays.length !== 1) {
+      return null;
+    }
+
+    return uniqueDays[0] ?? null;
+  }
+
+  private async getLatestIngestAt(): Promise<string | null> {
+    const em = this.getEntityManager();
+    const latestSourceFile = await em.findOne(IngestionSourceFile, {}, { orderBy: { updatedAt: "desc" } });
+    if (!latestSourceFile) {
+      return null;
+    }
+
+    return dayjs(latestSourceFile.updatedAt).utc().toISOString();
   }
 
   private deriveDayKey(relativePath: string): string {
@@ -741,6 +818,7 @@ export class PipelineService {
     const failedAt = dayjs().utc().toDate();
     for (const execution of staleExecutions) {
       execution.status = "failed";
+      execution.receivedAt = failedAt;
       execution.finishedAt = failedAt;
       execution.errorMessage = "Recovered after interrupted pipeline run before completion.";
     }
@@ -806,12 +884,16 @@ export class PipelineService {
               2
             )
           : submittedText;
+      const responseDay = this.derivePromptResponseDay(promptSourceContext);
       const execution: PromptExecution = em.create(PromptExecution, {
         prompt,
         componentId: prompt.key,
         cacheKey: "",
         cacheHit: false,
+        responseDay,
         startedAt,
+        sentAt: startedAt,
+        receivedAt: null,
         finishedAt: null,
         status: "running",
         submittedText: missionSubmittedText,
@@ -821,6 +903,16 @@ export class PipelineService {
       em.persist(execution);
       await em.flush();
       const promptSubmissionPath = await this.persistPromptSubmission(prompt.key, missionSubmittedText);
+      liveUpdateBus.publish({
+        type: "prompt.sent",
+        payload: {
+          executionId: execution.id,
+          promptKey: prompt.key,
+          componentId: execution.componentId,
+          day: execution.responseDay ?? dayjs(execution.startedAt).utc().format("YYYY-MM-DD"),
+          sentAt: dayjs(execution.sentAt).utc().toISOString()
+        }
+      });
       serverLogger.info("Prompt execution started", {
         promptKey: prompt.key,
         sourceDocumentCount: sourceContext.length,
@@ -844,6 +936,7 @@ export class PipelineService {
         execution.cacheHit = false;
         execution.output = output;
         execution.finishedAt = dayjs().utc().toDate();
+        execution.receivedAt = execution.finishedAt;
         if (prompt.key === "daily_summary") {
           latestSummaryArtifactOutput = output;
           await this.persistSummaryArtifacts(output, promptSourceContext);
@@ -856,15 +949,39 @@ export class PipelineService {
           outputLength: output.length,
           outputPreview: this.createPreview(output, 220, 2)
         });
+        liveUpdateBus.publish({
+          type: "prompt.received",
+          payload: {
+            executionId: execution.id,
+            promptKey: prompt.key,
+            componentId: execution.componentId,
+            day: execution.responseDay ?? dayjs(execution.startedAt).utc().format("YYYY-MM-DD"),
+            sentAt: dayjs(execution.sentAt).utc().toISOString(),
+            receivedAt: dayjs(execution.receivedAt).utc().toISOString()
+          }
+        });
       } catch (error) {
         execution.status = "failed";
         execution.output = "";
         execution.errorMessage = error instanceof Error ? error.message : "Unknown error";
         execution.finishedAt = dayjs().utc().toDate();
+        execution.receivedAt = execution.finishedAt;
         serverLogger.error("Prompt response failed", {
           promptKey: prompt.key,
           componentId: execution.componentId,
           errorMessage: execution.errorMessage
+        });
+        liveUpdateBus.publish({
+          type: "prompt.error",
+          payload: {
+            executionId: execution.id,
+            promptKey: prompt.key,
+            componentId: execution.componentId,
+            day: execution.responseDay ?? dayjs(execution.startedAt).utc().format("YYYY-MM-DD"),
+            sentAt: dayjs(execution.sentAt).utc().toISOString(),
+            receivedAt: dayjs(execution.receivedAt).utc().toISOString(),
+            errorMessage: execution.errorMessage
+          }
         });
       }
 
@@ -904,6 +1021,80 @@ export class PipelineService {
     return {
       generatedAt: dayjs().utc().toISOString(),
       prompts: rows
+    };
+  }
+
+  async getPromptMatrixState(daysLimit = 11): Promise<{
+    generatedAt: string;
+    latestIngestAt: string | null;
+    days: string[];
+    prompts: PromptMatrixRow[];
+  }> {
+    const em = this.getEntityManager();
+    const safeDaysLimit = Math.max(1, Math.min(Math.trunc(daysLimit), 20));
+    const prompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
+    const executions = await em.find(
+      PromptExecution,
+      {},
+      {
+        populate: ["prompt"],
+        orderBy: { startedAt: "desc", id: "desc" },
+        limit: 10_000
+      }
+    );
+    const latestIngestAt = await this.getLatestIngestAt();
+    const transcriptDays = await this.listTranscriptDays(safeDaysLimit);
+    const executionDays = executions.map((execution) =>
+      execution.responseDay ?? dayjs(execution.sentAt ?? execution.startedAt).utc().format("YYYY-MM-DD")
+    );
+    const dayKeys = Array.from(new Set([...transcriptDays, ...executionDays]))
+      .sort((left, right) => left.localeCompare(right))
+      .slice(-safeDaysLimit);
+
+    const rowMap = new Map<string, PromptMatrixRow>();
+    for (const prompt of prompts) {
+      rowMap.set(prompt.key, {
+        key: prompt.key,
+        componentId: prompt.key,
+        cells: dayKeys.map((day) => ({
+          day,
+          state: "none",
+          sentAt: null,
+          receivedAt: null,
+          responseDay: null,
+          executionId: null,
+          errorMessage: null
+        }))
+      });
+    }
+
+    for (const execution of executions) {
+      const promptKey = execution.prompt.key;
+      const row = rowMap.get(promptKey);
+      if (!row) {
+        continue;
+      }
+      const day = execution.responseDay ?? dayjs(execution.sentAt ?? execution.startedAt).utc().format("YYYY-MM-DD");
+      const cell = row.cells.find((entry) => entry.day === day);
+      if (!cell || cell.executionId !== null) {
+        continue;
+      }
+
+      cell.state = this.mapPromptExecutionStatusToMatrixState(execution.status);
+      cell.sentAt = dayjs(execution.sentAt ?? execution.startedAt).utc().toISOString();
+      cell.receivedAt = execution.receivedAt ? dayjs(execution.receivedAt).utc().toISOString() : null;
+      cell.responseDay = execution.responseDay ?? null;
+      cell.executionId = execution.id;
+      cell.errorMessage = execution.status === "failed" ? execution.errorMessage : null;
+    }
+
+    return {
+      generatedAt: dayjs().utc().toISOString(),
+      latestIngestAt,
+      days: dayKeys,
+      prompts: prompts
+        .map((prompt) => rowMap.get(prompt.key))
+        .filter((row): row is PromptMatrixRow => Boolean(row))
     };
   }
 
