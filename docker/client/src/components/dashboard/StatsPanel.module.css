@@ -106,6 +106,24 @@
   font-variant-numeric: tabular-nums;
 }
 
+.daily-volume-table tbody tr:nth-child(odd) {
+  background: rgba(122, 204, 255, 0.04);
+}
+
+.daily-volume-table tfoot th,
+.daily-volume-table tfoot td {
+  border-top: 1px solid rgba(122, 204, 255, 0.2);
+  padding-top: 0.34rem;
+  color: rgba(222, 238, 255, 0.94);
+  font-weight: 600;
+}
+
+.daily-volume-table tfoot td {
+  text-align: right;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
 .stats-skeleton-grid {
   margin-top: 0.46rem;
   display: grid;

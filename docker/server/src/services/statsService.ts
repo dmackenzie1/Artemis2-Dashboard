@@ -27,6 +27,11 @@ export type MissionStatsByDayEntry = {
   channels: number;
 };
 
+export type MissionStatsDailyVolume = {
+  generatedAt: string;
+  days: MissionStatsByDayEntry[];
+};
+
 export type MissionHourlyChannelEntry = {
   hour: string;
   channel: string;
@@ -102,6 +107,17 @@ export class StatsService {
         channels: Number(row.channels)
       }));
     });
+  }
+
+  async getDailyVolume(days = 5): Promise<MissionStatsDailyVolume> {
+    const safeDays = Math.min(Math.max(Math.floor(days), 1), 30);
+    const entries = await this.getStatsByDay();
+    const slicedEntries = entries.slice(Math.max(entries.length - safeDays, 0)).reverse();
+
+    return {
+      generatedAt: dayjs().utc().toISOString(),
+      days: slicedEntries
+    };
   }
 
   async getUtterancesPerHourPerChannel(days = 7): Promise<MissionHourlyChannelEntry[]> {
