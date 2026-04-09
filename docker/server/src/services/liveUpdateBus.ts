@@ -19,7 +19,10 @@ export type LiveUpdateEvent = {
     | "sql.jobs.completed"
     | "llm.day.processing.started"
     | "llm.day.processing.completed"
-    | "llm.days.completed";
+    | "llm.days.completed"
+    | "prompt.sent"
+    | "prompt.received"
+    | "prompt.error";
   emittedAt: string;
   payload?: Record<string, unknown>;
 };

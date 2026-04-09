@@ -13,7 +13,7 @@ import sharedStyles from "../styles/shared.module.css";
 import styles from "./DailyPage.module.css";
 import { renderStructuredText } from "../utils/formatting/renderStructuredText";
 import { clientLogger } from "../utils/logging/clientLogger";
-import { subscribeToLiveUpdates } from "../utils/live/liveEvents";
+import { subscribeToBroadcastLiveUpdates } from "../utils/live/liveEvents";
 
 export const DailyPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -77,7 +77,7 @@ export const DailyPage: FC = () => {
       void loadDailyDashboard();
     }, 60000);
 
-    const liveUpdatesSubscription = subscribeToLiveUpdates((event) => {
+    const liveUpdatesSubscription = subscribeToBroadcastLiveUpdates((event) => {
       if (event.type === "pipeline.run.completed" || event.type === "dashboard.cache.updated") {
         void loadDailyDashboard();
       }

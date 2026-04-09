@@ -1,8 +1,13 @@
 import type { FunctionComponent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
+  clearServerCaches,
+  fetchPromptMatrixState,
   fetchSystemLogFile,
   fetchSystemLogs,
+  triggerIngest,
+  type PromptMatrixStateData,
   type SystemLogEntry,
   type SystemLogFileResponse,
   type SystemLogListResponse
@@ -11,7 +16,7 @@ import { useComponentIdentity } from "../components/dashboard/primitives/useComp
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./SystemLogsPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
-import { subscribeToLiveUpdates, type LiveUpdateEvent } from "../utils/live/liveEvents";
+import { subscribeToBroadcastLiveUpdates, type LiveUpdateEvent } from "../utils/live/liveEvents";
 
 const formatTimestamp = (value: string): string => {
   const timestamp = Date.parse(value);
@@ -30,15 +35,37 @@ const formatTimestamp = (value: string): string => {
   }).format(timestamp);
 };
 
+const formatCompactUtc = (value: string): string => {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return value;
+  }
+
+  const utcDate = new Date(timestamp);
+  const year = `${utcDate.getUTCFullYear()}`;
+  const month = `${utcDate.getUTCMonth() + 1}`.padStart(2, "0");
+  const day = `${utcDate.getUTCDate()}`.padStart(2, "0");
+  const hour = `${utcDate.getUTCHours()}`.padStart(2, "0");
+  const minute = `${utcDate.getUTCMinutes()}`.padStart(2, "0");
+  const second = `${utcDate.getUTCSeconds()}`.padStart(2, "0");
+
+  return `${year}${month}${day}T${hour}${minute}${second}`;
+};
+
 export const SystemLogsPage: FunctionComponent = () => {
+  const location = useLocation();
   const [data, setData] = useState<SystemLogListResponse | null>(null);
   const [selectedLog, setSelectedLog] = useState<SystemLogFileResponse | null>(null);
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [promptMatrix, setPromptMatrix] = useState<PromptMatrixStateData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMatrixLoading, setIsMatrixLoading] = useState(true);
   const [isFileLoading, setIsFileLoading] = useState(false);
+  const [isAdminActionRunning, setIsAdminActionRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [socketEvents, setSocketEvents] = useState<LiveUpdateEvent[]>([]);
   const { componentId, componentUid } = useComponentIdentity("system-logs-page");
+  const adminMode = useMemo(() => new URLSearchParams(location.search).get("admin") === "true", [location.search]);
 
   const loadLogs = useCallback(async (): Promise<void> => {
     setIsLoading(true);
@@ -59,32 +86,115 @@ export const SystemLogsPage: FunctionComponent = () => {
     }
   }, [selectedLogId]);
 
+  const loadPromptMatrix = useCallback(async (): Promise<void> => {
+    setIsMatrixLoading(true);
+    try {
+      const payload = await fetchPromptMatrixState(11);
+      setPromptMatrix(payload);
+    } catch (loadError) {
+      clientLogger.error("System status prompt matrix failed to load", { error: loadError });
+      setError("Unable to load prompt matrix state right now.");
+    } finally {
+      setIsMatrixLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadLogs();
+    void loadPromptMatrix();
     const onGlobalRefresh = (): void => {
       void loadLogs();
+      void loadPromptMatrix();
     };
     window.addEventListener("global-data-refresh-requested", onGlobalRefresh);
 
     return () => {
       window.removeEventListener("global-data-refresh-requested", onGlobalRefresh);
     };
-  }, [loadLogs]);
+  }, [loadLogs, loadPromptMatrix]);
 
   useEffect(() => {
     const MAX_SOCKET_EVENTS = 150;
+    let reloadTimer: number | null = null;
     const addSocketEvent = (event: LiveUpdateEvent): void => {
       setSocketEvents((previous) => [event, ...previous].slice(0, MAX_SOCKET_EVENTS));
     };
 
-    const subscription = subscribeToLiveUpdates((event) => {
+    const queuePromptMatrixReload = (): void => {
+      if (reloadTimer !== null) {
+        window.clearTimeout(reloadTimer);
+      }
+      reloadTimer = window.setTimeout(() => {
+        reloadTimer = null;
+        void loadPromptMatrix();
+      }, 300);
+    };
+
+    const subscription = subscribeToBroadcastLiveUpdates((event) => {
       addSocketEvent(event);
+      if (
+        event.type === "prompt.sent" ||
+        event.type === "prompt.received" ||
+        event.type === "prompt.error" ||
+        event.type === "sql.jobs.completed" ||
+        event.type === "date.updated"
+      ) {
+        queuePromptMatrixReload();
+      }
     });
 
     return () => {
+      if (reloadTimer !== null) {
+        window.clearTimeout(reloadTimer);
+      }
       subscription.close();
     };
-  }, []);
+  }, [loadPromptMatrix]);
+
+  const onClearCacheClick = async (): Promise<void> => {
+    if (isAdminActionRunning) {
+      return;
+    }
+
+    setIsAdminActionRunning(true);
+    try {
+      await clearServerCaches();
+      void loadLogs();
+      void loadPromptMatrix();
+    } catch (adminError) {
+      clientLogger.error("System status clear cache failed", { error: adminError });
+      setError("Unable to clear caches right now.");
+    } finally {
+      setIsAdminActionRunning(false);
+    }
+  };
+
+  const onRegenerateClick = async (): Promise<void> => {
+    if (isAdminActionRunning) {
+      return;
+    }
+
+    setIsAdminActionRunning(true);
+    try {
+      await triggerIngest();
+      void loadLogs();
+      void loadPromptMatrix();
+    } catch (adminError) {
+      clientLogger.error("System status regenerate failed", { error: adminError });
+      setError("Unable to regenerate right now.");
+    } finally {
+      setIsAdminActionRunning(false);
+    }
+  };
+
+  const matrixDays = promptMatrix?.days ?? [];
+  const matrixRows = promptMatrix?.prompts ?? [];
+  const symbolByState: Record<"none" | "sent" | "received" | "error", string> = {
+    none: "-",
+    sent: "/",
+    received: "✓",
+    error: "!"
+  };
 
   const onLogSelect = async (entry: SystemLogEntry): Promise<void> => {
     setIsFileLoading(true);
@@ -113,9 +223,9 @@ export const SystemLogsPage: FunctionComponent = () => {
     <section className={sharedStyles["timeline-page"]} data-component-id={componentId} data-component-uid={componentUid}>
       <header className={sharedStyles["timeline-header"]}>
         <p className={sharedStyles["timeline-kicker"]}>Observability</p>
-        <h2>System Logs</h2>
+        <h2>System Status</h2>
         <p className={sharedStyles["timeline-subtitle"]}>
-          Prompt submission/request/response files plus ingestion event records generated by backend data refresh workflows.
+          Prompt lifecycle telemetry, ingestion records, and live event health across all active mission days.
         </p>
       </header>
 
@@ -130,9 +240,82 @@ export const SystemLogsPage: FunctionComponent = () => {
         >
           Refresh
         </button>
+        {adminMode ? (
+          <>
+            <button
+              type="button"
+              className={sharedStyles["timeline-control-button"]}
+              onClick={() => {
+                void onClearCacheClick();
+              }}
+              disabled={isAdminActionRunning}
+            >
+              Clear Cache
+            </button>
+            <button
+              type="button"
+              className={sharedStyles["timeline-control-button"]}
+              onClick={() => {
+                void onRegenerateClick();
+              }}
+              disabled={isAdminActionRunning}
+            >
+              Re-gen All
+            </button>
+          </>
+        ) : null}
       </section>
 
       {error ? <p className={sharedStyles["timeline-error"]}>{error}</p> : null}
+
+      <section className={sharedStyles.panel}>
+        <h3>Prompt Matrix ({matrixDays.length} day{matrixDays.length === 1 ? "" : "s"})</h3>
+        <p className={sharedStyles.subtle}>
+          Latest ingest at: {promptMatrix?.latestIngestAt ? `${formatCompactUtc(promptMatrix.latestIngestAt)} UTC` : "n/a"}
+        </p>
+        <p className={sharedStyles.subtle}>Legend: / sent/in-progress • ✓ received • ! error • - no execution</p>
+        {isMatrixLoading ? <p className={sharedStyles.subtle}>Loading matrix…</p> : null}
+        {!isMatrixLoading && matrixRows.length === 0 ? <p className={sharedStyles.subtle}>No prompt activity available yet.</p> : null}
+        {!isMatrixLoading && matrixRows.length > 0 ? (
+          <div className={styles["system-status-matrix-scroll"]}>
+            <table className={styles["system-status-matrix"]}>
+              <thead>
+                <tr>
+                  <th>Prompt</th>
+                  {matrixDays.map((day) => (
+                    <th key={`matrix-day-${day}`}>{day}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {matrixRows.map((row) => (
+                  <tr key={row.key}>
+                    <th>{row.key}</th>
+                    {row.cells.map((cell) => (
+                      <td
+                        key={`${row.key}-${cell.day}`}
+                        title={`${row.key} ${cell.day} • ${cell.state}${
+                          cell.sentAt ? ` • sent ${formatCompactUtc(cell.sentAt)} UTC` : ""
+                        }${cell.receivedAt ? ` • received ${formatCompactUtc(cell.receivedAt)} UTC` : ""}${
+                          cell.errorMessage ? ` • ${cell.errorMessage}` : ""
+                        }`}
+                        data-state={cell.state}
+                      >
+                        <span className={styles["system-status-matrix-symbol"]}>{symbolByState[cell.state]}</span>
+                        {cell.receivedAt || cell.sentAt ? (
+                          <small className={styles["system-status-matrix-time"]}>
+                            {formatCompactUtc(cell.receivedAt ?? cell.sentAt ?? "")}
+                          </small>
+                        ) : null}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </section>
 
       <section className={styles["system-logs-layout"]}>
         <article className={sharedStyles.panel}>

@@ -5,7 +5,7 @@ import { useComponentIdentity } from "../components/dashboard/primitives/useComp
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./NotableMomentsPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
-import { subscribeToLiveUpdates } from "../utils/live/liveEvents";
+import { subscribeToBroadcastLiveUpdates } from "../utils/live/liveEvents";
 
 export const NotableMomentsPage: FunctionComponent = () => {
   const [data, setData] = useState<NotableMomentsData | null>(null);
@@ -27,7 +27,7 @@ export const NotableMomentsPage: FunctionComponent = () => {
       void loadNotableMoments();
     }, 60000);
 
-    const liveUpdatesSubscription = subscribeToLiveUpdates((event) => {
+    const liveUpdatesSubscription = subscribeToBroadcastLiveUpdates((event) => {
       if (
         event.type === "pipeline.run.completed" ||
         event.type === "dashboard.cache.updated" ||

@@ -70,6 +70,33 @@ const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<
     alter table "prompt_executions"
     alter column "cache_hit" set not null;
   `);
+
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    add column if not exists "response_day" varchar(64);
+  `);
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    add column if not exists "sent_at" timestamp;
+  `);
+  await orm.em.getConnection().execute(`
+    update "prompt_executions"
+    set "sent_at" = "started_at"
+    where "sent_at" is null;
+  `);
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    alter column "sent_at" set not null;
+  `);
+  await orm.em.getConnection().execute(`
+    alter table "prompt_executions"
+    add column if not exists "received_at" timestamp;
+  `);
+  await orm.em.getConnection().execute(`
+    update "prompt_executions"
+    set "received_at" = "finished_at"
+    where "received_at" is null and "finished_at" is not null;
+  `);
 };
 
 const ensureTranscriptSearchIndexes = async (orm: MikroORM): Promise<void> => {

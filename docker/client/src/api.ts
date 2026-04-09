@@ -38,6 +38,25 @@ export type PipelineDashboardData = {
   }>;
 };
 
+export type PromptMatrixStateData = {
+  generatedAt: string;
+  latestIngestAt: string | null;
+  days: string[];
+  prompts: Array<{
+    key: string;
+    componentId: string;
+    cells: Array<{
+      day: string;
+      state: "none" | "sent" | "received" | "error";
+      sentAt: string | null;
+      receivedAt: string | null;
+      responseDay: string | null;
+      executionId: number | null;
+      errorMessage: string | null;
+    }>;
+  }>;
+};
+
 export type PipelineSummariesData = {
   generatedAt: string;
   summaries: Array<{
@@ -254,6 +273,16 @@ export const fetchPipelineDashboard = async (): Promise<PipelineDashboardData | 
   }
 
   return (await response.json()) as PipelineDashboardData;
+};
+
+export const fetchPromptMatrixState = async (days = 11): Promise<PromptMatrixStateData> => {
+  const safeDays = Math.max(1, Math.min(Math.trunc(days), 20));
+  const response = await fetch(`${base}/pipeline/prompt-matrix-state?days=${safeDays}`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Unable to load prompt matrix state");
+  }
+
+  return (await response.json()) as PromptMatrixStateData;
 };
 
 export const fetchPipelineSummaries = async (options?: {
