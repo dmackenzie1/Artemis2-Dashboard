@@ -32,6 +32,21 @@ export type PipelineDashboardData = {
   }>;
 };
 
+export type PipelineDailySummariesData = {
+  generatedAt: string;
+  channelGroup: string;
+  days: Array<{
+    day: string;
+    channelGroup: string;
+    summary: string;
+    generatedAt: string;
+    updatedAt: string;
+    wordCount: number;
+    utteranceCount: number;
+    sourceDocumentCount: number;
+  }>;
+};
+
 export type MissionStatsSummaryData = {
   generatedAt: string;
   days: {
@@ -209,6 +224,16 @@ export const fetchPipelineDashboard = async (): Promise<PipelineDashboardData | 
   return (await response.json()) as PipelineDashboardData;
 };
 
+export const fetchPipelineDailySummaries = async (channelGroup = "*"): Promise<PipelineDailySummariesData | null> => {
+  const response = await fetch(`${base}/pipeline/daily-summaries?channelGroup=${encodeURIComponent(channelGroup)}`);
+  if (!response.ok) {
+    clientLogger.warn("Pipeline daily summaries unavailable", { status: response.status, channelGroup });
+    return null;
+  }
+
+  return (await response.json()) as PipelineDailySummariesData;
+};
+
 export const triggerPipelineRun = async (): Promise<TriggerPipelineRunResponse> => {
   const response = await fetch(`${base}/pipeline/run`, { method: "POST" });
   if (!response.ok) {
@@ -324,8 +349,16 @@ export const fetchSystemLogFile = async (id: string): Promise<SystemLogFileRespo
   return (await response.json()) as SystemLogFileResponse;
 };
 
-export const searchUtterances = async (query: string, limit = 8): Promise<UtteranceSearchResponse> => {
-  const response = await fetch(`${base}/search/utterances?q=${encodeURIComponent(query)}&limit=${limit}`);
+export const searchUtterances = async (
+  query: string,
+  limit = 8,
+  options?: {
+    channel?: string;
+  }
+): Promise<UtteranceSearchResponse> => {
+  const channelParam =
+    options?.channel && options.channel.trim().length > 0 ? `&channel=${encodeURIComponent(options.channel.trim())}` : "";
+  const response = await fetch(`${base}/search/utterances?q=${encodeURIComponent(query)}&limit=${limit}${channelParam}`);
   if (!response.ok) {
     throw new Error("Unable to search utterances");
   }
@@ -333,11 +366,17 @@ export const searchUtterances = async (query: string, limit = 8): Promise<Uttera
   return (await response.json()) as UtteranceSearchResponse;
 };
 
-export const chat = async (query: string, mode: ChatMode = "rag_chat"): Promise<ChatResponse> => {
+export const chat = async (
+  query: string,
+  mode: ChatMode = "rag_chat",
+  options?: {
+    channel?: string;
+  }
+): Promise<ChatResponse> => {
   const response = await fetch(`${base}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, mode })
+    body: JSON.stringify({ query, mode, channel: options?.channel?.trim() || undefined })
   });
 
   if (!response.ok) {

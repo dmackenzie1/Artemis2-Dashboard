@@ -16,7 +16,6 @@ const createPipelineService = (): PipelineService => {
   };
 
   return new PipelineService(() => fakeEntityManager, {
-    sourceFilesDir: "/tmp/source-files",
     promptsDir: "/tmp/prompts",
     promptSubmissionsDir: "/tmp/prompt-submissions",
     llmClient: llmClient as unknown as LlmClient,
@@ -105,7 +104,7 @@ describe("PipelineService prompt queue ordering", () => {
       buildPromptQueue: (promptDefinitions: Array<{ key: string }>) => Array<{ key: string }>;
     }).buildPromptQueue(prompts);
 
-    expect(orderedPrompts.map((prompt) => prompt.key)).toEqual(["daily_summary", "mission_summary", "top_topics"]);
+    expect(orderedPrompts.map((prompt) => prompt.key)).toEqual(["daily_summary", "mission_summary"]);
   });
 });
 

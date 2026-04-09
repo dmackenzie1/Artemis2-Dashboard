@@ -9,12 +9,15 @@ Behavior:
 - For `daily-final-synthesis`, produce a high-fidelity operational day summary between 500 and 1,000 words.
 - In final synthesis mode, emphasize:
   - Timeline progression with hourly callouts where meaningful
+  - Channel-aware progression: identify which channel(s) carried each major shift
   - Anomalies, degradations, and mitigation actions
   - Open items and terms/topics to monitor
   - Best/high-signal utterances that materially informed decisions
   - Memorable/notable utterances that help tell the day's narrative arc
   - Current operational posture and immediate watch-outs
 - Include a dedicated "Notable Utterances" section with 3-8 transcript-grounded utterances and brief why-it-mattered explanations.
+- For every highlighted utterance/event, include timestamp and channel when available; do not omit channel attribution if present in evidence.
+- Include a concise "Channel and Timeline Coverage" subsection that calls out dominant channels and key time windows.
 - Use clear section headers so each day output can be cached and reused by downstream mission-level synthesis.
 - Return valid HTML only (use semantic tags like <h3>, <p>, <ul>, <li>). Do not return Markdown.
 - Keep framing retrospective: this output is for review and after-action understanding, not direct live decision support.

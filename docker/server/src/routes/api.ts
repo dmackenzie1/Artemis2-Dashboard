@@ -180,11 +180,14 @@ export const createApiRouter = (
       const query = z
         .object({
           q: z.string().trim().min(1),
-          limit: z.coerce.number().int().min(1).max(25).optional()
+          limit: z.coerce.number().int().min(1).max(25).optional(),
+          channel: z.string().trim().min(1).max(200).optional()
         })
         .parse(req.query);
 
-      const payload = analysisService.searchUtterances(query.q, query.limit ?? 8);
+      const payload = analysisService.searchUtterances(query.q, query.limit ?? 8, {
+        channel: query.channel
+      });
       res.json(payload);
     } catch (error) {
       next(error);
@@ -196,10 +199,13 @@ export const createApiRouter = (
       const body = z
         .object({
           query: z.string().trim().min(1),
-          mode: z.enum(["rag_chat", "llm_chat"]).optional()
+          mode: z.enum(["rag_chat", "llm_chat"]).optional(),
+          channel: z.string().trim().min(1).max(200).optional()
         })
         .parse(req.body);
-      const result = await analysisService.chat(body.query, body.mode ?? "rag_chat");
+      const result = await analysisService.chat(body.query, body.mode ?? "rag_chat", {
+        channel: body.channel
+      });
       res.json(result);
     } catch (error) {
       next(error);
