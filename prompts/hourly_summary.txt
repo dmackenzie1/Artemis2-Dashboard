@@ -13,3 +13,4 @@ Rules:
 - Include only hours present in the input.
 - If an hour has low signal, provide a brief continuity note.
 - Keep language retrospective and review-oriented; do not present this as real-time command guidance.
+- Treat `hourSynopsis` and `topUtterances` as the primary evidence for each hour, and use `utterances` as supplemental context.
