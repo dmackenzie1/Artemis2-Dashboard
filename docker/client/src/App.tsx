@@ -1,7 +1,7 @@
 import type { FC } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
-import { triggerPipelineRun } from "./api";
+import { triggerIngest } from "./api";
 import { useComponentIdentity } from "./components/dashboard/primitives/useComponentIdentity";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DailyPage } from "./pages/DailyPage";
@@ -50,11 +50,14 @@ export const App: FC = () => {
 
     setIsAdminRefreshRunning(true);
     try {
-      const result = await triggerPipelineRun();
-      clientLogger.info("Admin-triggered pipeline refresh requested", { status: result.status, accepted: result.accepted });
+      const result = await triggerIngest();
+      clientLogger.info("Admin-triggered full ingest refresh requested", {
+        generatedAt: result.generatedAt,
+        totalDays: result.days.length
+      });
       window.dispatchEvent(new Event("dashboard-admin-refresh-requested"));
     } catch (error) {
-      clientLogger.error("Admin-triggered pipeline refresh failed", { error });
+      clientLogger.error("Admin-triggered full ingest refresh failed", { error });
     } finally {
       setIsAdminRefreshRunning(false);
     }
@@ -99,7 +102,7 @@ export const App: FC = () => {
                 void onAdminRefreshClick();
               }}
               disabled={isAdminRefreshRunning}
-              title="Admin: rerun pipeline and refresh this page's queries"
+              title="Admin: rerun ingest + pipeline + cache invalidation and refresh this page's queries"
             >
               ↻
             </button>

@@ -60,4 +60,27 @@ export class ExpiringCache<T> {
   clear(): void {
     this.entries.clear();
   }
+
+  inspect(): {
+    size: number;
+    keys: Array<{
+      key: string;
+      isStale: boolean;
+      freshUntilMs: number;
+      staleUntilMs: number;
+    }>;
+  } {
+    const now = Date.now();
+    const keys = [...this.entries.entries()].map(([key, entry]) => ({
+      key,
+      isStale: now >= entry.freshUntilMs,
+      freshUntilMs: entry.freshUntilMs,
+      staleUntilMs: entry.staleUntilMs
+    }));
+
+    return {
+      size: this.entries.size,
+      keys
+    };
+  }
 }

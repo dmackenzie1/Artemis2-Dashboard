@@ -71,6 +71,11 @@ const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<
 const app = express();
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json({ limit: "4mb" }));
+app.use("/api", (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  next();
+});
 app.get("/api/events", (_req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -198,6 +203,15 @@ const runAutoIngestion = async (): Promise<void> => {
     });
     const dashboard = await analysisService.ingestAndAnalyze();
     await runTranscriptAndPipelineRefresh();
+    statsService?.invalidateCaches();
+    timeWindowSummaryService?.invalidateCache();
+    if (statsService) {
+      void statsService.primeCoreCaches().catch((error) => {
+        serverLogger.warn("Failed to prime stats caches after auto-ingestion", {
+          error: serializeUnknownError(error)
+        });
+      });
+    }
     liveUpdateBus.publish({
       type: "dashboard.cache.updated",
       payload: { trigger: "auto-ingestion", generatedAt: dashboard.generatedAt, totalDays: dashboard.days.length }
@@ -340,7 +354,14 @@ app.use(
     });
     liveUpdateBus.publish({ type: "stats.updated", payload: { trigger: "manual:/api/ingest" } });
     liveUpdateBus.publish({ type: "time-window-summary.updated", payload: { trigger: "manual:/api/ingest" } });
-  }, () => statsService, () => timeWindowSummaryService)
+  }, () => statsService, () => timeWindowSummaryService, async () => {
+    analysisService.clearAnalysisCache();
+    statsService?.invalidateCaches();
+    timeWindowSummaryService?.invalidateCache();
+    liveUpdateBus.publish({ type: "dashboard.cache.updated", payload: { trigger: "manual:/api/cache/clear", generatedAt: null, totalDays: null } });
+    liveUpdateBus.publish({ type: "stats.updated", payload: { trigger: "manual:/api/cache/clear" } });
+    liveUpdateBus.publish({ type: "time-window-summary.updated", payload: { trigger: "manual:/api/cache/clear" } });
+  })
 );
 
 if (env.TRANSCRIPTS_DB_ENABLED) {

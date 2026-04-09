@@ -11,7 +11,8 @@ export const createApiRouter = (
   getLlmConnectivityStatus: () => LlmConnectivityStatus,
   onIngestionComplete?: () => Promise<void>,
   getStatsService?: () => StatsService | null,
-  getTimeWindowSummaryService?: () => TimeWindowSummaryService | null
+  getTimeWindowSummaryService?: () => TimeWindowSummaryService | null,
+  onClearServerCaches?: () => Promise<void>
 ): Router => {
   const router = Router();
 
@@ -36,6 +37,35 @@ export const createApiRouter = (
 
   router.get("/dashboard", (_req, res) => {
     res.json(analysisService.getCache());
+  });
+
+  router.get("/cache/inspect", (_req, res) => {
+    const statsService = getStatsService?.();
+    const timeWindowSummaryService = getTimeWindowSummaryService?.();
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      analysis: analysisService.inspectCacheState(),
+      stats: statsService ? statsService.inspectCaches() : null,
+      rollingWindowSummary: timeWindowSummaryService ? timeWindowSummaryService.inspectCache() : null
+    });
+  });
+
+  router.post("/cache/clear", async (_req, res, next) => {
+    try {
+      if (onClearServerCaches) {
+        await onClearServerCaches();
+      } else {
+        analysisService.clearAnalysisCache();
+      }
+
+      res.status(202).json({
+        accepted: true,
+        status: "cleared"
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
   router.get("/timeline", (_req, res) => {

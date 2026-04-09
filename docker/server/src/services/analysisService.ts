@@ -213,6 +213,29 @@ export class AnalysisService {
     return this.cache;
   }
 
+  clearAnalysisCache(): void {
+    this.cache = null;
+  }
+
+  inspectCacheState(): {
+    analysisCache: { generatedAt: string | null; dayCount: number };
+    utteranceStore: { totalUtterances: number; dayCount: number; minDay: string | null; maxDay: string | null };
+  } {
+    const sortedDays = [...new Set(this.utterances.map((entry) => entry.day))].sort();
+    return {
+      analysisCache: {
+        generatedAt: this.cache?.generatedAt ?? null,
+        dayCount: this.cache?.days.length ?? 0
+      },
+      utteranceStore: {
+        totalUtterances: this.utterances.length,
+        dayCount: sortedDays.length,
+        minDay: sortedDays[0] ?? null,
+        maxDay: sortedDays[sortedDays.length - 1] ?? null
+      }
+    };
+  }
+
   getTopNotableUtterances(limit = 10, days = 7): NotableUtterance[] {
     if (this.utterances.length === 0) {
       return [];
