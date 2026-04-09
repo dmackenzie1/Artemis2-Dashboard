@@ -15,6 +15,7 @@ export const createApiRouter = (
   onClearServerCaches?: () => Promise<void>
 ): Router => {
   const router = Router();
+  const MAX_NOTABLE_UTTERANCES_LIMIT = 50;
 
   router.get("/health", (_req, res) => {
     res.json({ ok: true, llm: getLlmConnectivityStatus() });
@@ -157,15 +158,16 @@ export const createApiRouter = (
     try {
       const query = z
         .object({
-          limit: z.coerce.number().int().min(1).max(50).optional(),
+          limit: z.coerce.number().int().min(1).optional(),
           days: z.coerce.number().int().min(1).max(30).optional()
         })
         .parse(req.query);
 
-      const payload = analysisService.getTopNotableUtterances(query.limit ?? 10, query.days ?? 7);
+      const normalizedLimit = Math.min(query.limit ?? 10, MAX_NOTABLE_UTTERANCES_LIMIT);
+      const payload = analysisService.getTopNotableUtterances(normalizedLimit, query.days ?? 7);
       res.json({
         totalUtterances: payload.length,
-        limit: query.limit ?? 10,
+        limit: normalizedLimit,
         days: query.days ?? 7,
         utterances: payload
       });
