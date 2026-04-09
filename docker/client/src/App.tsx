@@ -1,7 +1,7 @@
 import type { FC } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
-import { triggerIngest } from "./api";
+import { clearServerCaches, triggerIngest } from "./api";
 import { useComponentIdentity } from "./components/dashboard/primitives/useComponentIdentity";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DailyPage } from "./pages/DailyPage";
@@ -15,6 +15,7 @@ import { AboutPage } from "./pages/AboutPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 import type { EmsspressobotController } from "./utils/emsspressobot";
 import { installEmsspressobot } from "./utils/emsspressobot";
+import { subscribeToLiveUpdates } from "./utils/live/liveEvents";
 
 export const App: FC = () => {
   const [isAdminRefreshRunning, setIsAdminRefreshRunning] = useState(false);
@@ -42,6 +43,60 @@ export const App: FC = () => {
 
     return undefined;
   }, [isEspressoBotVisible]);
+
+  useEffect(() => {
+    const cacheClearValue = new URLSearchParams(location.search).get("cacheClear");
+    if (cacheClearValue !== "true") {
+      return;
+    }
+
+    let cancelled = false;
+    void clearServerCaches()
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+        clientLogger.info("Server caches cleared from query parameter trigger", result);
+        window.dispatchEvent(new Event("dashboard-admin-refresh-requested"));
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        clientLogger.error("Failed to clear server caches from query parameter trigger", { error });
+      })
+      .finally(() => {
+        if (cancelled) {
+          return;
+        }
+        const params = new URLSearchParams(location.search);
+        params.delete("cacheClear");
+        const nextQuery = params.toString();
+        const nextPath = `${location.pathname}${nextQuery ? `?${nextQuery}` : ""}${location.hash}`;
+        window.history.replaceState({}, "", nextPath);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.hash, location.pathname, location.search]);
+
+  useEffect(() => {
+    const subscription = subscribeToLiveUpdates((event) => {
+      if (
+        event.type === "dashboard.cache.updated" ||
+        event.type === "stats.updated" ||
+        event.type === "time-window-summary.updated" ||
+        event.type === "pipeline.run.completed"
+      ) {
+        window.dispatchEvent(new Event("global-data-refresh-requested"));
+      }
+    });
+
+    return () => {
+      subscription.close();
+    };
+  }, []);
 
   const onAdminRefreshClick = async (): Promise<void> => {
     if (isAdminRefreshRunning) {

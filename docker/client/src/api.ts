@@ -173,11 +173,18 @@ export type NotableMoment = {
   sourcePath: string;
 };
 
+export type NotableMomentsDay = {
+  day: string;
+  moments: NotableMoment[];
+};
+
 export type NotableMomentsData = {
   generatedAt: string;
   status: "running" | "success" | "failed" | "never";
   targetMomentsPerDay?: number;
-  days: string[];
+  days: NotableMomentsDay[];
+  parsedDayCount?: number;
+  droppedDayCount?: number;
 };
 
 const base = "/api";
@@ -288,6 +295,15 @@ export const fetchNotableMoments = async (): Promise<NotableMomentsData | null> 
   }
 
   return (await response.json()) as NotableMomentsData;
+};
+
+export const clearServerCaches = async (): Promise<{ accepted: boolean; status: string }> => {
+  const response = await fetch(`${base}/cache/clear`, { method: "POST", cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Unable to clear server caches");
+  }
+
+  return (await response.json()) as { accepted: boolean; status: string };
 };
 
 export const fetchSystemLogs = async (): Promise<SystemLogListResponse> => {
