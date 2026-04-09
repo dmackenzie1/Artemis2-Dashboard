@@ -1,9 +1,11 @@
 import { createReadStream } from "node:fs";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { parse, type CsvError, type Info } from "csv-parse";
 import { TranscriptUtterance } from "../entities/TranscriptUtterance.js";
+import { IngestionSourceFile } from "../entities/IngestionSourceFile.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 import { tokenizeUtterance } from "../lib/tokenizer.js";
 import { compareTranscriptFiles, parseTranscriptFileName } from "../lib/transcriptFileNaming.js";
@@ -23,14 +25,19 @@ type IngestFileResult = {
   inserted: number;
   skipped: number;
   parseErrors: number;
+  checksum: string;
+  day: string;
 };
 
 export type TranscriptIngestionSummary = {
   filesProcessed: number;
+  filesSkippedUnchanged: number;
   inserted: number;
+  deleted: number;
   skipped: number;
   parseErrors: number;
   utterancesInDatabase: number;
+  changedDayKeys: string[];
 };
 
 const BATCH_SIZE = 750;
@@ -40,7 +47,18 @@ type TimestampValidationState = {
   outOfRangeHourRows: number;
 };
 
-const ingestFile = async (filePath: string, em: EntityManager): Promise<IngestFileResult> => {
+const checksumFile = async (filePath: string): Promise<string> => {
+  const hash = crypto.createHash("sha256");
+  await new Promise<void>((resolve, reject) => {
+    const stream = createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve());
+    stream.on("error", (error) => reject(error));
+  });
+  return hash.digest("hex");
+};
+
+const ingestFile = async (filePath: string, em: EntityManager, checksum: string): Promise<IngestFileResult> => {
   const sourceFile = path.basename(filePath);
   const parsedSourceFile = parseTranscriptFileName(sourceFile);
   let parseErrors = 0;
@@ -201,7 +219,13 @@ const ingestFile = async (filePath: string, em: EntityManager): Promise<IngestFi
     timestampValidation: validationState
   });
 
-  return { inserted, skipped, parseErrors };
+  return {
+    inserted,
+    skipped,
+    parseErrors,
+    checksum,
+    day: parsedSourceFile?.day ?? "unspecified-day"
+  };
 };
 
 const logOverlapWarnings = (fileNames: string[]): void => {
@@ -257,23 +281,65 @@ export const ingestTranscriptCsvDirectory = async (transcriptCsvDir: string, em:
 
   logOverlapWarnings(files);
 
-  const existingUtteranceCount = await em.count(TranscriptUtterance, {});
-  serverLogger.info("Resetting transcript table before CSV ingestion", {
-    existingUtteranceCount
-  });
-  await em.nativeDelete(TranscriptUtterance, {});
-
+  const manifestRows = await em.find(IngestionSourceFile, {});
+  const manifestBySourceFile = new Map(manifestRows.map((row) => [row.sourceFile, row]));
+  let filesSkippedUnchanged = 0;
   let inserted = 0;
+  let deleted = 0;
   let skipped = 0;
   let parseErrors = 0;
+  const changedDayKeys = new Set<string>();
+
+  const removedFiles = manifestRows.filter((row) => !files.includes(row.sourceFile));
+  for (const removed of removedFiles) {
+    const removedRows = await em.nativeDelete(TranscriptUtterance, { sourceFile: removed.sourceFile });
+    deleted += removedRows;
+    changedDayKeys.add(removed.day);
+    await em.nativeDelete(IngestionSourceFile, { sourceFile: removed.sourceFile });
+    serverLogger.info("Removed transcript rows for deleted source file", {
+      sourceFile: removed.sourceFile,
+      deletedRows: removedRows,
+      day: removed.day
+    });
+  }
+
   for (const fileName of files) {
     const filePath = path.join(transcriptCsvDir, fileName);
-    const result = await ingestFile(filePath, em);
+    const checksum = await checksumFile(filePath);
+    const existingManifest = manifestBySourceFile.get(fileName);
+    if (existingManifest?.checksum === checksum) {
+      filesSkippedUnchanged += 1;
+      continue;
+    }
+
+    const parsedSourceFile = parseTranscriptFileName(fileName);
+    const day = parsedSourceFile?.day ?? "unspecified-day";
+    const deletedRows = await em.nativeDelete(TranscriptUtterance, { sourceFile: fileName });
+    deleted += deletedRows;
+
+    const result = await ingestFile(filePath, em, checksum);
     inserted += result.inserted;
     skipped += result.skipped;
     parseErrors += result.parseErrors;
+    changedDayKeys.add(result.day);
+
+    const nextManifest = existingManifest ?? em.create(IngestionSourceFile, {
+      sourceFile: fileName,
+      checksum: result.checksum,
+      day,
+      rowCount: result.inserted,
+      updatedAt: new Date()
+    });
+    nextManifest.checksum = result.checksum;
+    nextManifest.day = day;
+    nextManifest.rowCount = result.inserted;
+    nextManifest.updatedAt = new Date();
+    em.persist(nextManifest);
+    await em.flush();
+
     serverLogger.info("Inserted records from transcript file", {
       fileName,
+      deletedRows,
       insertedRecords: result.inserted,
       skippedRecords: result.skipped,
       parseErrors: result.parseErrors,
@@ -284,9 +350,12 @@ export const ingestTranscriptCsvDirectory = async (transcriptCsvDir: string, em:
   const utterancesInDatabase = await em.count(TranscriptUtterance, {});
   return {
     filesProcessed: files.length,
+    filesSkippedUnchanged,
     inserted,
+    deleted,
     skipped,
     parseErrors,
-    utterancesInDatabase
+    utterancesInDatabase,
+    changedDayKeys: [...changedDayKeys].sort((left, right) => left.localeCompare(right))
   };
 };

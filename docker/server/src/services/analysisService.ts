@@ -10,6 +10,7 @@ import { retrieveRankedUtterances } from "./transcriptRetrievalService.js";
 import { ExpiringCache } from "./expiringCache.js";
 import { parseLlmJsonWithSchema } from "../lib/llmJson.js";
 import { z } from "zod";
+import { tokenizeUtterance } from "../lib/tokenizer.js";
 
 const { groupBy, uniq } = lodash;
 
@@ -19,13 +20,6 @@ const dailySummaryPlaceholder =
 const hourlyPromptMaxUtterancesPerHour = 60;
 const hourlyPromptTopUtterancesPerHour = 10;
 const topicPromptMaxUtterancesPerWindow = 260;
-
-
-const tokenize = (value: string): string[] =>
-  value
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length >= 4);
 
 const parseHourlyHighlights = (rawResponse: string): Record<string, string> => {
   const hourlySchema = z.record(z.string(), z.string());
@@ -483,14 +477,14 @@ export class AnalysisService {
     const tokenFrequency = new Map<string, number>();
 
     for (const entry of scoped) {
-      const uniqueTokens = new Set(tokenize(entry.text));
+      const uniqueTokens = new Set(tokenizeUtterance(entry.text));
       for (const token of uniqueTokens) {
         tokenFrequency.set(token, (tokenFrequency.get(token) ?? 0) + 1);
       }
     }
 
     const ranked = scoped.map((entry) => {
-      const uniqueTokens = [...new Set(tokenize(entry.text))];
+      const uniqueTokens = [...new Set(tokenizeUtterance(entry.text))];
       const rarityScore = uniqueTokens.reduce((total, token) => total + 1 / Math.max(tokenFrequency.get(token) ?? 1, 1), 0);
       const normalizedRarity = rarityScore / Math.max(uniqueTokens.length, 1);
       const wordCount = entry.text.trim().split(/\s+/).filter(Boolean).length;

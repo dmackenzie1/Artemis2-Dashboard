@@ -80,14 +80,29 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
     }
   });
 
-  router.get("/daily-summaries", async (req, res, next) => {
+  router.get("/summaries", async (req, res, next) => {
     try {
       const query = z
         .object({
+          summaryType: z.string().trim().min(1).max(64).optional(),
+          day: z.string().trim().min(1).max(64).optional(),
           channelGroup: z.string().trim().min(1).max(128).optional()
         })
         .parse(req.query);
-      const payload = await pipelineService.getDailySummaries(query.channelGroup ?? "*");
+      const payload = await pipelineService.getSummaries({
+        summaryType: query.summaryType,
+        day: query.day,
+        channelGroup: query.channelGroup
+      });
+      res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/summaries/catalog", async (_req, res, next) => {
+    try {
+      const payload = await pipelineService.getSummariesCatalog();
       res.json(payload);
     } catch (error) {
       next(error);
