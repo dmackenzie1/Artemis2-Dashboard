@@ -7,7 +7,6 @@ import { UtterancesTimelinePanel } from "../components/dashboard/UtterancesTimel
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import styles from "./DashboardPage.module.css";
 import { useLocation } from "react-router-dom";
-import { subscribeToLiveUpdates } from "../utils/live/liveEvents";
 
 export const DashboardPage: FunctionComponent = () => {
   const { componentId, componentUid } = useComponentIdentity("dashboard-page");
@@ -32,24 +31,14 @@ export const DashboardPage: FunctionComponent = () => {
   }, []);
 
   useEffect(() => {
-    const subscription = subscribeToLiveUpdates((event) => {
-      if (
-        event.type === "dashboard.cache.updated" ||
-        event.type === "stats.updated" ||
-        event.type === "time-window-summary.updated" ||
-        event.type === "pipeline.run.completed" ||
-        event.type === "date.updated" ||
-        event.type === "day.ingested" ||
-        event.type === "day.llm.loaded" ||
-        event.type === "day.notable-queries.updated"
-      ) {
-        setRefreshToken((previous) => previous + 1);
-        setLastRefreshAt(event.emittedAt);
-      }
-    });
+    const handleGlobalRefresh = (): void => {
+      setRefreshToken((previous) => previous + 1);
+      setLastRefreshAt(new Date().toISOString());
+    };
+    window.addEventListener("global-data-refresh-requested", handleGlobalRefresh);
 
     return () => {
-      subscription.close();
+      window.removeEventListener("global-data-refresh-requested", handleGlobalRefresh);
     };
   }, []);
 

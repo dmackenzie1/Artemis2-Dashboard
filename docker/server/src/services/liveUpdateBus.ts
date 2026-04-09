@@ -13,7 +13,13 @@ export type LiveUpdateEvent = {
     | "day.ingested"
     | "day.llm.loaded"
     | "day.notable-queries.updated"
-    | "date.updated";
+    | "date.updated"
+    | "sql.file.load.started"
+    | "sql.file.load.completed"
+    | "sql.jobs.completed"
+    | "llm.day.processing.started"
+    | "llm.day.processing.completed"
+    | "llm.days.completed";
   emittedAt: string;
   payload?: Record<string, unknown>;
 };

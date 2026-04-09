@@ -11,6 +11,7 @@ import { useComponentIdentity } from "../components/dashboard/primitives/useComp
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./SystemLogsPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
+import { subscribeToLiveUpdates, type LiveUpdateEvent } from "../utils/live/liveEvents";
 
 const formatTimestamp = (value: string): string => {
   const timestamp = Date.parse(value);
@@ -36,6 +37,7 @@ export const SystemLogsPage: FunctionComponent = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isFileLoading, setIsFileLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [socketEvents, setSocketEvents] = useState<LiveUpdateEvent[]>([]);
   const { componentId, componentUid } = useComponentIdentity("system-logs-page");
 
   const loadLogs = useCallback(async (): Promise<void> => {
@@ -68,6 +70,21 @@ export const SystemLogsPage: FunctionComponent = () => {
       window.removeEventListener("global-data-refresh-requested", onGlobalRefresh);
     };
   }, [loadLogs]);
+
+  useEffect(() => {
+    const MAX_SOCKET_EVENTS = 150;
+    const addSocketEvent = (event: LiveUpdateEvent): void => {
+      setSocketEvents((previous) => [event, ...previous].slice(0, MAX_SOCKET_EVENTS));
+    };
+
+    const subscription = subscribeToLiveUpdates((event) => {
+      addSocketEvent(event);
+    });
+
+    return () => {
+      subscription.close();
+    };
+  }, []);
 
   const onLogSelect = async (entry: SystemLogEntry): Promise<void> => {
     setIsFileLoading(true);
@@ -149,6 +166,22 @@ export const SystemLogsPage: FunctionComponent = () => {
             className={styles["system-logs-textbox"]}
           />
         </article>
+      </section>
+
+      <section className={sharedStyles.panel}>
+        <h3>Live Socket Event Stream ({socketEvents.length})</h3>
+        {socketEvents.length === 0 ? <p className={sharedStyles.subtle}>Waiting for socket events…</p> : null}
+        <ul className={styles["system-logs-list"]}>
+          {socketEvents.map((event, index) => (
+            <li key={`${event.type}-${event.emittedAt}-${index}`}>
+              <div className={styles["system-logs-item"]}>
+                <span>{event.type}</span>
+                <strong>{formatTimestamp(event.emittedAt)} UTC</strong>
+                <small>{JSON.stringify(event.payload ?? {}, null, 0)}</small>
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
     </section>
   );

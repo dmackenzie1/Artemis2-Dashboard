@@ -15,7 +15,7 @@ import { AboutPage } from "./pages/AboutPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 import type { EmsspressobotController } from "./utils/emsspressobot";
 import { installEmsspressobot } from "./utils/emsspressobot";
-import { subscribeToLiveUpdates } from "./utils/live/liveEvents";
+import { broadcastLiveUpdateToDom, subscribeToLiveUpdates } from "./utils/live/liveEvents";
 
 export const App: FC = () => {
   const [isAdminRefreshRunning, setIsAdminRefreshRunning] = useState(false);
@@ -83,6 +83,12 @@ export const App: FC = () => {
 
   useEffect(() => {
     const subscription = subscribeToLiveUpdates((event) => {
+      clientLogger.info("Socket live-update event received", {
+        type: event.type,
+        emittedAt: event.emittedAt,
+        payload: event.payload ?? null
+      });
+      broadcastLiveUpdateToDom(event);
       if (
         event.type === "dashboard.cache.updated" ||
         event.type === "stats.updated" ||
@@ -91,7 +97,11 @@ export const App: FC = () => {
         event.type === "date.updated" ||
         event.type === "day.ingested" ||
         event.type === "day.llm.loaded" ||
-        event.type === "day.notable-queries.updated"
+        event.type === "day.notable-queries.updated" ||
+        event.type === "sql.file.load.completed" ||
+        event.type === "sql.jobs.completed" ||
+        event.type === "llm.day.processing.completed" ||
+        event.type === "llm.days.completed"
       ) {
         window.dispatchEvent(new Event("global-data-refresh-requested"));
       }

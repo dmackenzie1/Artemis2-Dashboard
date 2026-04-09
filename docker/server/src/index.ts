@@ -217,6 +217,45 @@ type IngestionEventPayload = {
   details: Record<string, unknown>;
 };
 
+const publishSqlFileLoadStartedEvent = (options: { sourceFile: string; day: string; trigger: string; sourcePath: string | null }): void => {
+  liveUpdateBus.publish({
+    type: "sql.file.load.started",
+    payload: {
+      sourceFile: options.sourceFile,
+      day: options.day,
+      trigger: options.trigger,
+      sourcePath: options.sourcePath
+    }
+  });
+};
+
+const publishSqlFileLoadCompletedEvent = (options: {
+  sourceFile: string;
+  day: string;
+  inserted: number;
+  deletedRows: number;
+  skipped: number;
+  parseErrors: number;
+  utterancesInDatabase: number;
+  trigger: string;
+  sourcePath: string | null;
+}): void => {
+  liveUpdateBus.publish({
+    type: "sql.file.load.completed",
+    payload: {
+      sourceFile: options.sourceFile,
+      day: options.day,
+      inserted: options.inserted,
+      deletedRows: options.deletedRows,
+      skipped: options.skipped,
+      parseErrors: options.parseErrors,
+      utterancesInDatabase: options.utterancesInDatabase,
+      trigger: options.trigger,
+      sourcePath: options.sourcePath
+    }
+  });
+};
+
 const publishDateLifecycleEvents = (options: {
   dayKeys: Set<string>;
   trigger: string;
@@ -278,8 +317,30 @@ const runTranscriptAndPipelineRefresh = async (options?: { trigger?: string; sou
         step: "reading-file"
       }
     });
-    const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
+    const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em, {
+      onFileLoadStarted: (event) => {
+        publishSqlFileLoadStartedEvent({ ...event, trigger, sourcePath });
+      },
+      onFileLoadCompleted: (event) => {
+        publishSqlFileLoadCompletedEvent({ ...event, trigger, sourcePath });
+      }
+    });
     changedDayKeys = new Set(transcriptIngestion.changedDayKeys);
+    liveUpdateBus.publish({
+      type: "sql.jobs.completed",
+      payload: {
+        trigger,
+        sourcePath,
+        filesProcessed: transcriptIngestion.filesProcessed,
+        filesSkippedUnchanged: transcriptIngestion.filesSkippedUnchanged,
+        inserted: transcriptIngestion.inserted,
+        deleted: transcriptIngestion.deleted,
+        skipped: transcriptIngestion.skipped,
+        parseErrors: transcriptIngestion.parseErrors,
+        utterancesInDatabase: transcriptIngestion.utterancesInDatabase,
+        changedDayCount: transcriptIngestion.changedDayKeys.length
+      }
+    });
     publishDateLifecycleEvents({
       dayKeys: changedDayKeys,
       trigger,
@@ -300,6 +361,12 @@ const runTranscriptAndPipelineRefresh = async (options?: { trigger?: string; sou
 
   const currentPipelineService = pipelineService;
   if (currentPipelineService) {
+    for (const dayKey of [...changedDayKeys].sort((left, right) => left.localeCompare(right))) {
+      liveUpdateBus.publish({
+        type: "llm.day.processing.started",
+        payload: { day: dayKey, trigger, sourcePath }
+      });
+    }
     liveUpdateBus.publish({ type: "pipeline.run.started", payload: { trigger } });
     await currentPipelineService.runPipelineCycle({
       changedDayKeys,
@@ -316,6 +383,16 @@ const runTranscriptAndPipelineRefresh = async (options?: { trigger?: string; sou
       trigger,
       sourcePath,
       stage: "notable-queries-updated"
+    });
+    for (const dayKey of [...changedDayKeys].sort((left, right) => left.localeCompare(right))) {
+      liveUpdateBus.publish({
+        type: "llm.day.processing.completed",
+        payload: { day: dayKey, trigger, sourcePath }
+      });
+    }
+    liveUpdateBus.publish({
+      type: "llm.days.completed",
+      payload: { trigger, sourcePath, changedDayCount: changedDayKeys.size }
     });
     liveUpdateBus.publish({ type: "pipeline.run.completed", payload: { trigger } });
     serverLogger.info("Prompt workflow completed after ingestion");
@@ -567,8 +644,30 @@ const runStartupIngestion = async (): Promise<void> => {
           step: "reading-file"
         }
       });
-      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
+      const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em, {
+        onFileLoadStarted: (event) => {
+          publishSqlFileLoadStartedEvent({ ...event, trigger: "startup", sourcePath: null });
+        },
+        onFileLoadCompleted: (event) => {
+          publishSqlFileLoadCompletedEvent({ ...event, trigger: "startup", sourcePath: null });
+        }
+      });
       changedDayKeys = new Set(transcriptIngestion.changedDayKeys);
+      liveUpdateBus.publish({
+        type: "sql.jobs.completed",
+        payload: {
+          trigger: "startup",
+          sourcePath: null,
+          filesProcessed: transcriptIngestion.filesProcessed,
+          filesSkippedUnchanged: transcriptIngestion.filesSkippedUnchanged,
+          inserted: transcriptIngestion.inserted,
+          deleted: transcriptIngestion.deleted,
+          skipped: transcriptIngestion.skipped,
+          parseErrors: transcriptIngestion.parseErrors,
+          utterancesInDatabase: transcriptIngestion.utterancesInDatabase,
+          changedDayCount: transcriptIngestion.changedDayKeys.length
+        }
+      });
       publishDateLifecycleEvents({
         dayKeys: changedDayKeys,
         trigger: "startup",
@@ -601,6 +700,12 @@ const runStartupIngestion = async (): Promise<void> => {
 
     const currentPipelineService = pipelineService;
     if (currentPipelineService) {
+      for (const dayKey of [...changedDayKeys].sort((left, right) => left.localeCompare(right))) {
+        liveUpdateBus.publish({
+          type: "llm.day.processing.started",
+          payload: { day: dayKey, trigger: "startup", sourcePath: null }
+        });
+      }
       liveUpdateBus.publish({ type: "pipeline.run.started", payload: { trigger: "startup" } });
       await currentPipelineService.runPipelineCycle({
         changedDayKeys,
@@ -617,6 +722,16 @@ const runStartupIngestion = async (): Promise<void> => {
         trigger: "startup",
         sourcePath: null,
         stage: "notable-queries-updated"
+      });
+      for (const dayKey of [...changedDayKeys].sort((left, right) => left.localeCompare(right))) {
+        liveUpdateBus.publish({
+          type: "llm.day.processing.completed",
+          payload: { day: dayKey, trigger: "startup", sourcePath: null }
+        });
+      }
+      liveUpdateBus.publish({
+        type: "llm.days.completed",
+        payload: { trigger: "startup", sourcePath: null, changedDayCount: changedDayKeys.size }
       });
       liveUpdateBus.publish({ type: "pipeline.run.completed", payload: { trigger: "startup" } });
       serverLogger.info("Startup prompt workflow completed");
