@@ -1,6 +1,7 @@
 import { EntityManager } from "@mikro-orm/postgresql";
 import { z } from "zod";
 import { dayjs } from "../lib/dayjs.js";
+import { parseLlmJsonWithSchema } from "../lib/llmJson.js";
 import type { LlmClient } from "./llmClient.js";
 import { getPrompt } from "../lib/prompts.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
@@ -43,20 +44,6 @@ const llmOutputSchema = z.object({
   highlights: z.array(z.object({ hour: z.string().min(1), summary: z.string().min(1) })).default([])
 });
 
-const extractJsonObject = (raw: string): string | null => {
-  const fencedMatch = raw.match(/```json\s*([\s\S]*?)```/iu);
-  if (fencedMatch?.[1]) {
-    return fencedMatch[1].trim();
-  }
-
-  const firstBrace = raw.indexOf("{");
-  const lastBrace = raw.lastIndexOf("}");
-  if (firstBrace >= 0 && lastBrace > firstBrace) {
-    return raw.slice(firstBrace, lastBrace + 1);
-  }
-
-  return null;
-};
 
 export class TimeWindowSummaryService {
   private readonly cache = new ExpiringCache<TimeWindowSummary>(rollingWindowFreshCacheTtlMs, rollingWindowStaleCacheTtlMs);
@@ -176,11 +163,16 @@ export class TimeWindowSummaryService {
       componentId: `analysis/time-window/${safeHours}-hour`
     });
 
-    const extractedJson = extractJsonObject(llmRaw);
-    if (!extractedJson) {
-      serverLogger.warn("Time-window summary output did not include parseable JSON; using fallback", {
-        hours: safeHours
+    const parsed = parseLlmJsonWithSchema(llmRaw, llmOutputSchema, "object");
+    if (!parsed.ok) {
+      serverLogger.warn("Time-window summary JSON contract validation failed", {
+        componentId: `analysis/time-window/${safeHours}-hour`,
+        expectedSchema: "TimeWindowSummaryLlmSchema",
+        expectedRoot: "object",
+        actualFormat: parsed.detectedFormat,
+        reason: parsed.reason
       });
+
       const fallbackPayload: TimeWindowSummary = {
         generatedAt: dayjs().utc().toISOString(),
         window: {
@@ -191,50 +183,6 @@ export class TimeWindowSummaryService {
         stats: totals,
         summary: llmRaw,
         highlights: context.map((entry) => ({ hour: entry.hour, summary: "No structured highlight generated." }))
-      };
-      this.cache.set(cacheKey, fallbackPayload);
-      return fallbackPayload;
-    }
-
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(extractedJson);
-    } catch (error) {
-      serverLogger.warn("Time-window summary JSON parse failed; using raw text", {
-        hours: safeHours,
-        error
-      });
-      const fallbackPayload: TimeWindowSummary = {
-        generatedAt: dayjs().utc().toISOString(),
-        window: {
-          hours: safeHours,
-          start: windowStart.toISOString(),
-          end: windowEnd.toISOString()
-        },
-        stats: totals,
-        summary: llmRaw,
-        highlights: []
-      };
-      this.cache.set(cacheKey, fallbackPayload);
-      return fallbackPayload;
-    }
-
-    const parsed = llmOutputSchema.safeParse(parsedJson);
-    if (!parsed.success) {
-      serverLogger.warn("Time-window summary JSON failed schema validation; using raw text", {
-        hours: safeHours,
-        issues: parsed.error.issues
-      });
-      const fallbackPayload: TimeWindowSummary = {
-        generatedAt: dayjs().utc().toISOString(),
-        window: {
-          hours: safeHours,
-          start: windowStart.toISOString(),
-          end: windowEnd.toISOString()
-        },
-        stats: totals,
-        summary: llmRaw,
-        highlights: []
       };
       this.cache.set(cacheKey, fallbackPayload);
       return fallbackPayload;
