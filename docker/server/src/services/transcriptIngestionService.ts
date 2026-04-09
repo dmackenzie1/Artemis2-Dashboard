@@ -22,11 +22,33 @@ type CsvRow = {
 };
 
 type IngestFileResult = {
+  sourceFile: string;
   inserted: number;
   skipped: number;
   parseErrors: number;
   checksum: string;
   day: string;
+};
+
+export type TranscriptFileLoadStartedEvent = {
+  sourceFile: string;
+  day: string;
+  parsedSourceFile: ReturnType<typeof parseTranscriptFileName>;
+};
+
+export type TranscriptFileLoadCompletedEvent = {
+  sourceFile: string;
+  day: string;
+  inserted: number;
+  deletedRows: number;
+  skipped: number;
+  parseErrors: number;
+  utterancesInDatabase: number;
+};
+
+type IngestTranscriptCsvDirectoryOptions = {
+  onFileLoadStarted?: (event: TranscriptFileLoadStartedEvent) => void;
+  onFileLoadCompleted?: (event: TranscriptFileLoadCompletedEvent) => void;
 };
 
 export type TranscriptIngestionSummary = {
@@ -220,6 +242,7 @@ const ingestFile = async (filePath: string, em: EntityManager, checksum: string)
   });
 
   return {
+    sourceFile,
     inserted,
     skipped,
     parseErrors,
@@ -274,7 +297,11 @@ const logOverlapWarnings = (fileNames: string[]): void => {
   }
 };
 
-export const ingestTranscriptCsvDirectory = async (transcriptCsvDir: string, em: EntityManager): Promise<TranscriptIngestionSummary> => {
+export const ingestTranscriptCsvDirectory = async (
+  transcriptCsvDir: string,
+  em: EntityManager,
+  options: IngestTranscriptCsvDirectoryOptions = {}
+): Promise<TranscriptIngestionSummary> => {
   const files = (await fs.readdir(transcriptCsvDir))
     .filter((fileName) => fileName.toLowerCase().endsWith(".csv"))
     .sort(compareTranscriptFiles);
@@ -314,6 +341,11 @@ export const ingestTranscriptCsvDirectory = async (transcriptCsvDir: string, em:
 
     const parsedSourceFile = parseTranscriptFileName(fileName);
     const day = parsedSourceFile?.day ?? "unspecified-day";
+    options.onFileLoadStarted?.({
+      sourceFile: fileName,
+      day,
+      parsedSourceFile
+    });
     const deletedRows = await em.nativeDelete(TranscriptUtterance, { sourceFile: fileName });
     deleted += deletedRows;
 
@@ -336,6 +368,16 @@ export const ingestTranscriptCsvDirectory = async (transcriptCsvDir: string, em:
     nextManifest.updatedAt = new Date();
     em.persist(nextManifest);
     await em.flush();
+    const utterancesInDatabase = await em.count(TranscriptUtterance, {});
+    options.onFileLoadCompleted?.({
+      sourceFile: result.sourceFile,
+      day: result.day,
+      inserted: result.inserted,
+      deletedRows,
+      skipped: result.skipped,
+      parseErrors: result.parseErrors,
+      utterancesInDatabase
+    });
 
     serverLogger.info("Inserted records from transcript file", {
       fileName,

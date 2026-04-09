@@ -12,9 +12,21 @@ export type LiveUpdateEvent = {
     | "day.ingested"
     | "day.llm.loaded"
     | "day.notable-queries.updated"
-    | "date.updated";
+    | "date.updated"
+    | "sql.file.load.started"
+    | "sql.file.load.completed"
+    | "sql.jobs.completed"
+    | "llm.day.processing.started"
+    | "llm.day.processing.completed"
+    | "llm.days.completed";
   emittedAt: string;
   payload?: Record<string, unknown>;
+};
+
+export const LIVE_UPDATE_DOM_EVENT_PREFIX = "live-update:";
+
+export const broadcastLiveUpdateToDom = (event: LiveUpdateEvent): void => {
+  window.dispatchEvent(new CustomEvent<LiveUpdateEvent>(`${LIVE_UPDATE_DOM_EVENT_PREFIX}${event.type}`, { detail: event }));
 };
 
 export const subscribeToLiveUpdates = (
@@ -54,7 +66,13 @@ export const subscribeToLiveUpdates = (
     "day.ingested",
     "day.llm.loaded",
     "day.notable-queries.updated",
-    "date.updated"
+    "date.updated",
+    "sql.file.load.started",
+    "sql.file.load.completed",
+    "sql.jobs.completed",
+    "llm.day.processing.started",
+    "llm.day.processing.completed",
+    "llm.days.completed"
   ];
 
   for (const eventType of eventTypes) {
