@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- refactor: split `docker/server/src/index.ts` startup orchestration into dedicated app wiring, runtime migrations, and background-worker services while keeping `index.ts` focused on composition + `app.listen()`. Intent: Reduce entrypoint complexity so server startup responsibilities are isolated, easier to test, and safer to maintain.
 - fix: switch Overview Daily Transcript Volume to request/display all available days by default (while keeping optional `days` query support for bounded API calls). Intent: Ensure operators see complete day-level transcript coverage instead of a truncated last-5-day snapshot.
 - refactor: remove prompt-execution startup SQL backfill helper and rely on normal schema/index startup flow only (`updateSchema` + transcript search indexes). Intent: Eliminate one-off runtime DDL/backfill side effects now that all required `prompt_executions` columns already exist in deployed environments.
 - refactor: replace client window-level live-update `CustomEvent` fanout/listeners with a React `LiveUpdatesProvider` context + hook, and migrate page refresh/event consumers to typed reactive context state. Intent: Align live-update propagation with React lifecycle semantics so pages subscribe declaratively without manual DOM listener bookkeeping.
