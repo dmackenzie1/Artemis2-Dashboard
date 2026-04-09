@@ -63,6 +63,13 @@ type ServiceConfig = {
   llmClient: LlmClient;
   llmMaxTokens: number;
   loadTranscriptUtterances: () => Promise<TranscriptUtterance[]>;
+  loadTranscriptCandidates?: (
+    query: string,
+    options?: {
+      channel?: string;
+      candidateLimit?: number;
+    }
+  ) => Promise<TranscriptUtterance[]>;
   loadDailySummaryForDay?: (day: string) => Promise<string | null>;
 };
 
@@ -346,29 +353,33 @@ export class AnalysisService {
       .slice(0, Math.min(Math.max(limit, 1), 50));
   }
 
-  searchUtterances(
+  async searchUtterances(
     query: string,
     limit = 8,
     filters?: {
       channel?: string;
     }
-  ): {
+  ): Promise<{
     query: string;
     queryTokens: string[];
     totalUtterances: number;
     resultCount: number;
     utterances: ReturnType<typeof retrieveRankedUtterances>["ranked"];
-  } {
+  }> {
     const normalizedChannel = filters?.channel?.trim().toLowerCase() ?? "";
-    const normalizedLimit = Math.min(Math.max(limit, 1), 25);
+    const normalizedLimit = Math.min(Math.max(limit, 1), 80);
     const cacheKey = `${this.corpusVersion}|${query.trim().toLowerCase()}|${normalizedLimit}|${normalizedChannel}`;
     const cached = this.searchCache.get(cacheKey);
     if (cached) {
       return cached;
     }
 
-    const filteredUtterances =
-      normalizedChannel.length > 0
+    const filteredUtterances = this.config.loadTranscriptCandidates
+      ? await this.config.loadTranscriptCandidates(query, {
+          channel: normalizedChannel.length > 0 ? normalizedChannel : undefined,
+          candidateLimit: 2000
+        })
+      : normalizedChannel.length > 0
         ? this.utterances.filter((entry) => entry.channel.trim().toLowerCase() === normalizedChannel)
         : this.utterances;
     const retrieval = retrieveRankedUtterances(query, filteredUtterances, normalizedLimit);
@@ -409,8 +420,12 @@ export class AnalysisService {
     });
 
     const normalizedChannel = filters?.channel?.trim().toLowerCase() ?? "";
-    const scopedUtterances =
-      normalizedChannel.length > 0
+    const scopedUtterances = this.config.loadTranscriptCandidates
+      ? await this.config.loadTranscriptCandidates(query, {
+          channel: normalizedChannel.length > 0 ? normalizedChannel : undefined,
+          candidateLimit: 2000
+        })
+      : normalizedChannel.length > 0
         ? this.utterances.filter((entry) => entry.channel.trim().toLowerCase() === normalizedChannel)
         : this.utterances;
     const totalUtterances = scopedUtterances.length;

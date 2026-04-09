@@ -35,7 +35,7 @@ const clampLimit = (limit: number, defaultLimit = 8): number => {
     return defaultLimit;
   }
 
-  return Math.min(Math.max(Math.trunc(limit), 1), 25);
+  return Math.min(Math.max(Math.trunc(limit), 1), 80);
 };
 
 const rankUtterances = (queryTokens: string[], utterances: TranscriptUtterance[]): Array<{ utterance: TranscriptUtterance; score: number }> => {

@@ -1,0 +1,114 @@
+{
+  "version": "2026-04-09",
+  "intent": "Normalize recurring Artemis ASR misspellings and jargon variants before token overlap retrieval.",
+  "entries": [
+    {
+      "canonical": "vavilov",
+      "aliases": ["babelov", "babelaw", "babalov"],
+      "category": "lunar_topography_and_craters",
+      "notes": "Common far-side crater misspelling variants."
+    },
+    {
+      "canonical": "terminator",
+      "aliases": ["terminater", "the terminator"],
+      "category": "lunar_topography_and_craters",
+      "notes": "Lunar day/night boundary."
+    },
+    {
+      "canonical": "mare",
+      "aliases": ["mary", "mari", "marray"],
+      "category": "lunar_topography_and_craters",
+      "notes": "Basaltic plains pronunciation variants."
+    },
+    {
+      "canonical": "huntsville",
+      "aliases": ["hanswell", "hansville", "huntswell"],
+      "category": "locations_and_control_centers",
+      "notes": "Marshall Space Flight Center location variants."
+    },
+    {
+      "canonical": "tsukuba",
+      "aliases": ["scuba", "skooba"],
+      "category": "locations_and_control_centers",
+      "notes": "JAXA Tsukuba Space Center variants."
+    },
+    {
+      "canonical": "mer",
+      "aliases": ["smer", "smur", "mir"],
+      "category": "nasa_roles_and_callsigns",
+      "notes": "Mission Evaluation Room acronym variants."
+    },
+    {
+      "canonical": "manager",
+      "aliases": ["manger"],
+      "category": "nasa_roles_and_callsigns",
+      "notes": "Role title typo variants."
+    },
+    {
+      "canonical": "teamcoord",
+      "aliases": ["teamcord", "team cord"],
+      "category": "nasa_roles_and_callsigns",
+      "notes": "Team Coordinator variants."
+    },
+    {
+      "canonical": "displays",
+      "aliases": ["desplate", "des plate"],
+      "category": "nasa_roles_and_callsigns",
+      "notes": "Flight control callout variants."
+    },
+    {
+      "canonical": "eecom",
+      "aliases": ["ecom", "e-com", "ee com"],
+      "category": "nasa_roles_and_callsigns",
+      "notes": "Electrical, Environmental and Consumables Manager."
+    },
+    {
+      "canonical": "sciencecoord",
+      "aliases": ["science corp", "science core"],
+      "category": "nasa_roles_and_callsigns",
+      "notes": "Science Coordinator variants."
+    },
+    {
+      "canonical": "sw-3",
+      "aliases": ["saw 3", "sw3"],
+      "category": "technical_and_operational_terms",
+      "notes": "Software block shorthand variants."
+    },
+    {
+      "canonical": "sw-4",
+      "aliases": ["saw 4", "sw4"],
+      "category": "technical_and_operational_terms",
+      "notes": "Software block shorthand variants."
+    },
+    {
+      "canonical": "chit",
+      "aliases": ["chip"],
+      "category": "technical_and_operational_terms",
+      "notes": "Engineering request acronym context."
+    },
+    {
+      "canonical": "fluid",
+      "aliases": ["floyd"],
+      "category": "technical_and_operational_terms",
+      "notes": "Frequent homophone mismatch."
+    },
+    {
+      "canonical": "otc-3",
+      "aliases": ["otc3", "otc 3"],
+      "category": "technical_and_operational_terms",
+      "notes": "Maneuver/reference identifier normalization."
+    },
+    {
+      "canonical": "rtc-1",
+      "aliases": ["rtc1", "rtc 1"],
+      "category": "technical_and_operational_terms",
+      "notes": "Maneuver/reference identifier normalization."
+    },
+    {
+      "canonical": "ig",
+      "aliases": ["i-g"],
+      "category": "technical_and_operational_terms",
+      "notes": "Inner gimbal acronym formatting normalization."
+    }
+  ]
+}

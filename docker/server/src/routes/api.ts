@@ -175,17 +175,17 @@ export const createApiRouter = (
   });
 
 
-  router.get("/search/utterances", (req, res, next) => {
+  router.get("/search/utterances", async (req, res, next) => {
     try {
       const query = z
         .object({
           q: z.string().trim().min(1),
-          limit: z.coerce.number().int().min(1).max(25).optional(),
+          limit: z.coerce.number().int().min(1).max(80).optional(),
           channel: z.string().trim().min(1).max(200).optional()
         })
         .parse(req.query);
 
-      const payload = analysisService.searchUtterances(query.q, query.limit ?? 8, {
+      const payload = await analysisService.searchUtterances(query.q, query.limit ?? 8, {
         channel: query.channel
       });
       res.json(payload);
