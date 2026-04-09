@@ -3,11 +3,11 @@ import path from "node:path";
 import { dayjs } from "../lib/dayjs.js";
 import lodash from "lodash";
 import type { DashboardCache, DayInsights, NotableUtterance, TranscriptUtterance } from "../types.js";
-import { ingestCsvDirectory } from "../lib/csvIngest.js";
 import { getPrompt } from "../lib/prompts.js";
 import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 import { retrieveRankedUtterances } from "./transcriptRetrievalService.js";
+import { ExpiringCache } from "./expiringCache.js";
 
 const { groupBy, uniq } = lodash;
 
@@ -58,18 +58,50 @@ const parseHourlyHighlights = (rawResponse: string): Record<string, string> => {
 };
 
 type ServiceConfig = {
-  dataDir: string;
   promptsDir: string;
   cacheFile: string;
   llmClient: LlmClient;
+  llmMaxTokens: number;
+  loadTranscriptUtterances: () => Promise<TranscriptUtterance[]>;
 };
 
 export class AnalysisService {
   private utterances: TranscriptUtterance[] = [];
   private cache: DashboardCache | null = null;
   private isIngesting = false;
+  private corpusVersion = "empty";
+  private readonly searchCache = new ExpiringCache<{
+    query: string;
+    queryTokens: string[];
+    totalUtterances: number;
+    resultCount: number;
+    utterances: ReturnType<typeof retrieveRankedUtterances>["ranked"];
+  }>(2 * 60 * 1000);
+  private readonly chatCache = new ExpiringCache<{
+    answer: string;
+    evidence: Array<{
+      timestamp: string;
+      day: string;
+      channel: string;
+      text: string;
+      filename: string;
+      source: string;
+      score: number;
+    }>;
+    strategy: { mode: "rag_chat" | "llm_chat"; totalUtterances: number; contextUtterances: number; daysQueried: number };
+  }>(2 * 60 * 1000);
 
   constructor(private readonly config: ServiceConfig) {}
+
+  private updateCorpusVersion(utterances: TranscriptUtterance[]): void {
+    const latestTimestamp = utterances.length > 0 ? utterances[utterances.length - 1]?.timestamp ?? "none" : "none";
+    this.corpusVersion = `${utterances.length}:${latestTimestamp}`;
+  }
+
+  private clearQueryCaches(): void {
+    this.searchCache.clear();
+    this.chatCache.clear();
+  }
 
   async loadFromDisk(): Promise<void> {
     try {
@@ -91,18 +123,14 @@ export class AnalysisService {
 
     this.isIngesting = true;
     try {
-      serverLogger.info("Starting CSV ingestion", { dataDir: this.config.dataDir });
-
-      this.utterances = await ingestCsvDirectory(this.config.dataDir, {
-        onDirectoryRead: ({ directoryPath, totalFiles }) => {
-          serverLogger.info("CSV directory scanned", { directoryPath, totalFiles });
-        },
-        onFileIngested: ({ file, rowsParsed, rowsAccepted, rowsSkipped }) => {
-          serverLogger.info("CSV file ingested", { file, rowsParsed, rowsAccepted, rowsSkipped });
-        },
-        onIngestComplete: ({ totalFiles, totalRowsAccepted, totalRowsSkipped }) => {
-          serverLogger.info("CSV ingestion completed", { totalFiles, totalRowsAccepted, totalRowsSkipped });
-        }
+      serverLogger.info("Loading transcript utterances from database", { step: "reading-from-database" });
+      this.utterances = await this.config.loadTranscriptUtterances();
+      this.updateCorpusVersion(this.utterances);
+      this.clearQueryCaches();
+      serverLogger.info("Transcript utterances loaded from database", {
+        step: "done",
+        utteranceCount: this.utterances.length,
+        corpusVersion: this.corpusVersion
       });
       const byDay = groupBy(this.utterances, (item) => item.day);
       const dayKeys = Object.keys(byDay).sort();
@@ -215,11 +243,17 @@ export class AnalysisService {
 
   clearAnalysisCache(): void {
     this.cache = null;
+    this.clearQueryCaches();
   }
 
   inspectCacheState(): {
     analysisCache: { generatedAt: string | null; dayCount: number };
     utteranceStore: { totalUtterances: number; dayCount: number; minDay: string | null; maxDay: string | null };
+    retrieval: {
+      corpusVersion: string;
+      searchCache: ReturnType<ExpiringCache<unknown>["inspect"]>;
+      chatCache: ReturnType<ExpiringCache<unknown>["inspect"]>;
+    };
   } {
     const sortedDays = [...new Set(this.utterances.map((entry) => entry.day))].sort();
     return {
@@ -232,6 +266,11 @@ export class AnalysisService {
         dayCount: sortedDays.length,
         minDay: sortedDays[0] ?? null,
         maxDay: sortedDays[sortedDays.length - 1] ?? null
+      },
+      retrieval: {
+        corpusVersion: this.corpusVersion,
+        searchCache: this.searchCache.inspect(),
+        chatCache: this.chatCache.inspect()
       }
     };
   }
@@ -315,20 +354,28 @@ export class AnalysisService {
     resultCount: number;
     utterances: ReturnType<typeof retrieveRankedUtterances>["ranked"];
   } {
+    const cacheKey = `${this.corpusVersion}|${query.trim().toLowerCase()}|${Math.min(Math.max(limit, 1), 25)}`;
+    const cached = this.searchCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const retrieval = retrieveRankedUtterances(query, this.utterances, limit);
 
-    return {
+    const payload = {
       query,
       queryTokens: retrieval.queryTokens,
       totalUtterances: this.utterances.length,
       resultCount: retrieval.ranked.length,
       utterances: retrieval.ranked
     };
+    this.searchCache.set(cacheKey, payload);
+    return payload;
   }
 
   async chat(
     query: string,
-    mode: "rag" | "all" = "all"
+    mode: "rag_chat" | "llm_chat" = "rag_chat"
   ): Promise<{
     answer: string;
     evidence: Array<{
@@ -340,7 +387,7 @@ export class AnalysisService {
       source: string;
       score: number;
     }>;
-    strategy: { mode: "rag" | "all"; totalUtterances: number; contextUtterances: number; daysQueried: number };
+    strategy: { mode: "rag_chat" | "llm_chat"; totalUtterances: number; contextUtterances: number; daysQueried: number };
   }> {
     serverLogger.info("Chat prompt requested", {
       queryLength: query.length,
@@ -356,8 +403,17 @@ export class AnalysisService {
       };
     }
 
-    const ragRetrieval = retrieveRankedUtterances(query, this.utterances, 10);
-    const allContext = this.utterances.slice(-120).map((entry) => ({
+    const cacheKey = `${this.corpusVersion}|${mode}|${query.trim().toLowerCase()}`;
+    const cached = this.chatCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const ragRetrieval = retrieveRankedUtterances(query, this.utterances, 40);
+    const baseEvidence = ragRetrieval.ranked.map((entry) => ({
+      ...entry
+    }));
+    const fallbackEvidence = this.utterances.slice(-40).map((entry) => ({
       timestamp: entry.timestamp,
       day: entry.day,
       channel: entry.channel,
@@ -366,28 +422,85 @@ export class AnalysisService {
       source: entry.sourceFile,
       score: 0
     }));
+    const evidenceForPrompt = (baseEvidence.length > 0 ? baseEvidence : fallbackEvidence).slice(0, 40);
+    const daysQueried = new Set(evidenceForPrompt.map((entry) => entry.day)).size;
+    let answer = "";
 
-    const evidence = mode === "rag" ? ragRetrieval.ranked : allContext;
-    const evidenceForPrompt = evidence.slice(0, mode === "rag" ? 8 : 40);
-
-    const chatSystemPrompt = `You are an Artemis transcript analyst.
+    if (mode === "rag_chat") {
+      const chatSystemPrompt = `You are an Artemis transcript analyst.
 Use only provided evidence.
 Cite timestamp and channel where possible.
 If evidence is weak or missing, say you are uncertain and describe what is missing.
 Return valid HTML fragments only using tags such as <h3>, <p>, <ul>, and <li>. Do not use Markdown.`;
-    const answer = await this.config.llmClient.generateText({
-      systemPrompt: chatSystemPrompt,
-      userPrompt: JSON.stringify({
-        mode,
-        query,
-        queryTokens: ragRetrieval.queryTokens,
-        evidence: evidenceForPrompt
-      }),
-      componentId: `analysis/chat/${mode}`,
-      cacheEnabled: false
-    });
+      answer = await this.config.llmClient.generateText({
+        systemPrompt: chatSystemPrompt,
+        userPrompt: JSON.stringify({
+          mode,
+          query,
+          queryTokens: ragRetrieval.queryTokens,
+          evidence: evidenceForPrompt.slice(0, 12)
+        }),
+        componentId: `analysis/chat/${mode}`,
+        cacheEnabled: false
+      });
+    } else {
+      const perDayTokenBudget = Math.max(128, Math.floor(this.config.llmMaxTokens * 0.1));
+      const perDayCharacterBudget = perDayTokenBudget * 4;
+      const groupedByDay = new Map<string, typeof evidenceForPrompt>();
+      for (const entry of evidenceForPrompt) {
+        const bucket = groupedByDay.get(entry.day) ?? [];
+        bucket.push(entry);
+        groupedByDay.set(entry.day, bucket);
+      }
 
-    const daysQueried = new Set(evidenceForPrompt.map((entry) => entry.day)).size;
+      const latestTenDays = [...groupedByDay.keys()].sort().slice(-10);
+      const dayPassages = await Promise.all(
+        latestTenDays.map(async (day) => {
+          const dayEntries = groupedByDay.get(day) ?? [];
+          let remaining = perDayCharacterBudget;
+          const lines: string[] = [];
+          for (const entry of dayEntries) {
+            const line = `[${entry.timestamp}] ${entry.channel}: ${entry.text}`;
+            if (line.length > remaining) {
+              break;
+            }
+            lines.push(line);
+            remaining -= line.length;
+          }
+
+          const subResult = await this.config.llmClient.generateText({
+            systemPrompt:
+              "Identify transcript lines relevant to the user query for this single day. Return concise HTML using <h3>, <p>, <ul>, <li>.",
+            userPrompt: JSON.stringify({
+              mode,
+              query,
+              day,
+              dayBudgetTokens: perDayTokenBudget,
+              lines
+            }),
+            componentId: `analysis/chat/${mode}/day/${day}`,
+            cacheEnabled: false
+          });
+
+          return {
+            day,
+            subResult
+          };
+        })
+      );
+
+      answer = await this.config.llmClient.generateText({
+        systemPrompt:
+          "Synthesize day-level findings into one mission response. Return valid HTML only (<h3>, <p>, <ul>, <li>) and call out uncertainty where evidence is thin.",
+        userPrompt: JSON.stringify({
+          mode,
+          query,
+          dayPassages
+        }),
+        componentId: `analysis/chat/${mode}/final`,
+        cacheEnabled: false
+      });
+    }
 
     serverLogger.info("Chat prompt received", {
       mode,
@@ -396,7 +509,7 @@ Return valid HTML fragments only using tags such as <h3>, <p>, <ul>, and <li>. D
       daysQueried
     });
 
-    return {
+    const payload = {
       answer,
       evidence: evidenceForPrompt,
       strategy: {
@@ -406,6 +519,8 @@ Return valid HTML fragments only using tags such as <h3>, <p>, <ul>, and <li>. D
         daysQueried
       }
     };
+    this.chatCache.set(cacheKey, payload);
+    return payload;
   }
 
 }

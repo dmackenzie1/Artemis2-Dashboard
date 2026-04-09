@@ -5,6 +5,7 @@ import { RequestContext } from "@mikro-orm/core";
 import { EntityManager, MikroORM } from "@mikro-orm/postgresql";
 import path from "node:path";
 import { env } from "./env.config.js";
+import { dayjs } from "./lib/dayjs.js";
 import { LlmClient } from "./services/llmClient.js";
 import { AnalysisService } from "./services/analysisService.js";
 import { createApiRouter } from "./routes/api.js";
@@ -20,6 +21,7 @@ import { createSystemLogsRouter } from "./routes/systemLogs.js";
 import { TimeWindowSummaryService } from "./services/timeWindowSummaryService.js";
 import { RedisLlmCache } from "./services/redisLlmCache.js";
 import { liveUpdateBus } from "./services/liveUpdateBus.js";
+import { TranscriptUtterance } from "./entities/TranscriptUtterance.js";
 
 const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
   await orm.em.getConnection().execute(`
@@ -123,10 +125,31 @@ const llmClient = new LlmClient(
 let llmConnectivityStatus = await llmClient.checkConnectivity();
 
 const analysisService = new AnalysisService({
-  dataDir: env.DATA_DIR,
   promptsDir: env.PROMPTS_DIR,
   cacheFile: env.CACHE_FILE,
-  llmClient
+  llmClient,
+  llmMaxTokens: env.LLM_MAX_TOKENS,
+  loadTranscriptUtterances: async () => {
+    if (!transcriptOrm) {
+      return [];
+    }
+
+    const rows = await transcriptOrm.em.fork().find(TranscriptUtterance, {}, { orderBy: { timestamp: "asc" } });
+    return rows.map((row) => ({
+      id: String(row.id),
+      timestamp: dayjs(row.timestamp).utc().toISOString(),
+      day: dayjs(row.timestamp).utc().format("YYYY-MM-DD"),
+      hour: dayjs(row.timestamp).utc().format("HH:00"),
+      channel: row.channel,
+      durationSec: row.durationSec,
+      language: row.language,
+      translated: row.translated ? "yes" : "no",
+      text: row.text,
+      tokens: row.tokens,
+      filename: row.filename,
+      sourceFile: row.sourceFile
+    }));
+  }
 });
 const systemLogsService = new SystemLogsService({
   promptSubmissionsDir: env.PROMPT_SUBMISSIONS_DIR,
@@ -173,8 +196,25 @@ const writeIngestionEventLog = async (payload: IngestionEventPayload): Promise<v
 const runTranscriptAndPipelineRefresh = async (): Promise<void> => {
   const em = transcriptOrm?.em.fork();
   if (em) {
+    await writeIngestionEventLog({
+      trigger: "ingestion-refresh",
+      status: "success",
+      sourcePath: null,
+      details: {
+        step: "reading-file"
+      }
+    });
     const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
     serverLogger.info("Manual transcript ingestion completed", transcriptIngestion);
+    await writeIngestionEventLog({
+      trigger: "ingestion-refresh",
+      status: "success",
+      sourcePath: null,
+      details: {
+        step: "done",
+        transcriptIngestion
+      }
+    });
   }
 
   const currentPipelineService = pipelineService;
@@ -422,8 +462,25 @@ const runStartupIngestion = async (): Promise<void> => {
   try {
     const em = transcriptOrm?.em.fork();
     if (em) {
+      await writeIngestionEventLog({
+        trigger: "startup",
+        status: "success",
+        sourcePath: null,
+        details: {
+          step: "reading-file"
+        }
+      });
       const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
       serverLogger.info("Startup transcript ingestion completed", transcriptIngestion);
+      await writeIngestionEventLog({
+        trigger: "startup",
+        status: "success",
+        sourcePath: null,
+        details: {
+          step: "done",
+          transcriptIngestion
+        }
+      });
     }
 
     const dashboard = await analysisService.ingestAndAnalyze();

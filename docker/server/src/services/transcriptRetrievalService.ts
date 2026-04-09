@@ -45,7 +45,7 @@ const rankUtterances = (queryTokens: string[], utterances: TranscriptUtterance[]
 
   return utterances
     .map((utterance) => {
-      const utteranceTokens = tokenizeUtterance(utterance.text);
+      const utteranceTokens = utterance.tokens && utterance.tokens.length > 0 ? utterance.tokens : tokenizeUtterance(utterance.text);
       if (utteranceTokens.length === 0) {
         return null;
       }

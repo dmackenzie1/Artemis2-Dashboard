@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-describe("frontend smoke", () => {
+describe("client smoke", () => {
   it("runs", () => {
     expect(true).toBe(true);
   });

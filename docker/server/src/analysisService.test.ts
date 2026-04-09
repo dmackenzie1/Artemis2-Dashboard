@@ -19,10 +19,11 @@ const buildUtterance = (id: string, day: string, channel: string, text: string):
 describe("AnalysisService.getTopNotableUtterances", () => {
   it("returns highest-ranked utterances within the requested day window", () => {
     const service = new AnalysisService({
-      dataDir: "",
       promptsDir: "",
       cacheFile: "",
-      llmClient: { generateText: async () => "", parseTopics: () => [] } as never
+      llmClient: { generateText: async () => "", parseTopics: () => [] } as never,
+      llmMaxTokens: 12000,
+      loadTranscriptUtterances: async () => []
     });
 
     (service as unknown as { utterances: TranscriptUtterance[] }).utterances = [
@@ -41,10 +42,11 @@ describe("AnalysisService.getTopNotableUtterances", () => {
 
   it("clamps limit boundaries and returns empty state safely", () => {
     const service = new AnalysisService({
-      dataDir: "",
       promptsDir: "",
       cacheFile: "",
-      llmClient: { generateText: async () => "", parseTopics: () => [] } as never
+      llmClient: { generateText: async () => "", parseTopics: () => [] } as never,
+      llmMaxTokens: 12000,
+      loadTranscriptUtterances: async () => []
     });
 
     expect(service.getTopNotableUtterances(10, 7)).toEqual([]);
