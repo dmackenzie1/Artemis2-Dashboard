@@ -1,6 +1,6 @@
 import type { FunctionComponent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchDashboard, fetchStatsHourlyByChannel, fetchStatsSummary, type MissionStatsSummaryData } from "../../api";
+import { fetchStatsDailyVolume, fetchStatsHourlyByChannel, fetchStatsSummary, type MissionStatsSummaryData } from "../../api";
 import sharedStyles from "../../styles/shared.module.css";
 import styles from "./StatsPanel.module.css";
 import { DashboardPanel } from "./primitives/DashboardPanel";
@@ -9,6 +9,7 @@ import { StatusBadge } from "./primitives/StatusBadge";
 import { clientLogger } from "../../utils/logging/clientLogger";
 
 const DASHBOARD_POLL_INTERVAL_MS = 30 * 60 * 1000;
+const DAILY_VOLUME_DAYS = 5;
 
 const formatMetricValue = (value: number): string => {
   return value.toLocaleString();
@@ -21,9 +22,9 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
   const [hasError, setHasError] = useState(false);
 
   const loadStats = useCallback(async (): Promise<void> => {
-    const [statsSummaryResult, dashboardResult, hourlyResult] = await Promise.allSettled([
+    const [statsSummaryResult, dailyVolumeResult, hourlyResult] = await Promise.allSettled([
       fetchStatsSummary(),
-      fetchDashboard(),
+      fetchStatsDailyVolume(DAILY_VOLUME_DAYS),
       fetchStatsHourlyByChannel(30)
     ]);
 
@@ -36,17 +37,17 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
       clientLogger.error("Failed to fetch stats summary for stats panel", { error: statsSummaryResult.reason });
     }
 
-    if (dashboardResult.status === "fulfilled") {
+    if (dailyVolumeResult.status === "fulfilled") {
       setDailyTranscriptVolume(
-        (dashboardResult.value?.days ?? []).map((day) => ({
+        (dailyVolumeResult.value?.days ?? []).map((day) => ({
           day: day.day,
-          utterances: day.stats.utteranceCount,
-          words: day.stats.wordCount
+          utterances: day.utterances,
+          words: day.words
         }))
       );
     } else {
       encounteredFailure = true;
-      clientLogger.error("Failed to fetch dashboard cache for stats panel", { error: dashboardResult.reason });
+      clientLogger.error("Failed to fetch daily transcript volume for stats panel", { error: dailyVolumeResult.reason });
     }
 
     if (hourlyResult.status === "fulfilled") {
@@ -100,6 +101,13 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
       entries: stats.filter((stat) => stat.label.includes("Distinct"))
     }
   ].filter((group) => group.entries.length > 0);
+  const dailyVolumeTotals = dailyTranscriptVolume.reduce(
+    (acc, entry) => ({
+      utterances: acc.utterances + entry.utterances,
+      words: acc.words + entry.words
+    }),
+    { utterances: 0, words: 0 }
+  );
 
   return (
     <DashboardPanel
@@ -142,7 +150,7 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
           ))}
           {dailyTranscriptVolume.length > 0 ? (
             <section className={styles["stats-group"]}>
-              <p className={styles["stats-group-label"]}>Daily Transcript Volume</p>
+              <p className={styles["stats-group-label"]}>Daily Transcript Volume (Last {DAILY_VOLUME_DAYS} Days)</p>
               <table className={styles["daily-volume-table"]}>
                 <colgroup>
                   <col className={styles["snapshot-day-col"]} />
@@ -165,6 +173,13 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row">Total ({dailyTranscriptVolume.length}d)</th>
+                    <td>{formatMetricValue(dailyVolumeTotals.utterances)}</td>
+                    <td>{formatMetricValue(dailyVolumeTotals.words)}</td>
+                  </tr>
+                </tfoot>
               </table>
             </section>
           ) : null}

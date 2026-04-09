@@ -502,14 +502,46 @@ export class LlmClient {
     }
 
     try {
+      const isOpenAiCompatible = this.apiUrl.includes("/v1/chat/completions");
       const response = await fetch(this.apiUrl, {
-        method: "OPTIONS",
+        method: "POST",
         headers: {
-          ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}`, "x-api-key": this.apiKey } : {})
-        }
+          "Content-Type": "application/json",
+          ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}`, "x-api-key": this.apiKey } : {}),
+          ...(isOpenAiCompatible ? {} : { "anthropic-version": "2023-06-01" })
+        },
+        body: JSON.stringify(
+          isOpenAiCompatible
+            ? {
+                model: this.model,
+                max_tokens: 8,
+                messages: [
+                  {
+                    role: "system",
+                    content: "Connectivity check. Reply with OK."
+                  },
+                  {
+                    role: "user",
+                    content: "OK"
+                  }
+                ]
+              }
+            : {
+                model: this.model,
+                system: "Connectivity check. Reply with OK.",
+                max_tokens: 8,
+                messages: [
+                  {
+                    role: "user",
+                    content: "OK"
+                  }
+                ]
+              }
+        )
       });
       if (!response.ok) {
-        throw new Error(`Connectivity probe failed: ${response.status} ${response.statusText}`);
+        const errorBody = await response.text();
+        throw new Error(`Connectivity probe failed: ${response.status} ${response.statusText} ${errorBody}`.trim());
       }
 
       return {

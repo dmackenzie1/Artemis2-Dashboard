@@ -37,7 +37,11 @@ export const DashboardPage: FunctionComponent = () => {
         event.type === "dashboard.cache.updated" ||
         event.type === "stats.updated" ||
         event.type === "time-window-summary.updated" ||
-        event.type === "pipeline.run.completed"
+        event.type === "pipeline.run.completed" ||
+        event.type === "date.updated" ||
+        event.type === "day.ingested" ||
+        event.type === "day.llm.loaded" ||
+        event.type === "day.notable-queries.updated"
       ) {
         setRefreshToken((previous) => previous + 1);
         setLastRefreshAt(event.emittedAt);

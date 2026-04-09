@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { serverLogger } from "../utils/logging/serverLogger.js";
 
 export type LiveUpdateEvent = {
   type:
@@ -8,7 +9,11 @@ export type LiveUpdateEvent = {
     | "pipeline.run.started"
     | "pipeline.run.completed"
     | "pipeline.run.failed"
-    | "llm.connectivity.changed";
+    | "llm.connectivity.changed"
+    | "day.ingested"
+    | "day.llm.loaded"
+    | "day.notable-queries.updated"
+    | "date.updated";
   emittedAt: string;
   payload?: Record<string, unknown>;
 };
@@ -19,10 +24,16 @@ class LiveUpdateBus {
   private readonly emitter = new EventEmitter();
 
   publish(event: Omit<LiveUpdateEvent, "emittedAt">): void {
-    this.emitter.emit(LIVE_UPDATE_EVENT_NAME, {
+    const hydratedEvent = {
       ...event,
       emittedAt: new Date().toISOString()
-    } satisfies LiveUpdateEvent);
+    } satisfies LiveUpdateEvent;
+    this.emitter.emit(LIVE_UPDATE_EVENT_NAME, hydratedEvent);
+    serverLogger.info("Published live update event", {
+      type: hydratedEvent.type,
+      emittedAt: hydratedEvent.emittedAt,
+      payload: hydratedEvent.payload ?? null
+    });
   }
 
   subscribe(listener: (event: LiveUpdateEvent) => void): () => void {

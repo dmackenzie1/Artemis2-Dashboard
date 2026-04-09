@@ -217,6 +217,37 @@ type IngestionEventPayload = {
   details: Record<string, unknown>;
 };
 
+const publishDateLifecycleEvents = (options: {
+  dayKeys: Set<string>;
+  trigger: string;
+  sourcePath: string | null;
+  stage: "ingested" | "llm-loaded" | "notable-queries-updated";
+}): void => {
+  const sortedDayKeys = [...options.dayKeys].sort((left, right) => left.localeCompare(right));
+  for (const dayKey of sortedDayKeys) {
+    if (options.stage === "ingested") {
+      liveUpdateBus.publish({
+        type: "day.ingested",
+        payload: { day: dayKey, trigger: options.trigger, sourcePath: options.sourcePath }
+      });
+    } else if (options.stage === "llm-loaded") {
+      liveUpdateBus.publish({
+        type: "day.llm.loaded",
+        payload: { day: dayKey, trigger: options.trigger, sourcePath: options.sourcePath }
+      });
+    } else {
+      liveUpdateBus.publish({
+        type: "day.notable-queries.updated",
+        payload: { day: dayKey, trigger: options.trigger, sourcePath: options.sourcePath }
+      });
+    }
+    liveUpdateBus.publish({
+      type: "date.updated",
+      payload: { day: dayKey, stage: options.stage, trigger: options.trigger, sourcePath: options.sourcePath }
+    });
+  }
+};
+
 const writeIngestionEventLog = async (payload: IngestionEventPayload): Promise<void> => {
   const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
   const fileName = `${timestamp}-ingestion-event.json`;
@@ -233,7 +264,9 @@ const writeIngestionEventLog = async (payload: IngestionEventPayload): Promise<v
   }
 };
 
-const runTranscriptAndPipelineRefresh = async (): Promise<void> => {
+const runTranscriptAndPipelineRefresh = async (options?: { trigger?: string; sourcePath?: string | null }): Promise<void> => {
+  const trigger = options?.trigger ?? "ingestion-refresh";
+  const sourcePath = options?.sourcePath ?? null;
   const em = transcriptOrm?.em.fork();
   let changedDayKeys = new Set<string>();
   if (em) {
@@ -247,6 +280,12 @@ const runTranscriptAndPipelineRefresh = async (): Promise<void> => {
     });
     const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
     changedDayKeys = new Set(transcriptIngestion.changedDayKeys);
+    publishDateLifecycleEvents({
+      dayKeys: changedDayKeys,
+      trigger,
+      sourcePath,
+      stage: "ingested"
+    });
     serverLogger.info("Manual transcript ingestion completed", transcriptIngestion);
     await writeIngestionEventLog({
       trigger: "ingestion-refresh",
@@ -261,12 +300,24 @@ const runTranscriptAndPipelineRefresh = async (): Promise<void> => {
 
   const currentPipelineService = pipelineService;
   if (currentPipelineService) {
-    liveUpdateBus.publish({ type: "pipeline.run.started", payload: { trigger: "ingestion-refresh" } });
+    liveUpdateBus.publish({ type: "pipeline.run.started", payload: { trigger } });
     await currentPipelineService.runPipelineCycle({
       changedDayKeys,
       sourceDocumentsChanged: changedDayKeys.size > 0
     });
-    liveUpdateBus.publish({ type: "pipeline.run.completed", payload: { trigger: "ingestion-refresh" } });
+    publishDateLifecycleEvents({
+      dayKeys: changedDayKeys,
+      trigger,
+      sourcePath,
+      stage: "llm-loaded"
+    });
+    publishDateLifecycleEvents({
+      dayKeys: changedDayKeys,
+      trigger,
+      sourcePath,
+      stage: "notable-queries-updated"
+    });
+    liveUpdateBus.publish({ type: "pipeline.run.completed", payload: { trigger } });
     serverLogger.info("Prompt workflow completed after ingestion");
   }
 };
@@ -286,7 +337,7 @@ const runAutoIngestion = async (): Promise<void> => {
       reason,
       sourcePath
     });
-    await runTranscriptAndPipelineRefresh();
+    await runTranscriptAndPipelineRefresh({ trigger: reason, sourcePath });
     const dashboard = await analysisService.ingestAndAnalyze();
     statsService?.invalidateCaches();
     timeWindowSummaryService?.invalidateCache();
@@ -413,7 +464,7 @@ app.use("/api/system-logs", createSystemLogsRouter(systemLogsService));
 app.use(
   "/api",
   createApiRouter(analysisService, () => llmConnectivityStatus, async () => {
-    await runTranscriptAndPipelineRefresh();
+    await runTranscriptAndPipelineRefresh({ trigger: "manual:/api/ingest", sourcePath: null });
     const cache = analysisService.getCache();
     await writeIngestionEventLog({
       trigger: "manual:/api/ingest",
@@ -518,6 +569,12 @@ const runStartupIngestion = async (): Promise<void> => {
       });
       const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
       changedDayKeys = new Set(transcriptIngestion.changedDayKeys);
+      publishDateLifecycleEvents({
+        dayKeys: changedDayKeys,
+        trigger: "startup",
+        sourcePath: null,
+        stage: "ingested"
+      });
       serverLogger.info("Startup transcript ingestion completed", transcriptIngestion);
       await writeIngestionEventLog({
         trigger: "startup",
@@ -548,6 +605,18 @@ const runStartupIngestion = async (): Promise<void> => {
       await currentPipelineService.runPipelineCycle({
         changedDayKeys,
         sourceDocumentsChanged: changedDayKeys.size > 0
+      });
+      publishDateLifecycleEvents({
+        dayKeys: changedDayKeys,
+        trigger: "startup",
+        sourcePath: null,
+        stage: "llm-loaded"
+      });
+      publishDateLifecycleEvents({
+        dayKeys: changedDayKeys,
+        trigger: "startup",
+        sourcePath: null,
+        stage: "notable-queries-updated"
       });
       liveUpdateBus.publish({ type: "pipeline.run.completed", payload: { trigger: "startup" } });
       serverLogger.info("Startup prompt workflow completed");
