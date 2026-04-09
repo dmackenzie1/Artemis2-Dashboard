@@ -54,13 +54,13 @@ export const loadTranscriptCandidates = async (
         u.source_file as "sourceFile",
         u.tokens
       from transcript_utterances u
-      where u.tokens && ?::text[]
+      where u.tokens && array[?]::text[]
         and (?::text is null or lower(u.channel) = lower(?::text))
       order by
         (
           select count(*)::int
           from unnest(u.tokens) as token
-          where token = any(?::text[])
+          where token = any(array[?]::text[])
         ) desc,
         u.timestamp desc
       limit ?;

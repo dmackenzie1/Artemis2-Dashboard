@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { serverLogger } from "../utils/logging/serverLogger.js";
+import { parseLlmJsonWithSchema } from "../lib/llmJson.js";
+import { z } from "zod";
 
 export type LlmResponseCache = {
   get(key: string): Promise<string | null>;
@@ -19,6 +21,8 @@ type CacheLookupResult = {
   response: string;
   cacheState: "fresh" | "stale";
 };
+
+const defaultMaxUserPromptCharacters = 500_000;
 
 type GenerateOptions = {
   systemPrompt: string;
@@ -50,7 +54,8 @@ export class LlmClient {
     private readonly maxTokens = 12_000,
     private readonly responseCache?: LlmResponseCache,
     private readonly cacheTtlSeconds = 60 * 60,
-    private readonly staleWhileRevalidateSeconds = 60 * 60
+    private readonly staleWhileRevalidateSeconds = 60 * 60,
+    private readonly maxUserPromptCharacters = defaultMaxUserPromptCharacters
   ) {}
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
@@ -311,6 +316,18 @@ export class LlmClient {
     cacheKey: string | null,
     cacheEnabled: boolean
   ): Promise<string> {
+      if (options.userPrompt.length > this.maxUserPromptCharacters) {
+        serverLogger.error("LLM request rejected: user prompt exceeds max length", {
+          requestId,
+          componentId,
+          requestUserLength: options.userPrompt.length,
+          maxUserPromptCharacters: this.maxUserPromptCharacters
+        });
+        throw new Error(
+          `LLM prompt too large for ${componentId}. max=${this.maxUserPromptCharacters} actual=${options.userPrompt.length}`
+        );
+      }
+
       const requestUserPreview = this.createPreview(options.userPrompt, 350, 2);
       const requestSystemPreview = this.createPreview(options.systemPrompt, 350, 2);
       serverLogger.info("LLM request queued", {
@@ -514,14 +531,27 @@ export class LlmClient {
   }
 
   parseTopics(raw: string): Topic[] {
-    try {
-      const parsed = JSON.parse(raw) as Topic[];
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    } catch {
-      // no-op fallback
+    const topicSchema = z.array(
+      z.object({
+        title: z.string().min(1),
+        description: z.string().min(1),
+        channels: z.array(z.string()).default([]),
+        mentionTimestamps: z.array(z.string()).default([])
+      })
+    );
+
+    const parsed = parseLlmJsonWithSchema(raw, topicSchema, "array");
+    if (parsed.ok) {
+      return parsed.data;
     }
+
+    serverLogger.warn("Top topics response violated JSON contract; using fallback topic", {
+      componentId: "analysis/top_topics",
+      expectedSchema: "Topic[]",
+      expectedRoot: "array",
+      actualFormat: parsed.detectedFormat,
+      reason: parsed.reason
+    });
 
     return [
       {

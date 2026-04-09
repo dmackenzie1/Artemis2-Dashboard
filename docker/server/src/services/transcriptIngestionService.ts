@@ -6,6 +6,8 @@ import { parse, type CsvError, type Info } from "csv-parse";
 import { TranscriptUtterance } from "../entities/TranscriptUtterance.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 import { tokenizeUtterance } from "../lib/tokenizer.js";
+import { compareTranscriptFiles, parseTranscriptFileName } from "../lib/transcriptFileNaming.js";
+import { dayjs } from "../lib/dayjs.js";
 
 type CsvRow = {
   Date: string;
@@ -33,11 +35,34 @@ export type TranscriptIngestionSummary = {
 
 const BATCH_SIZE = 750;
 
+type TimestampValidationState = {
+  mismatchedDayRows: number;
+  outOfRangeHourRows: number;
+};
+
 const ingestFile = async (filePath: string, em: EntityManager): Promise<IngestFileResult> => {
   const sourceFile = path.basename(filePath);
+  const parsedSourceFile = parseTranscriptFileName(sourceFile);
   let parseErrors = 0;
+  const validationState: TimestampValidationState = {
+    mismatchedDayRows: 0,
+    outOfRangeHourRows: 0
+  };
+
+  if (!parsedSourceFile) {
+    serverLogger.warn("Transcript source file name does not match expected day-prefixed naming", {
+      sourceFile,
+      expectedExamples: [
+        "2026-04-09_summary.csv",
+        "2026-04-09_partial_1.csv",
+        "2026-04-09_00-06.csv"
+      ]
+    });
+  }
+
   serverLogger.info("Starting transcript file ingest", {
     sourceFile,
+    parsedSourceFile,
     step: "reading-file"
   });
   const parser = createReadStream(filePath).pipe(
@@ -95,6 +120,37 @@ const ingestFile = async (filePath: string, em: EntityManager): Promise<IngestFi
       continue;
     }
 
+    if (parsedSourceFile) {
+      const rowDay = dayjs(entity.timestamp).utc().format("YYYY-MM-DD");
+      if (rowDay !== parsedSourceFile.day) {
+        validationState.mismatchedDayRows += 1;
+        serverLogger.warn("Transcript row day does not match source file day", {
+          sourceFile,
+          expectedDay: parsedSourceFile.day,
+          actualDay: rowDay,
+          line: info.lines,
+          timestamp: dayjs(entity.timestamp).utc().toISOString()
+        });
+      }
+
+      if (parsedSourceFile.kind === "hour-range") {
+        const hour = Number.parseInt(dayjs(entity.timestamp).utc().format("HH"), 10);
+        const hourStart = parsedSourceFile.hourStart ?? 0;
+        const hourEnd = parsedSourceFile.hourEnd ?? 23;
+        if (hour < hourStart || hour > hourEnd) {
+          validationState.outOfRangeHourRows += 1;
+          serverLogger.warn("Transcript row hour outside hour-range source file bucket", {
+            sourceFile,
+            line: info.lines,
+            hour,
+            expectedHourStart: hourStart,
+            expectedHourEnd: hourEnd,
+            timestamp: dayjs(entity.timestamp).utc().toISOString()
+          });
+        }
+      }
+    }
+
     const tokens = tokenizeUtterance(entity.text);
     tokenized += 1;
 
@@ -141,16 +197,65 @@ const ingestFile = async (filePath: string, em: EntityManager): Promise<IngestFi
     inserted,
     tokenized,
     skipped,
-    parseErrors
+    parseErrors,
+    timestampValidation: validationState
   });
 
   return { inserted, skipped, parseErrors };
 };
 
+const logOverlapWarnings = (fileNames: string[]): void => {
+  const groupedByDay = fileNames.reduce<Map<string, string[]>>((grouped, fileName) => {
+    const parsed = parseTranscriptFileName(fileName);
+    if (!parsed) {
+      return grouped;
+    }
+
+    const existing = grouped.get(parsed.day) ?? [];
+    existing.push(fileName);
+    grouped.set(parsed.day, existing);
+    return grouped;
+  }, new Map<string, string[]>());
+
+  for (const [day, dayFileNames] of groupedByDay.entries()) {
+    const parsed = dayFileNames
+      .map((fileName) => parseTranscriptFileName(fileName))
+      .filter((descriptor): descriptor is NonNullable<typeof descriptor> => Boolean(descriptor));
+
+    const fullDayFiles = parsed.filter((descriptor) => descriptor.kind === "full-day");
+    if (fullDayFiles.length > 1) {
+      serverLogger.warn("Duplicate full-day transcript files detected for a single day", {
+        day,
+        files: fullDayFiles.map((descriptor) => descriptor.fileName)
+      });
+    }
+
+    const hourRanges = parsed
+      .filter((descriptor) => descriptor.kind === "hour-range")
+      .sort((left, right) => (left.hourStart ?? 0) - (right.hourStart ?? 0));
+
+    for (let index = 1; index < hourRanges.length; index += 1) {
+      const previous = hourRanges[index - 1];
+      const current = hourRanges[index];
+      if ((current.hourStart ?? 0) <= (previous.hourEnd ?? -1)) {
+        serverLogger.warn("Overlapping hour-range transcript files detected", {
+          day,
+          previousFile: previous.fileName,
+          currentFile: current.fileName,
+          previousRange: `${previous.hourStart}-${previous.hourEnd}`,
+          currentRange: `${current.hourStart}-${current.hourEnd}`
+        });
+      }
+    }
+  }
+};
+
 export const ingestTranscriptCsvDirectory = async (transcriptCsvDir: string, em: EntityManager): Promise<TranscriptIngestionSummary> => {
   const files = (await fs.readdir(transcriptCsvDir))
     .filter((fileName) => fileName.toLowerCase().endsWith(".csv"))
-    .sort();
+    .sort(compareTranscriptFiles);
+
+  logOverlapWarnings(files);
 
   const existingUtteranceCount = await em.count(TranscriptUtterance, {});
   serverLogger.info("Resetting transcript table before CSV ingestion", {

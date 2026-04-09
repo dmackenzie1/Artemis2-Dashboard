@@ -8,10 +8,17 @@ import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 import { retrieveRankedUtterances } from "./transcriptRetrievalService.js";
 import { ExpiringCache } from "./expiringCache.js";
+import { parseLlmJsonWithSchema } from "../lib/llmJson.js";
+import { z } from "zod";
 
 const { groupBy, uniq } = lodash;
 
 const notableSignalPattern = /\b(abort|risk|issue|anomaly|dropout|dropouts|fail|failure|fault|leak|warning|urgent|off-nominal|degraded|concern)\b/i;
+const dailySummaryPlaceholder =
+  "Daily summary pending pipeline generation. Trigger pipeline execution to populate the canonical summary.";
+const hourlyPromptMaxUtterancesPerHour = 120;
+const topicPromptMaxUtterancesPerWindow = 260;
+
 
 const tokenize = (value: string): string[] =>
   value
@@ -20,41 +27,26 @@ const tokenize = (value: string): string[] =>
     .filter((token) => token.length >= 4);
 
 const parseHourlyHighlights = (rawResponse: string): Record<string, string> => {
-  const trimmed = rawResponse.trim();
-  if (!trimmed) {
+  const hourlySchema = z.record(z.string(), z.string());
+  const parsed = parseLlmJsonWithSchema(rawResponse, hourlySchema, "object");
+
+  if (!parsed.ok) {
+    serverLogger.warn("Hourly summary response violated JSON contract", {
+      componentId: "analysis/hourly_summary",
+      expectedSchema: "Record<string, string>",
+      expectedRoot: "object",
+      actualFormat: parsed.detectedFormat,
+      reason: parsed.reason
+    });
     return {};
   }
 
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-
-    const entries = Object.entries(parsed)
-      .filter(([hour, summary]) => typeof hour === "string" && typeof summary === "string")
+  return Object.fromEntries(
+    Object.entries(parsed.data)
       .map(([hour, summary]) => [hour.trim(), summary.trim()] as const)
       .filter(([hour, summary]) => hour.length > 0 && summary.length > 0)
-      .sort(([left], [right]) => left.localeCompare(right));
-
-    return Object.fromEntries(entries);
-  } catch {
-    const extracted = trimmed.match(/\{[\s\S]*\}/u)?.[0];
-    if (!extracted) {
-      return {};
-    }
-
-    try {
-      const parsed = JSON.parse(extracted) as Record<string, string>;
-      return Object.fromEntries(
-        Object.entries(parsed)
-          .filter(([hour, summary]) => typeof hour === "string" && typeof summary === "string")
-          .sort(([left], [right]) => left.localeCompare(right))
-      );
-    } catch {
-      return {};
-    }
-  }
+      .sort(([left], [right]) => left.localeCompare(right))
+  );
 };
 
 type ServiceConfig = {
@@ -173,6 +165,20 @@ export class AnalysisService {
     ];
   }
 
+  private sampleEntriesForPrompt(entries: TranscriptUtterance[], maxEntries: number): TranscriptUtterance[] {
+    if (entries.length <= maxEntries) {
+      return entries;
+    }
+
+    const stride = Math.ceil(entries.length / maxEntries);
+    const sampled = entries.filter((_, index) => index % stride === 0).slice(0, maxEntries);
+    return sampled;
+  }
+
+  private hasPlaceholderDailySummaries(days: DayInsights[]): boolean {
+    return days.some((day) => day.summary.trim() === dailySummaryPlaceholder);
+  }
+
   private updateCorpusVersion(utterances: TranscriptUtterance[]): void {
     const latestTimestamp = utterances.length > 0 ? utterances[utterances.length - 1]?.timestamp ?? "none" : "none";
     this.corpusVersion = `${utterances.length}:${latestTimestamp}`;
@@ -240,9 +246,7 @@ export class AnalysisService {
         const persistedDailySummary = this.config.loadDailySummaryForDay
           ? await this.config.loadDailySummaryForDay(day)
           : null;
-        const dailySummary =
-          persistedDailySummary ??
-          "Daily summary pending pipeline generation. Trigger pipeline execution to populate the canonical summary.";
+        const dailySummary = persistedDailySummary ?? dailySummaryPlaceholder;
 
         const hourlyPrompt = await getPrompt(this.config.promptsDir, "hourly_summary.txt");
         serverLogger.info("Prompting hourly highlights", { day, hours: Object.keys(byHour).length });
@@ -255,7 +259,9 @@ export class AnalysisService {
               .map((hour) => ({
                 hour,
                 utteranceCount: byHour[hour].length,
-                utterances: byHour[hour].map((entry) => this.toPromptUtterance(entry))
+                utterances: this.sampleEntriesForPrompt(byHour[hour], hourlyPromptMaxUtterancesPerHour).map((entry) =>
+                  this.toPromptUtterance(entry)
+                )
               }))
           }),
           componentId: `analysis/hourly_summary/${day}`
@@ -290,7 +296,9 @@ export class AnalysisService {
                 endHour: window.endHour
               },
               utteranceCount: window.entries.length,
-              entries: window.entries.map((entry) => this.toPromptUtterance(entry))
+              entries: this.sampleEntriesForPrompt(window.entries, topicPromptMaxUtterancesPerWindow).map((entry) =>
+                this.toPromptUtterance(entry)
+              )
             }),
             componentId: `analysis/top_topics/${day}/window/${window.label}`
           });
@@ -333,13 +341,21 @@ export class AnalysisService {
         });
       }
 
-      serverLogger.info("Prompting mission overview summary", { totalDays: days.length });
-      const missionSummary = await this.config.llmClient.generateText({
-        systemPrompt: await getPrompt(this.config.promptsDir, "mission_summary.txt"),
-        userPrompt: JSON.stringify({ days: days.map((day) => ({ day: day.day, summary: day.summary })) }),
-        componentId: "analysis/mission_summary"
-      });
-      serverLogger.info("Prompt received for mission overview summary");
+      let missionSummary = "Mission summary deferred: one or more daily summaries are still pending pipeline generation.";
+      if (this.hasPlaceholderDailySummaries(days)) {
+        serverLogger.warn("Skipping mission overview summary generation due to incomplete upstream day summaries", {
+          totalDays: days.length,
+          pendingDayCount: days.filter((day) => day.summary.trim() === dailySummaryPlaceholder).length
+        });
+      } else {
+        serverLogger.info("Prompting mission overview summary", { totalDays: days.length });
+        missionSummary = await this.config.llmClient.generateText({
+          systemPrompt: await getPrompt(this.config.promptsDir, "mission_summary.txt"),
+          userPrompt: JSON.stringify({ days: days.map((day) => ({ day: day.day, summary: day.summary })) }),
+          componentId: "analysis/mission_summary"
+        });
+        serverLogger.info("Prompt received for mission overview summary");
+      }
 
       serverLogger.info("Prompting recent changes summary", { scopedDays: Math.min(days.length, 2) });
       const recentChanges = await this.config.llmClient.generateText({
