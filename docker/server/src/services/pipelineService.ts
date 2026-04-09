@@ -5,7 +5,7 @@ import { EntityManager } from "@mikro-orm/postgresql";
 import { dayjs } from "../lib/dayjs.js";
 import { PromptDefinition } from "../entities/PromptDefinition.js";
 import { PromptExecution } from "../entities/PromptExecution.js";
-import { DailySummary } from "../entities/DailySummary.js";
+import { SummaryArtifact } from "../entities/SummaryArtifact.js";
 import { TranscriptUtterance } from "../entities/TranscriptUtterance.js";
 import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
@@ -71,6 +71,7 @@ const dailySummaryTargetWords = {
 const dailySummaryChunkCharacterLimit = 220_000;
 const missionStatsCacheTtlMs = 5 * 60 * 1000;
 const canonicalChannelGroup = "*";
+const dailyFullSummaryType = "daily_full";
 
 type SourceContextDocument = {
   path: string;
@@ -88,7 +89,7 @@ type DailyDocumentVariant = {
   isPartial: boolean;
 };
 
-type ParsedDailySummarySection = {
+type ParsedSummaryArtifactSection = {
   day: string;
   summary: string;
 };
@@ -98,8 +99,12 @@ type PromptDefinitionSyncResult = {
   changedPromptKeys: string[];
 };
 
-type DailySummaryView = {
+type SummaryArtifactView = {
+  id: number;
+  summaryType: string;
   day: string;
+  periodStart: string;
+  periodEnd: string;
   channelGroup: string;
   summary: string;
   generatedAt: string;
@@ -200,7 +205,7 @@ export class PipelineService {
       .map(([day, documents]) => ({ day, documents: this.resolveDailyGroupDocuments(documents) }));
   }
 
-  private createDailySummaryCacheSubmission(sourceContext: SourceContextDocument[]): string {
+  private createSummaryArtifactCacheSubmission(sourceContext: SourceContextDocument[]): string {
     const groupedDays = this.buildDailyGroups(sourceContext);
     serverLogger.info("Prepared grouped daily-summary source document manifest", {
       groupedDayCount: groupedDays.length,
@@ -241,7 +246,7 @@ export class PipelineService {
 
   private async buildPromptSubmission(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
     if (prompt.key === "daily_summary") {
-      return this.createDailySummaryCacheSubmission(sourceContext);
+      return this.createSummaryArtifactCacheSubmission(sourceContext);
     }
 
     if (prompt.key === "recent_changes") {
@@ -343,7 +348,7 @@ export class PipelineService {
     return chunks;
   }
 
-  private async generateDailySummaryOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
+  private async generateSummaryArtifactOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
     const dayGroups = this.buildDailyGroups(sourceContext);
     const dayOutputs: string[] = [];
     serverLogger.info("Starting daily summary layered generation", {
@@ -422,8 +427,8 @@ export class PipelineService {
     const dayGroups = this.buildDailyGroups(sourceContext);
     const em = this.getEntityManager();
     const persistedDailySummaries = await em.find(
-      DailySummary,
-      { channelGroup: canonicalChannelGroup, day: { $in: dayGroups.map((group) => group.day) } },
+      SummaryArtifact,
+      { summaryType: dailyFullSummaryType, channelGroup: canonicalChannelGroup, day: { $in: dayGroups.map((group) => group.day) } },
       { orderBy: { day: "asc" } }
     );
     const summaryByDay = new Map(persistedDailySummaries.map((summary) => [summary.day, summary.summary]));
@@ -517,8 +522,8 @@ export class PipelineService {
     return Math.max(this.config.notableMoments.minPerDay, this.config.notableMoments.baselinePerDay);
   }
 
-  private parseDailySummarySections(output: string): ParsedDailySummarySection[] {
-    const sections: ParsedDailySummarySection[] = [];
+  private parseSummaryArtifactSections(output: string): ParsedSummaryArtifactSection[] {
+    const sections: ParsedSummaryArtifactSection[] = [];
     const sectionPattern = /^##\s+(.+?)\n+([\s\S]*?)(?=^##\s+.+?$|$)/gmu;
     let match = sectionPattern.exec(output);
 
@@ -542,10 +547,10 @@ export class PipelineService {
     return trimmed.split(/\s+/u).length;
   }
 
-  private async persistDailySummaries(output: string, sourceContext: SourceContextDocument[]): Promise<void> {
+  private async persistSummaryArtifacts(output: string, sourceContext: SourceContextDocument[]): Promise<void> {
     const em = this.getEntityManager();
     const dayGroupsByDay = new Map(this.buildDailyGroups(sourceContext).map((group) => [group.day, group]));
-    const parsedSections = this.parseDailySummarySections(output);
+    const parsedSections = this.parseSummaryArtifactSections(output);
     const generatedAt = dayjs().utc().toDate();
 
     for (const section of parsedSections) {
@@ -555,30 +560,50 @@ export class PipelineService {
         0
       ) ?? 0;
       const sourceDocumentCount = group?.documents.length ?? 0;
-      const existing = await em.findOne(DailySummary, { day: section.day, channelGroup: canonicalChannelGroup });
+      const periodStart = dayjs(`${section.day}T00:00:00Z`).utc().toDate();
+      const periodEnd = dayjs(`${section.day}T23:59:59.999Z`).utc().toDate();
+      const sourceChecksum = crypto
+        .createHash("sha256")
+        .update(group?.documents.map((document) => `${document.path}:${document.checksum}`).join("|") ?? "")
+        .digest("hex");
+      const existing = await em.findOne(SummaryArtifact, {
+        summaryType: dailyFullSummaryType,
+        periodStart,
+        periodEnd,
+        channelGroup: canonicalChannelGroup
+      });
 
       if (!existing) {
         em.persist(
-          em.create(DailySummary, {
+          em.create(SummaryArtifact, {
+            summaryType: dailyFullSummaryType,
             day: section.day,
+            periodStart,
+            periodEnd,
             channelGroup: canonicalChannelGroup,
             summary: section.summary,
             generatedAt,
             updatedAt: generatedAt,
             wordCount: this.countWords(section.summary),
             utteranceCount,
-            sourceDocumentCount
+            sourceDocumentCount,
+            sourceChecksum
           })
         );
         continue;
       }
 
+      existing.summaryType = dailyFullSummaryType;
       existing.summary = section.summary;
+      existing.day = section.day;
+      existing.periodStart = periodStart;
+      existing.periodEnd = periodEnd;
       existing.generatedAt = generatedAt;
       existing.updatedAt = generatedAt;
       existing.wordCount = this.countWords(section.summary);
       existing.utteranceCount = utteranceCount;
       existing.sourceDocumentCount = sourceDocumentCount;
+      existing.sourceChecksum = sourceChecksum;
     }
 
     await em.flush();
@@ -589,12 +614,13 @@ export class PipelineService {
       return sourceContext;
     }
 
-    return sourceContext.filter((document) => dayKeys.has(this.deriveDayKey(document.path)));
+    const filtered = sourceContext.filter((document) => dayKeys.has(this.deriveDayKey(document.path)));
+    return filtered.length > 0 ? filtered : sourceContext;
   }
 
-  private buildDailySummaryOutputFromCache(daySummaries: DailySummary[]): string {
+  private buildSummaryArtifactOutputFromCache(daySummaries: SummaryArtifact[]): string {
     return daySummaries
-      .filter((summary) => summary.channelGroup === canonicalChannelGroup)
+      .filter((summary) => summary.channelGroup === canonicalChannelGroup && summary.summaryType === dailyFullSummaryType)
       .sort((left, right) => left.day.localeCompare(right.day))
       .map((summary) => `## ${summary.day}\n\n${summary.summary}`)
       .join("\n\n");
@@ -676,7 +702,7 @@ export class PipelineService {
     };
   }
 
-  async runPipelineCycle(): Promise<void> {
+  async runPipelineCycle(options?: { changedDayKeys?: Set<string>; sourceDocumentsChanged?: boolean }): Promise<void> {
     if (this.runInProgress) {
       return;
     }
@@ -686,11 +712,13 @@ export class PipelineService {
       await this.markStaleRunningExecutionsAsFailed();
       const promptSyncResult = await this.syncPromptDefinitions();
       const sourceContext = await this.buildSourceContextFromTranscriptDatabase();
-      const changedDayKeys = sourceContext.map((document) => this.deriveDayKey(document.path));
+      const inferredChangedDayKeys = new Set(sourceContext.map((document) => this.deriveDayKey(document.path)));
+      const changedDayKeys = options?.changedDayKeys ?? inferredChangedDayKeys;
+      const sourceDocumentsChanged = options?.sourceDocumentsChanged ?? inferredChangedDayKeys.size > 0;
       await this.executePromptsSequentially({
-        changedDayKeys: new Set(changedDayKeys),
+        changedDayKeys,
         changedPromptKeys: new Set(promptSyncResult.changedPromptKeys),
-        sourceDocumentsChanged: sourceContext.length > 0,
+        sourceDocumentsChanged,
         sourceContext
       });
       this.missionStatsCache = null;
@@ -736,13 +764,13 @@ export class PipelineService {
     const changedDayKeys = options?.changedDayKeys ?? new Set<string>();
     const changedPromptKeys = options?.changedPromptKeys ?? new Set<string>();
     const sourceDocumentsChanged = options?.sourceDocumentsChanged ?? true;
-    let latestDailySummaryOutput: string | null = null;
+    let latestSummaryArtifactOutput: string | null = null;
 
     for (const prompt of prompts) {
       const promptChanged = changedPromptKeys.has(prompt.key);
       const shouldRunPrompt =
         prompt.key === "mission_summary"
-          ? sourceDocumentsChanged || promptChanged || latestDailySummaryOutput !== null
+          ? sourceDocumentsChanged || promptChanged || latestSummaryArtifactOutput !== null
           : sourceDocumentsChanged || promptChanged;
       if (!shouldRunPrompt) {
         continue;
@@ -758,21 +786,21 @@ export class PipelineService {
       }
 
       const submittedText = await this.buildPromptSubmission(prompt, promptSourceContext);
-      if (prompt.key === "mission_summary" && !latestDailySummaryOutput) {
+      if (prompt.key === "mission_summary" && !latestSummaryArtifactOutput) {
         const existingDailySummaries = await em.find(
-          DailySummary,
-          { channelGroup: canonicalChannelGroup },
+          SummaryArtifact,
+          { summaryType: dailyFullSummaryType, channelGroup: canonicalChannelGroup },
           { orderBy: { day: "asc" } }
         );
-        latestDailySummaryOutput = this.buildDailySummaryOutputFromCache(existingDailySummaries);
+        latestSummaryArtifactOutput = this.buildSummaryArtifactOutputFromCache(existingDailySummaries);
       }
       const missionSubmittedText: string =
-        prompt.key === "mission_summary" && latestDailySummaryOutput
+        prompt.key === "mission_summary" && latestSummaryArtifactOutput
           ? JSON.stringify(
               {
                 generatedAt: dayjs().utc().toISOString(),
                 strategy: "summaries-over-raw-docs",
-                dailySummaryOutput: latestDailySummaryOutput
+                dailySummaryOutput: latestSummaryArtifactOutput
               },
               null,
               2
@@ -802,7 +830,7 @@ export class PipelineService {
       try {
         const output =
           prompt.key === "daily_summary"
-            ? await this.generateDailySummaryOutput(prompt, promptSourceContext)
+            ? await this.generateSummaryArtifactOutput(prompt, promptSourceContext)
             : prompt.key === "notable_moments"
               ? await this.generateNotableMomentsOutput(prompt, promptSourceContext)
             : await this.config.llmClient.generateText({
@@ -817,8 +845,8 @@ export class PipelineService {
         execution.output = output;
         execution.finishedAt = dayjs().utc().toDate();
         if (prompt.key === "daily_summary") {
-          latestDailySummaryOutput = output;
-          await this.persistDailySummaries(output, promptSourceContext);
+          latestSummaryArtifactOutput = output;
+          await this.persistSummaryArtifacts(output, promptSourceContext);
         }
         serverLogger.info("Prompt response received", {
           promptKey: prompt.key,
@@ -889,15 +917,32 @@ export class PipelineService {
     return { changedDocuments: sourceContext.length };
   }
 
-  async getDailySummaries(channelGroup = canonicalChannelGroup): Promise<{ generatedAt: string; channelGroup: string; days: DailySummaryView[] }> {
+  async getSummaries(filters?: {
+    summaryType?: string;
+    day?: string;
+    channelGroup?: string;
+  }): Promise<{ generatedAt: string; summaries: SummaryArtifactView[] }> {
     const em = this.getEntityManager();
-    const rows = await em.find(DailySummary, { channelGroup }, { orderBy: { day: "asc" } });
+    const where: Record<string, unknown> = {};
+    if (filters?.summaryType) {
+      where.summaryType = filters.summaryType;
+    }
+    if (filters?.day) {
+      where.day = filters.day;
+    }
+    if (filters?.channelGroup) {
+      where.channelGroup = filters.channelGroup;
+    }
 
+    const rows = await em.find(SummaryArtifact, where, { orderBy: { periodStart: "asc", channelGroup: "asc" } });
     return {
       generatedAt: dayjs().utc().toISOString(),
-      channelGroup,
-      days: rows.map((row) => ({
+      summaries: rows.map((row) => ({
+        id: row.id,
+        summaryType: row.summaryType,
         day: row.day,
+        periodStart: dayjs(row.periodStart).utc().toISOString(),
+        periodEnd: dayjs(row.periodEnd).utc().toISOString(),
         channelGroup: row.channelGroup,
         summary: row.summary,
         generatedAt: dayjs(row.generatedAt).utc().toISOString(),
@@ -905,6 +950,34 @@ export class PipelineService {
         wordCount: row.wordCount,
         utteranceCount: row.utteranceCount,
         sourceDocumentCount: row.sourceDocumentCount
+      }))
+    };
+  }
+
+  async getSummariesCatalog(): Promise<{
+    generatedAt: string;
+    entries: Array<{
+      summaryType: string;
+      day: string;
+      channelGroup: string;
+      periodStart: string;
+      periodEnd: string;
+      generatedAt: string;
+      updatedAt: string;
+    }>;
+  }> {
+    const em = this.getEntityManager();
+    const rows = await em.find(SummaryArtifact, {}, { orderBy: { periodStart: "desc", channelGroup: "asc" } });
+    return {
+      generatedAt: dayjs().utc().toISOString(),
+      entries: rows.map((row) => ({
+        summaryType: row.summaryType,
+        day: row.day,
+        channelGroup: row.channelGroup,
+        periodStart: dayjs(row.periodStart).utc().toISOString(),
+        periodEnd: dayjs(row.periodEnd).utc().toISOString(),
+        generatedAt: dayjs(row.generatedAt).utc().toISOString(),
+        updatedAt: dayjs(row.updatedAt).utc().toISOString()
       }))
     };
   }

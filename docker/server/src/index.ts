@@ -22,7 +22,7 @@ import { TimeWindowSummaryService } from "./services/timeWindowSummaryService.js
 import { RedisLlmCache } from "./services/redisLlmCache.js";
 import { liveUpdateBus } from "./services/liveUpdateBus.js";
 import { TranscriptUtterance } from "./entities/TranscriptUtterance.js";
-import { DailySummary } from "./entities/DailySummary.js";
+import { SummaryArtifact } from "./entities/SummaryArtifact.js";
 import { loadTranscriptCandidates } from "./services/transcriptCandidateService.js";
 
 const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
@@ -183,7 +183,11 @@ const analysisService = new AnalysisService({
       return null;
     }
 
-    const summary = await transcriptOrm.em.fork().findOne(DailySummary, { day, channelGroup: "*" });
+    const summary = await transcriptOrm.em.fork().findOne(SummaryArtifact, {
+      summaryType: "daily_full",
+      day,
+      channelGroup: "*"
+    });
     return summary?.summary ?? null;
   }
 });
@@ -231,6 +235,7 @@ const writeIngestionEventLog = async (payload: IngestionEventPayload): Promise<v
 
 const runTranscriptAndPipelineRefresh = async (): Promise<void> => {
   const em = transcriptOrm?.em.fork();
+  let changedDayKeys = new Set<string>();
   if (em) {
     await writeIngestionEventLog({
       trigger: "ingestion-refresh",
@@ -241,6 +246,7 @@ const runTranscriptAndPipelineRefresh = async (): Promise<void> => {
       }
     });
     const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
+    changedDayKeys = new Set(transcriptIngestion.changedDayKeys);
     serverLogger.info("Manual transcript ingestion completed", transcriptIngestion);
     await writeIngestionEventLog({
       trigger: "ingestion-refresh",
@@ -256,7 +262,10 @@ const runTranscriptAndPipelineRefresh = async (): Promise<void> => {
   const currentPipelineService = pipelineService;
   if (currentPipelineService) {
     liveUpdateBus.publish({ type: "pipeline.run.started", payload: { trigger: "ingestion-refresh" } });
-    await currentPipelineService.runPipelineCycle();
+    await currentPipelineService.runPipelineCycle({
+      changedDayKeys,
+      sourceDocumentsChanged: changedDayKeys.size > 0
+    });
     liveUpdateBus.publish({ type: "pipeline.run.completed", payload: { trigger: "ingestion-refresh" } });
     serverLogger.info("Prompt workflow completed after ingestion");
   }
@@ -496,6 +505,7 @@ const runStartupIngestion = async (): Promise<void> => {
   serverLogger.info("Startup ingestion scheduled");
 
   try {
+    let changedDayKeys = new Set<string>();
     const em = transcriptOrm?.em.fork();
     if (em) {
       await writeIngestionEventLog({
@@ -507,6 +517,7 @@ const runStartupIngestion = async (): Promise<void> => {
         }
       });
       const transcriptIngestion = await ingestTranscriptCsvDirectory(env.DATA_DIR, em);
+      changedDayKeys = new Set(transcriptIngestion.changedDayKeys);
       serverLogger.info("Startup transcript ingestion completed", transcriptIngestion);
       await writeIngestionEventLog({
         trigger: "startup",
@@ -534,7 +545,10 @@ const runStartupIngestion = async (): Promise<void> => {
     const currentPipelineService = pipelineService;
     if (currentPipelineService) {
       liveUpdateBus.publish({ type: "pipeline.run.started", payload: { trigger: "startup" } });
-      await currentPipelineService.runPipelineCycle();
+      await currentPipelineService.runPipelineCycle({
+        changedDayKeys,
+        sourceDocumentsChanged: changedDayKeys.size > 0
+      });
       liveUpdateBus.publish({ type: "pipeline.run.completed", payload: { trigger: "startup" } });
       serverLogger.info("Startup prompt workflow completed");
       startPipelineSchedule();

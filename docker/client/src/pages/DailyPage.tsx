@@ -1,6 +1,6 @@
 import type { FC } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { fetchDashboard, fetchPipelineDailySummaries, type DashboardData, type PipelineDailySummariesData } from "../api";
+import { fetchDashboard, fetchPipelineSummaries, type DashboardData, type PipelineSummariesData } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./DailyPage.module.css";
@@ -9,13 +9,18 @@ import { clientLogger } from "../utils/logging/clientLogger";
 
 export const DailyPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [pipelineDailySummaries, setPipelineDailySummaries] = useState<PipelineDailySummariesData | null>(null);
+  const [pipelineSummaries, setPipelineSummaries] = useState<PipelineSummariesData | null>(null);
   const { componentId, componentUid } = useComponentIdentity("daily-page");
   const days = data?.days ?? [];
 
   const pipelineSummaryByDay = useMemo(
-    () => new Map((pipelineDailySummaries?.days ?? []).map((entry) => [entry.day, entry.summary])),
-    [pipelineDailySummaries]
+    () =>
+      new Map(
+        (pipelineSummaries?.summaries ?? [])
+          .filter((entry) => entry.summaryType === "daily_full" && entry.channelGroup === "*")
+          .map((entry) => [entry.day, entry.summary])
+      ),
+    [pipelineSummaries]
   );
 
   useEffect(() => {
@@ -23,10 +28,13 @@ export const DailyPage: FC = () => {
 
     const loadDailyDashboard = async (): Promise<void> => {
       try {
-        const [dashboardPayload, pipelineDailyPayload] = await Promise.all([fetchDashboard(), fetchPipelineDailySummaries()]);
+        const [dashboardPayload, pipelineDailyPayload] = await Promise.all([
+          fetchDashboard(),
+          fetchPipelineSummaries({ summaryType: "daily_full", channelGroup: "*" })
+        ]);
         if (isMounted) {
           setData(dashboardPayload);
-          setPipelineDailySummaries(pipelineDailyPayload);
+          setPipelineSummaries(pipelineDailyPayload);
         }
       } catch (error) {
         clientLogger.error("Failed to load daily dashboard", { error });

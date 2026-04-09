@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { IngestionSourceFile } from "../entities/IngestionSourceFile.js";
 import { TranscriptUtterance } from "../entities/TranscriptUtterance.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 import { ingestTranscriptCsvDirectory } from "./transcriptIngestionService.js";
@@ -35,9 +36,12 @@ describe("ingestTranscriptCsvDirectory", () => {
     const em = {
       count: vi
         .fn()
-        .mockResolvedValueOnce(17)
         .mockImplementation(async () => insertedBatches.flat().length),
-      nativeDelete: vi.fn().mockResolvedValue(undefined),
+      find: vi.fn().mockResolvedValue([]),
+      create: vi.fn((_entity: unknown, row: IngestionSourceFile) => row),
+      persist: vi.fn(),
+      flush: vi.fn().mockResolvedValue(undefined),
+      nativeDelete: vi.fn().mockResolvedValue(0),
       insertMany: vi.fn(async (_entity: unknown, rows: Array<Omit<TranscriptUtterance, "id">>) => {
         insertedBatches.push(rows);
       })
@@ -48,13 +52,16 @@ describe("ingestTranscriptCsvDirectory", () => {
     const allInsertedRows = insertedBatches.flat();
 
     expect(summary.filesProcessed).toBe(2);
+    expect(summary.filesSkippedUnchanged).toBe(0);
     expect(summary.inserted).toBe(1);
+    expect(summary.deleted).toBe(0);
     expect(summary.skipped).toBe(0);
     expect(summary.parseErrors).toBe(1);
     expect(summary.utterancesInDatabase).toBe(1);
     expect(allInsertedRows).toHaveLength(1);
     expect(allInsertedRows[0]?.text).toContain("2'6\"");
-    expect(em.nativeDelete).toHaveBeenCalledWith(TranscriptUtterance, {});
+    expect(em.nativeDelete).toHaveBeenCalledWith(TranscriptUtterance, { sourceFile: "00-malformed.csv" });
+    expect(em.nativeDelete).toHaveBeenCalledWith(TranscriptUtterance, { sourceFile: "2026-04-05_summary.csv" });
   });
 
   it("logs mismatched filename date and overlapping partial hour files", async () => {
@@ -75,9 +82,12 @@ describe("ingestTranscriptCsvDirectory", () => {
     const em = {
       count: vi
         .fn()
-        .mockResolvedValueOnce(0)
         .mockImplementation(async () => insertedBatches.flat().length),
-      nativeDelete: vi.fn().mockResolvedValue(undefined),
+      find: vi.fn().mockResolvedValue([]),
+      create: vi.fn((_entity: unknown, row: IngestionSourceFile) => row),
+      persist: vi.fn(),
+      flush: vi.fn().mockResolvedValue(undefined),
+      nativeDelete: vi.fn().mockResolvedValue(0),
       insertMany: vi.fn(async (_entity: unknown, rows: Array<Omit<TranscriptUtterance, "id">>) => {
         insertedBatches.push(rows);
       })

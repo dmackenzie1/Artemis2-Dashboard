@@ -38,11 +38,14 @@ export type PipelineDashboardData = {
   }>;
 };
 
-export type PipelineDailySummariesData = {
+export type PipelineSummariesData = {
   generatedAt: string;
-  channelGroup: string;
-  days: Array<{
+  summaries: Array<{
+    id: number;
+    summaryType: string;
     day: string;
+    periodStart: string;
+    periodEnd: string;
     channelGroup: string;
     summary: string;
     generatedAt: string;
@@ -50,6 +53,19 @@ export type PipelineDailySummariesData = {
     wordCount: number;
     utteranceCount: number;
     sourceDocumentCount: number;
+  }>;
+};
+
+export type PipelineSummariesCatalogData = {
+  generatedAt: string;
+  entries: Array<{
+    summaryType: string;
+    day: string;
+    channelGroup: string;
+    periodStart: string;
+    periodEnd: string;
+    generatedAt: string;
+    updatedAt: string;
   }>;
 };
 
@@ -230,14 +246,40 @@ export const fetchPipelineDashboard = async (): Promise<PipelineDashboardData | 
   return (await response.json()) as PipelineDashboardData;
 };
 
-export const fetchPipelineDailySummaries = async (channelGroup = "*"): Promise<PipelineDailySummariesData | null> => {
-  const response = await fetch(`${base}/pipeline/daily-summaries?channelGroup=${encodeURIComponent(channelGroup)}`);
+export const fetchPipelineSummaries = async (options?: {
+  summaryType?: string;
+  day?: string;
+  channelGroup?: string;
+}): Promise<PipelineSummariesData | null> => {
+  const query = new URLSearchParams();
+  if (options?.summaryType) {
+    query.set("summaryType", options.summaryType);
+  }
+  if (options?.day) {
+    query.set("day", options.day);
+  }
+  if (options?.channelGroup) {
+    query.set("channelGroup", options.channelGroup);
+  }
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  const response = await fetch(`${base}/pipeline/summaries${suffix}`);
   if (!response.ok) {
-    clientLogger.warn("Pipeline daily summaries unavailable", { status: response.status, channelGroup });
+    clientLogger.warn("Pipeline summaries unavailable", { status: response.status, options });
     return null;
   }
 
-  return (await response.json()) as PipelineDailySummariesData;
+  return (await response.json()) as PipelineSummariesData;
+};
+
+export const fetchPipelineSummariesCatalog = async (): Promise<PipelineSummariesCatalogData | null> => {
+  const response = await fetch(`${base}/pipeline/summaries/catalog`);
+  if (!response.ok) {
+    clientLogger.warn("Pipeline summaries catalog unavailable", { status: response.status });
+    return null;
+  }
+
+  return (await response.json()) as PipelineSummariesCatalogData;
 };
 
 export const triggerPipelineRun = async (): Promise<TriggerPipelineRunResponse> => {
