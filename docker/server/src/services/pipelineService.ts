@@ -11,6 +11,9 @@ import { TranscriptUtterance } from "../entities/TranscriptUtterance.js";
 import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 import { liveUpdateBus } from "./liveUpdateBus.js";
+import { TranscriptContextBuilder } from "./pipeline/TranscriptContextBuilder.js";
+import { createSummaryPromptGenerators } from "./pipeline/summaryGenerators.js";
+import type { SourceContextDocument } from "./pipeline/pipelineTypes.js";
 
 type EntityManagerProvider = () => EntityManager;
 
@@ -66,30 +69,10 @@ const promptFilePattern = /\.txt$/i;
 const runnablePromptKeys = new Set(["daily_summary", "mission_summary", "recent_changes", "notable_moments"]);
 const promptExecutionPriority = ["daily_summary", "notable_moments", "mission_summary"];
 const skippedPromptKeys = new Set(["hourly_summary"]);
-const dailySummaryTargetWords = {
-  min: 5_000,
-  max: 10_000
-} as const;
-const dailySummaryChunkCharacterLimit = 220_000;
 const missionStatsCacheTtlMs = 5 * 60 * 1000;
 const canonicalChannelGroup = "*";
 const dailyFullSummaryType = "daily_full";
 
-type SourceContextDocument = {
-  path: string;
-  checksum: string;
-  content: string;
-};
-
-type DailyDocumentGroup = {
-  day: string;
-  documents: SourceContextDocument[];
-};
-
-type DailyDocumentVariant = {
-  canonicalPath: string;
-  isPartial: boolean;
-};
 
 type ParsedSummaryArtifactSection = {
   day: string;
@@ -137,11 +120,21 @@ type PromptMatrixRow = {
 export class PipelineService {
   private runInProgress = false;
   private missionStatsCache: { computedAtMs: number; payload: MissionStatsView } | null = null;
+  private readonly transcriptContextBuilder: TranscriptContextBuilder;
+  private readonly summaryGenerators: ReturnType<typeof createSummaryPromptGenerators>;
 
   constructor(
     private readonly getEntityManager: EntityManagerProvider,
     private readonly config: PipelineConfig
-  ) {}
+  ) {
+    this.transcriptContextBuilder = new TranscriptContextBuilder();
+    this.summaryGenerators = createSummaryPromptGenerators({
+      llmClient: this.config.llmClient,
+      getEntityManager: this.getEntityManager,
+      transcriptContextBuilder: this.transcriptContextBuilder,
+      notableMomentsConfig: this.config.notableMoments
+    });
+  }
 
   private async persistPromptSubmission(promptKey: string, submittedText: string): Promise<string> {
     const timestamp = dayjs().utc().format("YYYYMMDDTHHmmssSSS");
@@ -197,19 +190,7 @@ export class PipelineService {
   }
 
   private derivePromptResponseDay(sourceContext: SourceContextDocument[]): string | null {
-    if (sourceContext.length === 0) {
-      return null;
-    }
-
-    const uniqueDays = Array.from(new Set(sourceContext.map((document) => this.deriveDayKey(document.path)))).filter(
-      (day) => day !== "unspecified-day"
-    );
-
-    if (uniqueDays.length !== 1) {
-      return null;
-    }
-
-    return uniqueDays[0] ?? null;
+    return this.transcriptContextBuilder.derivePromptResponseDay(sourceContext);
   }
 
   private async getLatestIngestAt(): Promise<string | null> {
@@ -222,153 +203,19 @@ export class PipelineService {
     return dayjs(latestSourceFile.updatedAt).utc().toISOString();
   }
 
-  private deriveDayKey(relativePath: string): string {
-    const normalized = relativePath.toLowerCase();
-    const dateMatch = normalized.match(/(\d{4}-\d{2}-\d{2})/u);
-    if (dateMatch?.[1]) {
-      return dateMatch[1];
-    }
-
-    const dayNumberMatch = normalized.match(/\bday[\s_-]?(\d{1,3})\b/u);
-    if (dayNumberMatch?.[1]) {
-      return `day-${dayNumberMatch[1].padStart(2, "0")}`;
-    }
-
-    return "unspecified-day";
-  }
-
-  private deriveDailyDocumentVariant(relativePath: string): DailyDocumentVariant {
-    const parsedPath = path.parse(relativePath);
-    const isPartial = /_partial$/iu.test(parsedPath.name);
-    const canonicalName = isPartial ? parsedPath.name.replace(/_partial$/iu, "") : parsedPath.name;
-    return {
-      canonicalPath: path.join(parsedPath.dir, `${canonicalName}${parsedPath.ext}`),
-      isPartial
-    };
-  }
-
-  private resolveDailyGroupDocuments(documents: SourceContextDocument[]): SourceContextDocument[] {
-    const preferredByCanonicalPath = documents.reduce<Map<string, SourceContextDocument>>((selected, document) => {
-      const variant = this.deriveDailyDocumentVariant(document.path);
-      const existing = selected.get(variant.canonicalPath);
-
-      if (!existing) {
-        selected.set(variant.canonicalPath, document);
-        return selected;
-      }
-
-      const existingVariant = this.deriveDailyDocumentVariant(existing.path);
-      if (existingVariant.isPartial && !variant.isPartial) {
-        selected.set(variant.canonicalPath, document);
-      }
-
-      return selected;
-    }, new Map<string, SourceContextDocument>());
-
-    return [...preferredByCanonicalPath.values()].sort((left, right) => left.path.localeCompare(right.path));
-  }
-
-  private buildDailyGroups(sourceContext: SourceContextDocument[]): DailyDocumentGroup[] {
-    const groupedByDay = sourceContext.reduce<Map<string, SourceContextDocument[]>>((grouped, document) => {
-      const dayKey = this.deriveDayKey(document.path);
-      const documents = grouped.get(dayKey) ?? [];
-      documents.push(document);
-      grouped.set(dayKey, documents);
-      return grouped;
-    }, new Map<string, SourceContextDocument[]>());
-
-    return [...groupedByDay.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([day, documents]) => ({ day, documents: this.resolveDailyGroupDocuments(documents) }));
-  }
-
-  private createSummaryArtifactCacheSubmission(sourceContext: SourceContextDocument[]): string {
-    const groupedDays = this.buildDailyGroups(sourceContext);
-    serverLogger.info("Prepared grouped daily-summary source document manifest", {
-      groupedDayCount: groupedDays.length,
-      groupedDays: groupedDays.map((group) => ({
-        day: group.day,
-        documentCount: group.documents.length,
-        documents: group.documents.map((document) => document.path)
-      }))
-    });
-
-    const dayGroups = groupedDays.map((group) => ({
-      day: group.day,
-      sourceDocuments: group.documents.map((document) => ({
-        path: document.path,
-        checksum: document.checksum
-      })),
-      instructions: {
-        minimumWordTarget: dailySummaryTargetWords.min,
-        maximumWordTarget: dailySummaryTargetWords.max,
-        objective:
-          "Produce a detailed day-level summary that can be cached in the database and reused by mission-level summaries."
-      }
-    }));
-
-    return JSON.stringify(
-      {
-        generatedAt: dayjs().utc().toISOString(),
-        strategy: "daily-layer-first",
-        chunking: {
-          maxCharactersPerChunk: dailySummaryChunkCharacterLimit
-        },
-        dayGroups
-      },
-      null,
-      2
-    );
-  }
-
   private async buildPromptSubmission(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
     if (prompt.key === "daily_summary") {
-      return this.createSummaryArtifactCacheSubmission(sourceContext);
+      return this.transcriptContextBuilder.buildDailySummarySubmission(sourceContext);
     }
 
     if (prompt.key === "recent_changes") {
-      const groupedDays = this.buildDailyGroups(sourceContext);
-      const latestWindowGroups = groupedDays.slice(-2);
-
-      return JSON.stringify(
-        {
-          generatedAt: dayjs().utc().toISOString(),
-          strategy: "rolling-24h-vs-prior-baseline",
-          window: {
-            latestDays: latestWindowGroups.length,
-            targetRollingHours: 24
-          },
-          dayGroups: latestWindowGroups.map((group) => ({
-            day: group.day,
-            sourceDocuments: group.documents.map((document) => ({
-              path: document.path,
-              checksum: document.checksum,
-              content: document.content
-            }))
-          }))
-        },
-        null,
-        2
-      );
+      return this.transcriptContextBuilder.buildRecentChangesSubmission(sourceContext);
     }
 
     if (prompt.key === "notable_moments") {
-      const groupedDays = this.buildDailyGroups(sourceContext);
-      return JSON.stringify(
-        {
-          generatedAt: dayjs().utc().toISOString(),
-          strategy: "daily-notable-moments",
-          dayGroups: groupedDays.map((group) => ({
-            day: group.day,
-            sourceDocuments: group.documents.map((document) => ({
-              path: document.path,
-              checksum: document.checksum
-            })),
-            targetMoments: this.config.notableMoments.baselinePerDay
-          }))
-        },
-        null,
-        2
+      return this.transcriptContextBuilder.buildNotableMomentsSubmission(
+        sourceContext,
+        this.config.notableMoments.baselinePerDay
       );
     }
 
@@ -382,172 +229,20 @@ export class PipelineService {
     );
   }
 
-  private splitDayDocumentsIntoChunks(documents: SourceContextDocument[]): SourceContextDocument[][] {
-    const chunks: SourceContextDocument[][] = [];
-    let currentChunk: SourceContextDocument[] = [];
-    let currentCharacterCount = 0;
-
-    for (const document of documents) {
-      const documentCharacters = document.content.length;
-      if (currentChunk.length > 0 && currentCharacterCount + documentCharacters > dailySummaryChunkCharacterLimit) {
-        chunks.push(currentChunk);
-        currentChunk = [];
-        currentCharacterCount = 0;
-      }
-
-      if (documentCharacters > dailySummaryChunkCharacterLimit) {
-        const parts = Math.max(Math.ceil(documentCharacters / dailySummaryChunkCharacterLimit), 1);
-        const partSize = Math.ceil(documentCharacters / parts);
-
-        for (let partIndex = 0; partIndex < parts; partIndex += 1) {
-          const start = partIndex * partSize;
-          const end = Math.min(start + partSize, documentCharacters);
-          const partContent = document.content.slice(start, end);
-          chunks.push([
-            {
-              ...document,
-              path: `${document.path}#part-${partIndex + 1}`,
-              content: partContent
-            }
-          ]);
-        }
-        continue;
-      }
-
-      currentChunk.push(document);
-      currentCharacterCount += documentCharacters;
-    }
-
-    if (currentChunk.length > 0) {
-      chunks.push(currentChunk);
-    }
-
-    return chunks;
-  }
-
   private async generateSummaryArtifactOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
-    const dayGroups = this.buildDailyGroups(sourceContext);
-    const dayOutputs: string[] = [];
-    serverLogger.info("Starting daily summary layered generation", {
-      groupedDayCount: dayGroups.length
-    });
-
-    for (const group of dayGroups) {
-      const documentChunks = this.splitDayDocumentsIntoChunks(group.documents);
-      const chunkOutputs: string[] = [];
-      serverLogger.info("Processing daily summary group", {
-        day: group.day,
-        sourceDocumentCount: group.documents.length,
-        chunkCount: documentChunks.length
-      });
-
-      for (const [chunkIndex, chunkDocuments] of documentChunks.entries()) {
-        const chunkOutput = await this.config.llmClient.generateText({
-          systemPrompt: prompt.content,
-          userPrompt: JSON.stringify(
-            {
-              mode: "daily-chunk-analysis",
-              day: group.day,
-              chunk: {
-                index: chunkIndex + 1,
-                total: documentChunks.length,
-                maxCharacters: dailySummaryChunkCharacterLimit
-              },
-              instructions: {
-                focus:
-                  "Extract timeline events, anomalies, decisions, and mission-impactful details for this chunk. Preserve factual specificity for downstream synthesis."
-              },
-              sourceDocuments: chunkDocuments.map((document) => ({
-                path: document.path,
-                content: document.content
-              }))
-            },
-            null,
-            2
-          ),
-          componentId: `${prompt.key}:${group.day}:chunk-${chunkIndex + 1}`
-        });
-
-        chunkOutputs.push(chunkOutput);
-      }
-
-      const synthesizedDaySummary = await this.config.llmClient.generateText({
-        systemPrompt: prompt.content,
-        userPrompt: JSON.stringify(
-          {
-            mode: "daily-final-synthesis",
-            day: group.day,
-            instructions: {
-              minimumWordTarget: dailySummaryTargetWords.min,
-              maximumWordTarget: dailySummaryTargetWords.max,
-              objective:
-                "Generate the final reusable day summary by synthesizing chunk analyses while removing repetition and preserving chronology."
-            },
-            chunkSummaries: chunkOutputs.map((summary, index) => ({
-              chunk: index + 1,
-              summary
-            }))
-          },
-          null,
-          2
-        ),
-        componentId: `${prompt.key}:${group.day}:final`
-      });
-
-      dayOutputs.push(`## ${group.day}\n\n${synthesizedDaySummary}`);
+    const generator = this.summaryGenerators.get("daily_summary");
+    if (!generator) {
+      throw new Error("Daily summary generator is not configured.");
     }
-
-    return dayOutputs.join("\n\n");
+    return generator.generateOutput(prompt, sourceContext);
   }
 
   private async generateNotableMomentsOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
-    const dayGroups = this.buildDailyGroups(sourceContext);
-    const em = this.getEntityManager();
-    const persistedDailySummaries = await em.find(
-      SummaryArtifact,
-      { summaryType: dailyFullSummaryType, channelGroup: canonicalChannelGroup, day: { $in: dayGroups.map((group) => group.day) } },
-      { orderBy: { day: "asc" } }
-    );
-    const summaryByDay = new Map(persistedDailySummaries.map((summary) => [summary.day, summary.summary]));
-    const dayOutputs: string[] = [];
-    serverLogger.info("Starting notable moments generation", {
-      groupedDayCount: dayGroups.length,
-      target: this.config.notableMoments
-    });
-
-    for (const group of dayGroups) {
-      const targetMoments = this.resolveTargetNotableMoments(group.documents);
-      const output = await this.config.llmClient.generateText({
-        systemPrompt: prompt.content,
-        userPrompt: JSON.stringify(
-          {
-            mode: "daily-notable-moments",
-            day: group.day,
-            targetMoments,
-            dailySummary: summaryByDay.get(group.day) ?? null,
-            sourceDocuments: group.documents.map((document) => ({
-              path: document.path,
-              content: document.content
-            }))
-          },
-          null,
-          2
-        ),
-        componentId: `${prompt.key}:${group.day}`
-      });
-
-      dayOutputs.push(output);
+    const generator = this.summaryGenerators.get("notable_moments");
+    if (!generator) {
+      throw new Error("Notable moments generator is not configured.");
     }
-
-    return JSON.stringify(
-      {
-        generatedAt: dayjs().utc().toISOString(),
-        targetMomentsPerDay: this.config.notableMoments.baselinePerDay,
-        days: dayOutputs
-      },
-      null,
-      2
-    );
+    return generator.generateOutput(prompt, sourceContext);
   }
 
   private buildPromptQueue(prompts: PromptDefinition[]): PromptDefinition[] {
@@ -582,23 +277,6 @@ export class PipelineService {
       .filter((line) => line.length > 0).length;
   }
 
-  private resolveTargetNotableMoments(documents: SourceContextDocument[]): number {
-    const estimatedUtterances = documents.reduce((total, document) => total + this.countNonEmptyLines(document.content), 0);
-    const hasHighSignalMoment = documents.some((document) =>
-      /exit(ing)? lunar|other side of the moon|president|breakthrough|critical|anomaly|dock|undock|burn/iu.test(document.content)
-    );
-
-    if (hasHighSignalMoment || estimatedUtterances >= 1_800) {
-      return this.config.notableMoments.maxPerDay;
-    }
-
-    if (estimatedUtterances >= 900) {
-      return this.config.notableMoments.highSignalPerDay;
-    }
-
-    return Math.max(this.config.notableMoments.minPerDay, this.config.notableMoments.baselinePerDay);
-  }
-
   private parseSummaryArtifactSections(output: string): ParsedSummaryArtifactSection[] {
     const sections: ParsedSummaryArtifactSection[] = [];
     const sectionPattern = /^##\s+(.+?)\n+([\s\S]*?)(?=^##\s+.+?$|$)/gmu;
@@ -626,7 +304,7 @@ export class PipelineService {
 
   private async persistSummaryArtifacts(output: string, sourceContext: SourceContextDocument[]): Promise<void> {
     const em = this.getEntityManager();
-    const dayGroupsByDay = new Map(this.buildDailyGroups(sourceContext).map((group) => [group.day, group]));
+    const dayGroupsByDay = new Map(this.transcriptContextBuilder.buildDailyGroups(sourceContext).map((group) => [group.day, group]));
     const parsedSections = this.parseSummaryArtifactSections(output);
     const generatedAt = dayjs().utc().toDate();
 
@@ -687,12 +365,7 @@ export class PipelineService {
   }
 
   private filterSourceContextByDayKeys(sourceContext: SourceContextDocument[], dayKeys: Set<string>): SourceContextDocument[] {
-    if (dayKeys.size === 0) {
-      return sourceContext;
-    }
-
-    const filtered = sourceContext.filter((document) => dayKeys.has(this.deriveDayKey(document.path)));
-    return filtered.length > 0 ? filtered : sourceContext;
+    return this.transcriptContextBuilder.filterSourceContextByDayKeys(sourceContext, dayKeys);
   }
 
   private buildSummaryArtifactOutputFromCache(daySummaries: SummaryArtifact[]): string {
@@ -789,7 +462,7 @@ export class PipelineService {
       await this.markStaleRunningExecutionsAsFailed();
       const promptSyncResult = await this.syncPromptDefinitions();
       const sourceContext = await this.buildSourceContextFromTranscriptDatabase();
-      const inferredChangedDayKeys = new Set(sourceContext.map((document) => this.deriveDayKey(document.path)));
+      const inferredChangedDayKeys = new Set(sourceContext.map((document) => this.transcriptContextBuilder.deriveDayKey(document.path)));
       const changedDayKeys = options?.changedDayKeys ?? inferredChangedDayKeys;
       const sourceDocumentsChanged = options?.sourceDocumentsChanged ?? inferredChangedDayKeys.size > 0;
       await this.executePromptsSequentially({
@@ -1102,7 +775,7 @@ export class PipelineService {
     const sourceContext = await this.buildSourceContextFromTranscriptDatabase();
     serverLogger.info("Source documents reingested", {
       changedDocuments: sourceContext.length,
-      changedDays: sourceContext.map((document) => this.deriveDayKey(document.path))
+      changedDays: sourceContext.map((document) => this.transcriptContextBuilder.deriveDayKey(document.path))
     });
     this.missionStatsCache = null;
     return { changedDocuments: sourceContext.length };
