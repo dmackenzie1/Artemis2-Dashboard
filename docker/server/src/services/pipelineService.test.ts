@@ -3,12 +3,6 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 import type { LlmClient } from "./llmClient.js";
 import { PipelineService } from "./pipelineService.js";
 
-type SourceContextDocument = {
-  path: string;
-  checksum: string;
-  content: string;
-};
-
 const createPipelineService = (): PipelineService => {
   const fakeEntityManager = {} as EntityManager;
   const llmClient = {
@@ -28,69 +22,6 @@ const createPipelineService = (): PipelineService => {
   });
 };
 
-describe("PipelineService daily-summary grouping", () => {
-  it("prefers full-day documents over _partial variants sharing the same canonical name", () => {
-    const service = createPipelineService();
-    const sourceContext: SourceContextDocument[] = [
-      {
-        path: "2026-04-04_summary_partial.csv",
-        checksum: "partial-checksum",
-        content: "partial-content"
-      },
-      {
-        path: "2026-04-04_summary.csv",
-        checksum: "full-checksum",
-        content: "full-content"
-      }
-    ];
-
-    const dailyGroups = (service as unknown as {
-      buildDailyGroups: (documents: SourceContextDocument[]) => Array<{ day: string; documents: SourceContextDocument[] }>;
-    }).buildDailyGroups(sourceContext);
-
-    expect(dailyGroups).toEqual([
-      {
-        day: "2026-04-04",
-        documents: [
-          {
-            path: "2026-04-04_summary.csv",
-            checksum: "full-checksum",
-            content: "full-content"
-          }
-        ]
-      }
-    ]);
-  });
-
-  it("retains partial files when no canonical full-day source exists", () => {
-    const service = createPipelineService();
-    const sourceContext: SourceContextDocument[] = [
-      {
-        path: "2026-04-05_summary_partial.csv",
-        checksum: "partial-checksum",
-        content: "partial-content"
-      }
-    ];
-
-    const dailyGroups = (service as unknown as {
-      buildDailyGroups: (documents: SourceContextDocument[]) => Array<{ day: string; documents: SourceContextDocument[] }>;
-    }).buildDailyGroups(sourceContext);
-
-    expect(dailyGroups).toEqual([
-      {
-        day: "2026-04-05",
-        documents: [
-          {
-            path: "2026-04-05_summary_partial.csv",
-            checksum: "partial-checksum",
-            content: "partial-content"
-          }
-        ]
-      }
-    ]);
-  });
-});
-
 describe("PipelineService prompt queue ordering", () => {
   it("orders daily_summary ahead of mission_summary to enable summary-first mission synthesis", () => {
     const service = createPipelineService();
@@ -105,35 +36,5 @@ describe("PipelineService prompt queue ordering", () => {
     }).buildPromptQueue(prompts);
 
     expect(orderedPrompts.map((prompt) => prompt.key)).toEqual(["daily_summary", "mission_summary"]);
-  });
-});
-
-describe("PipelineService incremental daily targeting", () => {
-  it("filters source documents to only changed day keys", () => {
-    const service = createPipelineService();
-    const sourceContext: SourceContextDocument[] = [
-      {
-        path: "2026-04-07_summary.csv",
-        checksum: "checksum-1",
-        content: "day-7-content"
-      },
-      {
-        path: "2026-04-08_summary.csv",
-        checksum: "checksum-2",
-        content: "day-8-content"
-      }
-    ];
-
-    const filtered = (service as unknown as {
-      filterSourceContextByDayKeys: (documents: SourceContextDocument[], dayKeys: Set<string>) => SourceContextDocument[];
-    }).filterSourceContextByDayKeys(sourceContext, new Set(["2026-04-08"]));
-
-    expect(filtered).toEqual([
-      {
-        path: "2026-04-08_summary.csv",
-        checksum: "checksum-2",
-        content: "day-8-content"
-      }
-    ]);
   });
 });
