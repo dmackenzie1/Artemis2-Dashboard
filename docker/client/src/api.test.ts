@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { chat, fetchDashboard, fetchHealth, fetchStatsDailyVolume, fetchStatsSummary, searchUtterances } from "./api";
+import { chat, fetchDashboard, fetchHealth, fetchStatsDailyVolume, fetchStatsHourlyByChannel, fetchStatsSummary, searchUtterances } from "./api";
 
 const mockFetch = vi.fn<typeof fetch>();
 
@@ -110,5 +110,21 @@ describe("api helpers", () => {
 
     await expect(fetchStatsDailyVolume(5)).resolves.toEqual(payload);
     expect(mockFetch).toHaveBeenCalledWith("/api/stats/daily-volume?days=5");
+  });
+
+  it("deduplicates in-flight hourly stats requests for the same day range", async () => {
+    const payload = [{ hour: "2026-04-09T00:00:00Z", channel: "FLIGHT", utterances: 12 }];
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => payload
+    } as Response);
+
+    const firstRequest = fetchStatsHourlyByChannel(30);
+    const secondRequest = fetchStatsHourlyByChannel(30);
+
+    await expect(firstRequest).resolves.toEqual(payload);
+    await expect(secondRequest).resolves.toEqual(payload);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledWith("/api/stats/channels/hourly?days=30");
   });
 });

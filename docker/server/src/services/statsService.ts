@@ -38,6 +38,13 @@ export type MissionHourlyChannelEntry = {
   utterances: number;
 };
 
+export type HourlyStatsRequestDiagnostics = {
+  requestedDays: number;
+  safeDays: number;
+  cacheKey: string;
+  cacheState: "miss" | "fresh" | "stale";
+};
+
 export class StatsService {
   private readonly summaryCache = new ExpiringCache<MissionStatsSummary>(statsFreshCacheTtlMs, statsStaleCacheTtlMs);
   private readonly dailyCache = new ExpiringCache<MissionStatsByDayEntry[]>(statsFreshCacheTtlMs, statsStaleCacheTtlMs);
@@ -121,10 +128,13 @@ export class StatsService {
   }
 
   async getUtterancesPerHourPerChannel(days = 7): Promise<MissionHourlyChannelEntry[]> {
-    const safeDays = Math.min(Math.max(days, 1), 30);
-    const cacheKey = `hourly:${safeDays}`;
+    const { safeDays, cacheKey } = this.getHourlyCacheMetadata(days);
     return this.resolveWithStaleWhileRevalidate(cacheKey, this.hourlyCache, async () => {
-      serverLogger.info("Running hourly channel stats query", { requestedDays: days, safeDays });
+      serverLogger.info("Running hourly channel stats query", {
+        requestedDays: days,
+        safeDays,
+        cacheKey
+      });
       const rows = await this.getEntityManager().getConnection().execute<
         { hour: string; channel: string; utterances: string }[]
       >(
@@ -158,6 +168,18 @@ export class StatsService {
         utterances: Number(row.utterances)
       }));
     });
+  }
+
+  inspectHourlyRequest(days = 7): HourlyStatsRequestDiagnostics {
+    const { safeDays, cacheKey } = this.getHourlyCacheMetadata(days);
+    const cached = this.hourlyCache.getWithStaleness(cacheKey);
+
+    return {
+      requestedDays: days,
+      safeDays,
+      cacheKey,
+      cacheState: !cached ? "miss" : cached.isStale ? "stale" : "fresh"
+    };
   }
 
   invalidateCaches(): void {
@@ -222,5 +244,14 @@ export class StatsService {
     })();
 
     this.refreshInFlight.set(cacheKey, refreshPromise);
+  }
+
+  private getHourlyCacheMetadata(days: number): { safeDays: number; cacheKey: string } {
+    const safeDays = Math.min(Math.max(days, 1), 30);
+    const cacheKey = `hourly:${safeDays}`;
+    return {
+      safeDays,
+      cacheKey
+    };
   }
 }
