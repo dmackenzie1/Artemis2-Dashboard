@@ -7,40 +7,21 @@ import { UtterancesTimelinePanel } from "../components/dashboard/UtterancesTimel
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import styles from "./DashboardPage.module.css";
 import { useLocation } from "react-router-dom";
+import { useLiveUpdates } from "../context/LiveUpdatesContext";
 
 export const DashboardPage: FunctionComponent = () => {
   const { componentId, componentUid } = useComponentIdentity("dashboard-page");
   const [refreshToken, setRefreshToken] = useState(0);
-  const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null);
   const location = useLocation();
+  const { adminRefreshVersion, globalRefreshVersion, lastAdminRefreshAt } = useLiveUpdates();
   const adminMode = useMemo(() => {
     const adminQueryValue = new URLSearchParams(location.search).get("admin");
     return adminQueryValue === "true";
   }, [location.search]);
 
   useEffect(() => {
-    const handleAdminRefresh = (): void => {
-      setRefreshToken((previous) => previous + 1);
-      setLastRefreshAt(new Date().toISOString());
-    };
-
-    window.addEventListener("dashboard-admin-refresh-requested", handleAdminRefresh);
-    return () => {
-      window.removeEventListener("dashboard-admin-refresh-requested", handleAdminRefresh);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleGlobalRefresh = (): void => {
-      setRefreshToken((previous) => previous + 1);
-      setLastRefreshAt(new Date().toISOString());
-    };
-    window.addEventListener("global-data-refresh-requested", handleGlobalRefresh);
-
-    return () => {
-      window.removeEventListener("global-data-refresh-requested", handleGlobalRefresh);
-    };
-  }, []);
+    setRefreshToken((previous) => previous + 1);
+  }, [adminRefreshVersion, globalRefreshVersion]);
 
   return (
     <div className={styles["dashboard-layout"]} data-component-id={componentId} data-component-uid={componentUid}>
@@ -60,8 +41,8 @@ export const DashboardPage: FunctionComponent = () => {
       <section className={styles["dashboard-bottom-row"]} data-component-id="dashboard-bottom-row" data-component-uid={`${componentUid}-bottom`}>
         <UtterancesTimelinePanel refreshToken={refreshToken} />
       </section>
-      {adminMode && lastRefreshAt ? (
-        <div className={styles["dashboard-admin-hint"]}>Refresh requested at {new Date(lastRefreshAt).toLocaleTimeString()}.</div>
+      {adminMode && lastAdminRefreshAt ? (
+        <div className={styles["dashboard-admin-hint"]}>Refresh requested at {new Date(lastAdminRefreshAt).toLocaleTimeString()}.</div>
       ) : null}
     </div>
   );

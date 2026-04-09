@@ -15,13 +15,14 @@ import { AboutPage } from "./pages/AboutPage";
 import { clientLogger } from "./utils/logging/clientLogger";
 import type { EmsspressobotController } from "./utils/emsspressobot";
 import { installEmsspressobot } from "./utils/emsspressobot";
-import { broadcastLiveUpdateToDom, subscribeToLiveUpdates } from "./utils/live/liveEvents";
+import { useLiveUpdates } from "./context/LiveUpdatesContext";
 
 export const App: FC = () => {
   const [isAdminRefreshRunning, setIsAdminRefreshRunning] = useState(false);
   const [isEspressoBotVisible, setIsEspressoBotVisible] = useState(false);
   const emsspressobotRef = useRef<EmsspressobotController | null>(null);
   const location = useLocation();
+  const { requestAdminRefresh } = useLiveUpdates();
   const { componentId, componentUid } = useComponentIdentity("app-shell");
 
   const adminMode = useMemo(() => {
@@ -57,7 +58,7 @@ export const App: FC = () => {
           return;
         }
         clientLogger.info("Server caches cleared from query parameter trigger", result);
-        window.dispatchEvent(new Event("dashboard-admin-refresh-requested"));
+        requestAdminRefresh();
       })
       .catch((error) => {
         if (cancelled) {
@@ -81,39 +82,6 @@ export const App: FC = () => {
     };
   }, [location.hash, location.pathname, location.search]);
 
-  useEffect(() => {
-    const subscription = subscribeToLiveUpdates((event) => {
-      clientLogger.info("Socket live-update event received", {
-        type: event.type,
-        emittedAt: event.emittedAt,
-        payload: event.payload ?? null
-      });
-      broadcastLiveUpdateToDom(event);
-      if (
-        event.type === "dashboard.cache.updated" ||
-        event.type === "stats.updated" ||
-        event.type === "time-window-summary.updated" ||
-        event.type === "pipeline.run.completed" ||
-        event.type === "date.updated" ||
-        event.type === "day.ingested" ||
-        event.type === "day.llm.loaded" ||
-        event.type === "day.notable-queries.updated" ||
-        event.type === "sql.file.load.completed" ||
-        event.type === "sql.jobs.completed" ||
-        event.type === "llm.day.processing.completed" ||
-        event.type === "llm.days.completed" ||
-        event.type === "prompt.received" ||
-        event.type === "prompt.error"
-      ) {
-        window.dispatchEvent(new Event("global-data-refresh-requested"));
-      }
-    });
-
-    return () => {
-      subscription.close();
-    };
-  }, []);
-
   const onAdminRefreshClick = async (): Promise<void> => {
     if (isAdminRefreshRunning) {
       return;
@@ -126,7 +94,7 @@ export const App: FC = () => {
         generatedAt: result.generatedAt,
         totalDays: result.days.length
       });
-      window.dispatchEvent(new Event("dashboard-admin-refresh-requested"));
+      requestAdminRefresh();
     } catch (error) {
       clientLogger.error("Admin-triggered full ingest refresh failed", { error });
     } finally {
