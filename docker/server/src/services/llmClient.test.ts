@@ -292,9 +292,22 @@ describe("LlmClient.generateText", () => {
 });
 
 describe("LlmClient.checkConnectivity", () => {
-  it("uses a transport-level OPTIONS probe instead of generating model output", async () => {
+  it("uses a lightweight POST probe aligned with normal model transport wiring", async () => {
     const originalFetch = global.fetch;
-    const mockFetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const mockFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "OK"
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
 
     try {
       global.fetch = mockFetch;
@@ -304,11 +317,26 @@ describe("LlmClient.checkConnectivity", () => {
 
       expect(connectivity.connected).toBe(true);
       expect(mockFetch).toHaveBeenCalledWith("https://example.test/v1/chat/completions", {
-        method: "OPTIONS",
+        method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: "Bearer test-key",
           "x-api-key": "test-key"
-        }
+        },
+        body: JSON.stringify({
+          model: "model-test",
+          max_tokens: 8,
+          messages: [
+            {
+              role: "system",
+              content: "Connectivity check. Reply with OK."
+            },
+            {
+              role: "user",
+              content: "OK"
+            }
+          ]
+        })
       });
     } finally {
       global.fetch = originalFetch;
