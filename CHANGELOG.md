@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- refactor: decompose backend bootstrap by introducing `createServerRuntime`, dedicated runtime migration modules (`migrations/runtime/*`), and a `BackgroundWorkersService` so `src/index.ts` only wires startup/shutdown and `app.listen`. Intent: Keep server entrypoint maintainable by isolating Express+DB bootstrapping, migration DDL responsibilities, and long-running worker orchestration behind focused modules.
 - refactor: split backend startup orchestration into dedicated app wiring, runtime migration utilities, and ingestion/background worker scheduling services to reduce `src/index.ts` complexity. Intent: Keep server bootstrap maintainable by isolating Express route wiring, runtime DB/index migrations, and long-running ingestion/scheduler responsibilities behind focused modules.
 - refactor: split transcript context chunking/day-group derivation and prompt-specific summary generation into dedicated pipeline strategy modules while reducing `PipelineService` to orchestration flow only, with new focused unit tests for extracted classes. Intent: Keep the pipeline execution coordinator maintainable by isolating context construction and summary-mode behavior behind testable single-responsibility components.
 - fix: switch Overview Daily Transcript Volume to request/display all available days by default (while keeping optional `days` query support for bounded API calls). Intent: Ensure operators see complete day-level transcript coverage instead of a truncated last-5-day snapshot.
