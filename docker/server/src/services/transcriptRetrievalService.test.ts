@@ -33,4 +33,19 @@ describe("retrieveRankedUtterances", () => {
     expect(result.ranked[0]?.filename).toBe("file-2.csv");
     expect(result.ranked[0]?.score).toBeGreaterThan(result.ranked[1]?.score ?? 0);
   });
+
+  it("boosts crew loop channels when evidence text is similar", () => {
+    const result = retrieveRankedUtterances(
+      "status update on rendezvous alignment",
+      [
+        buildUtterance("1", "Status update on rendezvous alignment", "FLIGHT DIRECTOR"),
+        buildUtterance("2", "Status update on rendezvous alignment", "XPL1 0/OE"),
+        buildUtterance("3", "Status update on rendezvous alignment", "PAYLOAD")
+      ],
+      3
+    );
+
+    expect(result.ranked[0]?.channel).toBe("XPL1 0/OE");
+    expect(result.ranked[0]?.score).toBeGreaterThan(result.ranked[1]?.score ?? 0);
+  });
 });

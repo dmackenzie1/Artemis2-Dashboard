@@ -10,6 +10,12 @@ TalkyBot source system: https://talkybot.fit.nasa.gov/
 - Focuses on what already happened (summaries, topics, timeline activity, and transcript-grounded query/chat).
 - Not intended as real-time flight-control decision support.
 
+## Transcript query evidence priorities
+
+- Query/search workflows should prioritize `timestamp/date + channel + transcript text` as the canonical evidence tuple.
+- Metadata such as `duration`, `language`, `translated`, and `filename` is secondary and should only be used when explicitly requested by an operator.
+- Channel identity is mission-critical for interpretation. Keep crew loops (for example OE/XPL/SpaceOE) and flight-control loops (for example Flight Director/ISS/ORION MER manager) distinguishable in retrieval and synthesis outputs.
+
 ## Repository layout
 
 - `docker/client`: React 19 + Vite client workspace.

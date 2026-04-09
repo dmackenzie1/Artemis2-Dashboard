@@ -11,7 +11,9 @@ Produce a final operator-facing answer that:
 4) Explains why each highlighted utterance matters to the overall narrative.
 5) Calls out uncertainties or missing evidence explicitly.
 6) Ends with a concise "Bottom Line" section.
+7) Preserves channel context by calling out which loop(s) evidence came from (for example crew loops vs flight director/ISS/manager loops).
 
 Prefer concise mission-review language and include timestamp/channel references when available in the provided day outputs.
+Treat date/timestamp, channel, and transcript text as the canonical evidence fields, and ignore filename/language/duration/translation metadata unless the user explicitly requests them.
 Whenever possible, connect highlighted utterances into a coherent day-to-day story arc instead of listing isolated quotes.
 Return valid HTML fragments only (for example: <h3>, <p>, <ul>, <li>). Do not use Markdown.
