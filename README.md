@@ -52,11 +52,23 @@ npx @emss/make-dotenv
 npm install
 ```
 
-3. Start stack:
+3. Start stack (preferred `appcompose` wrapper):
 
 ```bash
 ./appcompose dev build
 ./appcompose dev up -d
+```
+
+If your local checkout does not include `appcompose`, use plain Docker Compose:
+
+```bash
+docker-compose -f docker-compose.yml up --build -d
+```
+
+To completely stop and remove the stack **including volumes**:
+
+```bash
+docker-compose -f docker-compose.yml down --volumes --remove-orphans
 ```
 
 4. Open `http://localhost:8080`.
