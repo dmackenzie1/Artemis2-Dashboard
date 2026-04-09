@@ -5,6 +5,7 @@ import { serializeUnknownError, serverLogger } from "../utils/logging/serverLogg
 import type { LlmConnectivityStatus } from "../services/llmClient.js";
 import type { StatsService } from "../services/statsService.js";
 import type { TimeWindowSummaryService } from "../services/timeWindowSummaryService.js";
+import { dayjs } from "../lib/dayjs.js";
 
 export const createApiRouter = (
   analysisService: AnalysisService,
@@ -101,14 +102,32 @@ export const createApiRouter = (
   router.get("/stats/channels/hourly", async (req, res, next) => {
     try {
       const query = z.object({ days: z.coerce.number().int().min(1).max(30).optional() }).parse(req.query);
-      serverLogger.info("Hourly channel stats requested", { days: query.days ?? 7 });
       const statsService = getStatsService?.();
       if (!statsService) {
         res.status(503).json({ message: "Stats DB is disabled. Enable TRANSCRIPTS_DB_ENABLED for database-backed stats." });
         return;
       }
 
-      const payload = await statsService.getUtterancesPerHourPerChannel(query.days ?? 7);
+      const requestedDays = query.days ?? 7;
+      const diagnostics = statsService.inspectHourlyRequest(requestedDays);
+      const requestId = `hourly-stats-${dayjs().utc().format("YYYYMMDDTHHmmss")}-${Math.random().toString(36).slice(2, 8)}`;
+      const startedAt = dayjs().utc().toISOString();
+      serverLogger.info("Hourly channel stats requested", {
+        requestId,
+        requestedAt: startedAt,
+        endpoint: "/api/stats/channels/hourly",
+        ...diagnostics
+      });
+
+      const payload = await statsService.getUtterancesPerHourPerChannel(requestedDays);
+      serverLogger.info("Hourly channel stats response ready", {
+        requestId,
+        requestedAt: startedAt,
+        completedAt: dayjs().utc().toISOString(),
+        endpoint: "/api/stats/channels/hourly",
+        ...diagnostics,
+        rowsReturned: payload.length
+      });
       res.json(payload);
     } catch (error) {
       serverLogger.error("Hourly channel stats request failed", { error: serializeUnknownError(error) });

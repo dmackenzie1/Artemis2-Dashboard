@@ -254,6 +254,9 @@ export type NotableMomentsData = {
 };
 
 const base = "/api";
+const hourlyStatsClientCacheTtlMs = 60 * 1000;
+const hourlyStatsResponseCache = new Map<number, { fetchedAtMs: number; payload: MissionHourlyChannelEntry[] }>();
+const hourlyStatsInFlight = new Map<number, Promise<MissionHourlyChannelEntry[]>>();
 
 export const fetchDashboard = async (): Promise<DashboardData | null> => {
   const response = await fetch(`${base}/dashboard`);
@@ -352,13 +355,35 @@ export const fetchStatsSummary = async (): Promise<MissionStatsSummaryData | nul
 };
 
 export const fetchStatsHourlyByChannel = async (days = 7): Promise<MissionHourlyChannelEntry[]> => {
-  const response = await fetch(`${base}/stats/channels/hourly?days=${days}`);
-  if (!response.ok) {
-    clientLogger.warn("Hourly channel stats unavailable", { status: response.status, days });
-    return [];
+  const cacheHit = hourlyStatsResponseCache.get(days);
+  if (cacheHit && Date.now() - cacheHit.fetchedAtMs < hourlyStatsClientCacheTtlMs) {
+    return cacheHit.payload;
   }
 
-  return (await response.json()) as MissionHourlyChannelEntry[];
+  const existingRequest = hourlyStatsInFlight.get(days);
+  if (existingRequest) {
+    return existingRequest;
+  }
+
+  const nextRequest = (async (): Promise<MissionHourlyChannelEntry[]> => {
+    const response = await fetch(`${base}/stats/channels/hourly?days=${days}`);
+    if (!response.ok) {
+      clientLogger.warn("Hourly channel stats unavailable", { status: response.status, days });
+      return [];
+    }
+
+    const payload = (await response.json()) as MissionHourlyChannelEntry[];
+    hourlyStatsResponseCache.set(days, { fetchedAtMs: Date.now(), payload });
+    return payload;
+  })();
+
+  hourlyStatsInFlight.set(days, nextRequest);
+
+  try {
+    return await nextRequest;
+  } finally {
+    hourlyStatsInFlight.delete(days);
+  }
 };
 
 export const fetchStatsDailyVolume = async (days = 5): Promise<MissionDailyVolumeData | null> => {
