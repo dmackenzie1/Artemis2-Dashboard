@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { AnalysisService } from "./services/analysisService.js";
 import type { TranscriptUtterance } from "./types.js";
 
@@ -57,5 +60,54 @@ describe("AnalysisService.getTopNotableUtterances", () => {
 
     const top = service.getTopNotableUtterances(999, 7);
     expect(top).toHaveLength(1);
+  });
+});
+
+describe("AnalysisService ingest placeholder gating", () => {
+  it("skips mission-summary LLM call when daily summaries are placeholders", async () => {
+    const promptsDir = await mkdtemp(path.join(os.tmpdir(), "analysis-prompts-"));
+    const cacheFile = path.join(promptsDir, "cache.json");
+
+    await Promise.all([
+      writeFile(path.join(promptsDir, "hourly_summary.txt"), "hourly", "utf8"),
+      writeFile(path.join(promptsDir, "top_topics.txt"), "topics", "utf8"),
+      writeFile(path.join(promptsDir, "mission_summary.txt"), "mission", "utf8"),
+      writeFile(path.join(promptsDir, "recent_changes.txt"), "recent", "utf8")
+    ]);
+
+    const generateText = vi.fn(async ({ componentId }: { componentId?: string }) => {
+      if (componentId?.includes("hourly_summary")) {
+        return JSON.stringify({ "12:00": "Hourly note" });
+      }
+
+      if (componentId?.includes("top_topics")) {
+        return JSON.stringify([
+          {
+            title: "Systems",
+            description: "Systems coordination",
+            channels: ["FLIGHT"],
+            mentionTimestamps: ["12:00"]
+          }
+        ]);
+      }
+
+      return "recent output";
+    });
+
+    const service = new AnalysisService({
+      promptsDir,
+      cacheFile,
+      llmClient: { generateText, parseTopics: (raw: string) => JSON.parse(raw) } as never,
+      llmMaxTokens: 12000,
+      loadTranscriptUtterances: async () => [buildUtterance("1", "2026-04-05", "FLIGHT", "Nominal update")],
+      loadDailySummaryForDay: async () => null
+    });
+
+    const cache = await service.ingestAndAnalyze();
+
+    expect(cache.missionSummary).toContain("deferred");
+    expect(generateText).not.toHaveBeenCalledWith(expect.objectContaining({ componentId: "analysis/mission_summary" }));
+
+    await rm(promptsDir, { recursive: true, force: true });
   });
 });

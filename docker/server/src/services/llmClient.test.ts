@@ -30,6 +30,24 @@ describe("LlmClient.parseTopics", () => {
     expect(topics).toHaveLength(1);
     expect(topics[0]?.title).toBe("Mission Systems Coordination");
   });
+
+  it("parses topic arrays wrapped in markdown fences", () => {
+    const client = new LlmClient();
+
+    const topics = client.parseTopics("```json\n[{\"title\":\"Power\",\"description\":\"Power status\",\"channels\":[\"FLIGHT\"],\"mentionTimestamps\":[\"10:00\"]}]\n```");
+
+    expect(topics).toHaveLength(1);
+    expect(topics[0]?.title).toBe("Power");
+  });
+
+  it("rejects html topic payloads and returns fallback", () => {
+    const client = new LlmClient();
+
+    const topics = client.parseTopics("<html><body>bad</body></html>");
+
+    expect(topics).toHaveLength(1);
+    expect(topics[0]?.title).toBe("Mission Systems Coordination");
+  });
 });
 
 describe("LlmClient.generateText", () => {
@@ -258,6 +276,17 @@ describe("LlmClient.generateText", () => {
     } finally {
       global.fetch = originalFetch;
     }
+  });
+
+  it("rejects oversized user prompts before network dispatch", async () => {
+    const client = new LlmClient("https://example.test/v1/chat/completions", "test-key", "model-test", undefined, 12000, undefined, 3600, 3600, 50);
+
+    await expect(
+      client.generateText({
+        systemPrompt: "System",
+        userPrompt: "x".repeat(120)
+      })
+    ).rejects.toThrow("LLM prompt too large");
   });
 
 });
