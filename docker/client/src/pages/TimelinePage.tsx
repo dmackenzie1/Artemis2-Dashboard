@@ -14,6 +14,7 @@ import sharedStyles from "../styles/shared.module.css";
 import styles from "./TimelinePage.module.css";
 import { renderStructuredText } from "../utils/formatting/renderStructuredText";
 import { clientLogger } from "../utils/logging/clientLogger";
+import { useLiveUpdates } from "../context/LiveUpdatesContext";
 
 type TimelineDisplayItem =
   | {
@@ -280,6 +281,7 @@ export const TimelinePage: FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const timelineRootRef = useRef<HTMLDivElement | null>(null);
+  const { globalRefreshVersion } = useLiveUpdates();
   const { componentId, componentUid } = useComponentIdentity("timeline-page");
 
   useEffect(() => {
@@ -318,16 +320,11 @@ export const TimelinePage: FC = () => {
     };
 
     void loadTimeline();
-    const onGlobalRefresh = (): void => {
-      void loadTimeline();
-    };
-    window.addEventListener("global-data-refresh-requested", onGlobalRefresh);
 
     return () => {
       active = false;
-      window.removeEventListener("global-data-refresh-requested", onGlobalRefresh);
     };
-  }, []);
+  }, [globalRefreshVersion]);
 
   const allItems = useMemo(
     () => buildTimelineItems(timelineDays, notableUtterances, notableMomentsDays),
