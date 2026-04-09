@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- refactor: remove startup raw `ALTER TABLE prompt_executions` bootstrap SQL from backend entrypoint and rely on existing schema columns while preserving regular MikroORM schema sync/index setup. Intent: Avoid ad-hoc boot-time DDL drift logic in favor of explicit schema management assumptions for current deployments.
 - fix: enrich hourly-channel stats request logging with endpoint/request metadata + cache-state context, and deduplicate concurrent client hourly stats fetches with short-lived in-memory caching. Intent: Make Docker/server logs actionable for operators (what was requested, when, and cache path) while reducing repeated duplicate hourly stats traffic from overlapping dashboard requests.
 - feat: add SQL/LLM lifecycle live events (`sql.file.load.*`, `sql.jobs.completed`, `llm.day.processing.*`, `llm.days.completed`), publish file-level ingest stats before/after DB writes, and fan out client-side socket event broadcasts plus System Logs live event stream visibility. Intent: Let each dashboard surface independently requery lightweight APIs as SQL and LLM stages complete, with explicit per-file observability for operators.
 - fix: enforce Daily page rendering from canonical `daily_full` summaries only (no ingest-summary fallback), auto-refresh from SSE + interval fallback, and keep day-scoped notable moments plus hourly highlights without extra topic duplication blocks. Intent: Ensure operators review one authoritative per-day narrative prompt output and avoid mixed/duplicated day storytelling sections.
