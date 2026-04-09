@@ -80,6 +80,20 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
     }
   });
 
+  router.get("/daily-summaries", async (req, res, next) => {
+    try {
+      const query = z
+        .object({
+          channelGroup: z.string().trim().min(1).max(128).optional()
+        })
+        .parse(req.query);
+      const payload = await pipelineService.getDailySummaries(query.channelGroup ?? "*");
+      res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post("/run", async (_req, res, next) => {
     try {
       const wasAlreadyRunning = pipelineService.isPipelineRunInProgress();

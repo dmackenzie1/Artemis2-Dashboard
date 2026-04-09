@@ -22,6 +22,7 @@ import { TimeWindowSummaryService } from "./services/timeWindowSummaryService.js
 import { RedisLlmCache } from "./services/redisLlmCache.js";
 import { liveUpdateBus } from "./services/liveUpdateBus.js";
 import { TranscriptUtterance } from "./entities/TranscriptUtterance.js";
+import { DailySummary } from "./entities/DailySummary.js";
 
 const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
   await orm.em.getConnection().execute(`
@@ -149,6 +150,14 @@ const analysisService = new AnalysisService({
       filename: row.filename,
       sourceFile: row.sourceFile
     }));
+  },
+  loadDailySummaryForDay: async (day) => {
+    if (!transcriptOrm) {
+      return null;
+    }
+
+    const summary = await transcriptOrm.em.fork().findOne(DailySummary, { day, channelGroup: "*" });
+    return summary?.summary ?? null;
   }
 });
 const systemLogsService = new SystemLogsService({
@@ -422,7 +431,6 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
   timeWindowSummaryService = new TimeWindowSummaryService(getEntityManager, llmClient, env.PROMPTS_DIR);
 
   pipelineService = new PipelineService(getEntityManager, {
-    sourceFilesDir: env.SOURCE_FILES_DIR,
     promptsDir: env.PROMPTS_DIR,
     llmClient,
     promptSubmissionsDir: env.PROMPT_SUBMISSIONS_DIR,

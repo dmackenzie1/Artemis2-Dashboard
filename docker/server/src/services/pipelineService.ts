@@ -5,15 +5,14 @@ import { EntityManager } from "@mikro-orm/postgresql";
 import { dayjs } from "../lib/dayjs.js";
 import { PromptDefinition } from "../entities/PromptDefinition.js";
 import { PromptExecution } from "../entities/PromptExecution.js";
-import { SourceDocument } from "../entities/SourceDocument.js";
 import { DailySummary } from "../entities/DailySummary.js";
+import { TranscriptUtterance } from "../entities/TranscriptUtterance.js";
 import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 
 type EntityManagerProvider = () => EntityManager;
 
 type PipelineConfig = {
-  sourceFilesDir: string;
   promptsDir: string;
   llmClient: LlmClient;
   promptSubmissionsDir: string;
@@ -62,6 +61,7 @@ type MissionStatsView = {
 };
 
 const promptFilePattern = /\.txt$/i;
+const runnablePromptKeys = new Set(["daily_summary", "mission_summary", "recent_changes", "notable_moments"]);
 const promptExecutionPriority = ["daily_summary", "notable_moments", "mission_summary"];
 const skippedPromptKeys = new Set(["hourly_summary"]);
 const dailySummaryTargetWords = {
@@ -70,6 +70,7 @@ const dailySummaryTargetWords = {
 } as const;
 const dailySummaryChunkCharacterLimit = 220_000;
 const missionStatsCacheTtlMs = 5 * 60 * 1000;
+const canonicalChannelGroup = "*";
 
 type SourceContextDocument = {
   path: string;
@@ -92,14 +93,20 @@ type ParsedDailySummarySection = {
   summary: string;
 };
 
-type SourceDocumentSyncResult = {
-  changedDocuments: number;
-  changedDayKeys: string[];
-};
-
 type PromptDefinitionSyncResult = {
   changedPrompts: number;
   changedPromptKeys: string[];
+};
+
+type DailySummaryView = {
+  day: string;
+  channelGroup: string;
+  summary: string;
+  generatedAt: string;
+  updatedAt: string;
+  wordCount: number;
+  utteranceCount: number;
+  sourceDocumentCount: number;
 };
 
 export class PipelineService {
@@ -457,7 +464,7 @@ export class PipelineService {
     const indexByKey = new Map<string, number>(promptExecutionPriority.map((key, index) => [key, index]));
 
     return prompts
-      .filter((prompt) => !skippedPromptKeys.has(prompt.key))
+      .filter((prompt) => runnablePromptKeys.has(prompt.key) && !skippedPromptKeys.has(prompt.key))
       .sort((left, right) => {
         const leftPriority = indexByKey.get(left.key);
         const rightPriority = indexByKey.get(right.key);
@@ -540,12 +547,13 @@ export class PipelineService {
         0
       ) ?? 0;
       const sourceDocumentCount = group?.documents.length ?? 0;
-      const existing = await em.findOne(DailySummary, { day: section.day });
+      const existing = await em.findOne(DailySummary, { day: section.day, channelGroup: canonicalChannelGroup });
 
       if (!existing) {
         em.persist(
           em.create(DailySummary, {
             day: section.day,
+            channelGroup: canonicalChannelGroup,
             summary: section.summary,
             generatedAt,
             updatedAt: generatedAt,
@@ -578,57 +586,43 @@ export class PipelineService {
 
   private buildDailySummaryOutputFromCache(daySummaries: DailySummary[]): string {
     return daySummaries
+      .filter((summary) => summary.channelGroup === canonicalChannelGroup)
       .sort((left, right) => left.day.localeCompare(right.day))
       .map((summary) => `## ${summary.day}\n\n${summary.summary}`)
       .join("\n\n");
   }
 
-  async syncSourceDocuments(): Promise<SourceDocumentSyncResult> {
+  private async buildSourceContextFromTranscriptDatabase(): Promise<SourceContextDocument[]> {
     const em = this.getEntityManager();
-    const entries = await fs.readdir(this.config.sourceFilesDir, { withFileTypes: true });
-    const files = entries.filter((entry) => entry.isFile()).map((entry) => entry.name).sort();
-    const now = dayjs().utc().toDate();
-    let changedCount = 0;
-    const changedDayKeys = new Set<string>();
+    const utterances = await em.find(TranscriptUtterance, {}, { orderBy: { timestamp: "asc", id: "asc" } });
+    const groupedByDay = utterances.reduce<Map<string, TranscriptUtterance[]>>((grouped, utterance) => {
+      const dayKey = dayjs(utterance.timestamp).utc().format("YYYY-MM-DD");
+      const existing = grouped.get(dayKey) ?? [];
+      existing.push(utterance);
+      grouped.set(dayKey, existing);
+      return grouped;
+    }, new Map<string, TranscriptUtterance[]>());
 
-    for (const fileName of files) {
-      const relativePath = fileName;
-      const fullPath = path.join(this.config.sourceFilesDir, fileName);
-      const stat = await fs.stat(fullPath);
-      const content = await fs.readFile(fullPath, "utf8");
-      const checksum = crypto.createHash("sha256").update(content).digest("hex");
-      const existing = await em.findOne(SourceDocument, { relativePath });
+    return [...groupedByDay.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([day, entries]) => {
+        const content = entries
+          .map((entry) =>
+            [
+              `[${dayjs(entry.timestamp).utc().toISOString()}]`,
+              entry.channel.trim().length ? entry.channel.trim() : "UNKNOWN",
+              entry.text.trim()
+            ].join(" ")
+          )
+          .join("\n");
+        const checksum = crypto.createHash("sha256").update(content).digest("hex");
 
-      if (!existing) {
-        const created = em.create(SourceDocument, {
-          relativePath,
+        return {
+          path: `${day}__channel-group-${canonicalChannelGroup}.txt`,
           checksum,
-          content,
-          fileModifiedAt: stat.mtime,
-          ingestedAt: now
-        });
-
-        em.persist(created);
-        changedCount += 1;
-        changedDayKeys.add(this.deriveDayKey(relativePath));
-        continue;
-      }
-
-      if (existing.checksum !== checksum || existing.fileModifiedAt.getTime() !== stat.mtime.getTime()) {
-        existing.checksum = checksum;
-        existing.content = content;
-        existing.fileModifiedAt = stat.mtime;
-        existing.ingestedAt = now;
-        changedCount += 1;
-        changedDayKeys.add(this.deriveDayKey(relativePath));
-      }
-    }
-
-    await em.flush();
-    return {
-      changedDocuments: changedCount,
-      changedDayKeys: [...changedDayKeys].sort((left, right) => left.localeCompare(right))
-    };
+          content
+        };
+      });
   }
 
   async syncPromptDefinitions(): Promise<PromptDefinitionSyncResult> {
@@ -682,12 +676,14 @@ export class PipelineService {
     this.runInProgress = true;
     try {
       await this.markStaleRunningExecutionsAsFailed();
-      const sourceSyncResult = await this.syncSourceDocuments();
       const promptSyncResult = await this.syncPromptDefinitions();
+      const sourceContext = await this.buildSourceContextFromTranscriptDatabase();
+      const changedDayKeys = sourceContext.map((document) => this.deriveDayKey(document.path));
       await this.executePromptsSequentially({
-        changedDayKeys: new Set(sourceSyncResult.changedDayKeys),
+        changedDayKeys: new Set(changedDayKeys),
         changedPromptKeys: new Set(promptSyncResult.changedPromptKeys),
-        sourceDocumentsChanged: sourceSyncResult.changedDocuments > 0
+        sourceDocumentsChanged: sourceContext.length > 0,
+        sourceContext
       });
       this.missionStatsCache = null;
     } finally {
@@ -723,17 +719,12 @@ export class PipelineService {
     changedDayKeys?: Set<string>;
     changedPromptKeys?: Set<string>;
     sourceDocumentsChanged?: boolean;
+    sourceContext?: SourceContextDocument[];
   }): Promise<void> {
     const em = this.getEntityManager();
     const allPrompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
     const prompts = this.buildPromptQueue(allPrompts);
-    const sourceDocs = await em.find(SourceDocument, {}, { orderBy: { relativePath: "asc" } });
-
-    const sourceContext: SourceContextDocument[] = sourceDocs.map((doc) => ({
-      path: doc.relativePath,
-      checksum: doc.checksum,
-      content: doc.content
-    }));
+    const sourceContext = options?.sourceContext ?? (await this.buildSourceContextFromTranscriptDatabase());
     const changedDayKeys = options?.changedDayKeys ?? new Set<string>();
     const changedPromptKeys = options?.changedPromptKeys ?? new Set<string>();
     const sourceDocumentsChanged = options?.sourceDocumentsChanged ?? true;
@@ -760,7 +751,11 @@ export class PipelineService {
 
       const submittedText = await this.buildPromptSubmission(prompt, promptSourceContext);
       if (prompt.key === "mission_summary" && !latestDailySummaryOutput) {
-        const existingDailySummaries = await em.find(DailySummary, {}, { orderBy: { day: "asc" } });
+        const existingDailySummaries = await em.find(
+          DailySummary,
+          { channelGroup: canonicalChannelGroup },
+          { orderBy: { day: "asc" } }
+        );
         latestDailySummaryOutput = this.buildDailySummaryOutputFromCache(existingDailySummaries);
       }
       const missionSubmittedText: string =
@@ -877,13 +872,33 @@ export class PipelineService {
   }
 
   async runManualReingest(): Promise<{ changedDocuments: number }> {
-    const result = await this.syncSourceDocuments();
+    const sourceContext = await this.buildSourceContextFromTranscriptDatabase();
     serverLogger.info("Source documents reingested", {
-      changedDocuments: result.changedDocuments,
-      changedDays: result.changedDayKeys
+      changedDocuments: sourceContext.length,
+      changedDays: sourceContext.map((document) => this.deriveDayKey(document.path))
     });
     this.missionStatsCache = null;
-    return { changedDocuments: result.changedDocuments };
+    return { changedDocuments: sourceContext.length };
+  }
+
+  async getDailySummaries(channelGroup = canonicalChannelGroup): Promise<{ generatedAt: string; channelGroup: string; days: DailySummaryView[] }> {
+    const em = this.getEntityManager();
+    const rows = await em.find(DailySummary, { channelGroup }, { orderBy: { day: "asc" } });
+
+    return {
+      generatedAt: dayjs().utc().toISOString(),
+      channelGroup,
+      days: rows.map((row) => ({
+        day: row.day,
+        channelGroup: row.channelGroup,
+        summary: row.summary,
+        generatedAt: dayjs(row.generatedAt).utc().toISOString(),
+        updatedAt: dayjs(row.updatedAt).utc().toISOString(),
+        wordCount: row.wordCount,
+        utteranceCount: row.utteranceCount,
+        sourceDocumentCount: row.sourceDocumentCount
+      }))
+    };
   }
 
   async getMissionStatsView(): Promise<MissionStatsView> {

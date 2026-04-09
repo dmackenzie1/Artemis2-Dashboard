@@ -63,6 +63,7 @@ type ServiceConfig = {
   llmClient: LlmClient;
   llmMaxTokens: number;
   loadTranscriptUtterances: () => Promise<TranscriptUtterance[]>;
+  loadDailySummaryForDay?: (day: string) => Promise<string | null>;
 };
 
 export class AnalysisService {
@@ -145,14 +146,12 @@ export class AnalysisService {
           hourlyUtterances[hour] = byHour[hour].length;
         }
 
-        const dailyPrompt = await getPrompt(this.config.promptsDir, "daily_summary.txt");
-        serverLogger.info("Prompting daily summary", { day, sampleSize: Math.min(entries.length, 120) });
-        const dailySummary = await this.config.llmClient.generateText({
-          systemPrompt: dailyPrompt,
-          userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) }),
-          componentId: `analysis/daily_summary/${day}`
-        });
-        serverLogger.info("Prompt received for daily summary", { day });
+        const persistedDailySummary = this.config.loadDailySummaryForDay
+          ? await this.config.loadDailySummaryForDay(day)
+          : null;
+        const dailySummary =
+          persistedDailySummary ??
+          "Daily summary pending pipeline generation. Trigger pipeline execution to populate the canonical summary.";
 
         const hourlyPrompt = await getPrompt(this.config.promptsDir, "hourly_summary.txt");
         serverLogger.info("Prompting hourly highlights", { day, hours: Object.keys(byHour).length });
@@ -180,10 +179,10 @@ export class AnalysisService {
         );
 
         const topicsPrompt = await getPrompt(this.config.promptsDir, "top_topics.txt");
-        serverLogger.info("Prompting top topics", { day, sampleSize: Math.min(entries.length, 120) });
+        serverLogger.info("Prompting top topics", { day, utteranceCount: entries.length });
         const topicsRaw = await this.config.llmClient.generateText({
           systemPrompt: topicsPrompt,
-          userPrompt: JSON.stringify({ day, sample: entries.slice(0, 120) }),
+          userPrompt: JSON.stringify({ day, entries }),
           componentId: `analysis/top_topics/${day}`
         });
         serverLogger.info("Prompt received for top topics", { day });
@@ -347,25 +346,37 @@ export class AnalysisService {
       .slice(0, Math.min(Math.max(limit, 1), 50));
   }
 
-  searchUtterances(query: string, limit = 8): {
+  searchUtterances(
+    query: string,
+    limit = 8,
+    filters?: {
+      channel?: string;
+    }
+  ): {
     query: string;
     queryTokens: string[];
     totalUtterances: number;
     resultCount: number;
     utterances: ReturnType<typeof retrieveRankedUtterances>["ranked"];
   } {
-    const cacheKey = `${this.corpusVersion}|${query.trim().toLowerCase()}|${Math.min(Math.max(limit, 1), 25)}`;
+    const normalizedChannel = filters?.channel?.trim().toLowerCase() ?? "";
+    const normalizedLimit = Math.min(Math.max(limit, 1), 25);
+    const cacheKey = `${this.corpusVersion}|${query.trim().toLowerCase()}|${normalizedLimit}|${normalizedChannel}`;
     const cached = this.searchCache.get(cacheKey);
     if (cached) {
       return cached;
     }
 
-    const retrieval = retrieveRankedUtterances(query, this.utterances, limit);
+    const filteredUtterances =
+      normalizedChannel.length > 0
+        ? this.utterances.filter((entry) => entry.channel.trim().toLowerCase() === normalizedChannel)
+        : this.utterances;
+    const retrieval = retrieveRankedUtterances(query, filteredUtterances, normalizedLimit);
 
     const payload = {
       query,
       queryTokens: retrieval.queryTokens,
-      totalUtterances: this.utterances.length,
+      totalUtterances: filteredUtterances.length,
       resultCount: retrieval.ranked.length,
       utterances: retrieval.ranked
     };
@@ -375,7 +386,10 @@ export class AnalysisService {
 
   async chat(
     query: string,
-    mode: "rag_chat" | "llm_chat" = "rag_chat"
+    mode: "rag_chat" | "llm_chat" = "rag_chat",
+    filters?: {
+      channel?: string;
+    }
   ): Promise<{
     answer: string;
     evidence: Array<{
@@ -394,7 +408,12 @@ export class AnalysisService {
       mode
     });
 
-    const totalUtterances = this.utterances.length;
+    const normalizedChannel = filters?.channel?.trim().toLowerCase() ?? "";
+    const scopedUtterances =
+      normalizedChannel.length > 0
+        ? this.utterances.filter((entry) => entry.channel.trim().toLowerCase() === normalizedChannel)
+        : this.utterances;
+    const totalUtterances = scopedUtterances.length;
     if (totalUtterances === 0) {
       return {
         answer: "No transcript evidence is currently loaded. Please run ingestion before querying chat.",
@@ -403,17 +422,17 @@ export class AnalysisService {
       };
     }
 
-    const cacheKey = `${this.corpusVersion}|${mode}|${query.trim().toLowerCase()}`;
+    const cacheKey = `${this.corpusVersion}|${mode}|${query.trim().toLowerCase()}|${normalizedChannel}`;
     const cached = this.chatCache.get(cacheKey);
     if (cached) {
       return cached;
     }
 
-    const ragRetrieval = retrieveRankedUtterances(query, this.utterances, 40);
+    const ragRetrieval = retrieveRankedUtterances(query, scopedUtterances, 40);
     const baseEvidence = ragRetrieval.ranked.map((entry) => ({
       ...entry
     }));
-    const fallbackEvidence = this.utterances.slice(-40).map((entry) => ({
+    const fallbackEvidence = scopedUtterances.slice(-40).map((entry) => ({
       timestamp: entry.timestamp,
       day: entry.day,
       channel: entry.channel,
