@@ -128,14 +128,14 @@ export type ChatResponse = {
   answer: string;
   evidence: RankedEvidence[];
   strategy: {
-    mode: "rag" | "all";
+    mode: "rag_chat" | "llm_chat";
     totalUtterances: number;
     contextUtterances: number;
     daysQueried: number;
   };
 };
 
-export type ChatMode = "rag" | "all";
+export type ChatMode = "rag_chat" | "llm_chat";
 
 export type SystemLogEntry = {
   id: string;
@@ -333,7 +333,7 @@ export const searchUtterances = async (query: string, limit = 8): Promise<Uttera
   return (await response.json()) as UtteranceSearchResponse;
 };
 
-export const chat = async (query: string, mode: ChatMode = "all"): Promise<ChatResponse> => {
+export const chat = async (query: string, mode: ChatMode = "rag_chat"): Promise<ChatResponse> => {
   const response = await fetch(`${base}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

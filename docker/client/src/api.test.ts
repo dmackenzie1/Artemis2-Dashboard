@@ -25,7 +25,7 @@ describe("api helpers", () => {
     const payload = {
       answer: "ok",
       evidence: [],
-      strategy: { mode: "all", totalUtterances: 50, contextUtterances: 50, daysQueried: 5 }
+      strategy: { mode: "rag_chat", totalUtterances: 50, contextUtterances: 50, daysQueried: 5 }
     };
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => payload } as Response);
 
@@ -33,7 +33,7 @@ describe("api helpers", () => {
     expect(mockFetch).toHaveBeenCalledWith("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: "status", mode: "all" })
+      body: JSON.stringify({ query: "status", mode: "rag_chat" })
     });
   });
 
@@ -41,15 +41,15 @@ describe("api helpers", () => {
     const payload = {
       answer: "ok",
       evidence: [],
-      strategy: { mode: "all", totalUtterances: 50, contextUtterances: 50, daysQueried: 5 }
+      strategy: { mode: "llm_chat", totalUtterances: 50, contextUtterances: 50, daysQueried: 5 }
     };
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => payload } as Response);
 
-    await expect(chat("status", "all")).resolves.toEqual(payload);
+    await expect(chat("status", "llm_chat")).resolves.toEqual(payload);
     expect(mockFetch).toHaveBeenCalledWith("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: "status", mode: "all" })
+      body: JSON.stringify({ query: "status", mode: "llm_chat" })
     });
   });
 

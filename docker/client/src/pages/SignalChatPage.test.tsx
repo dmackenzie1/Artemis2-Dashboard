@@ -46,7 +46,7 @@ describe("SignalChatPage", () => {
     chatMock.mockResolvedValueOnce({
       answer: "Risk appears elevated around comm dropouts.",
       evidence: [],
-      strategy: { mode: "rag", totalUtterances: 10, contextUtterances: 4, daysQueried: 2 }
+      strategy: { mode: "rag_chat", totalUtterances: 10, contextUtterances: 4, daysQueried: 2 }
     });
 
     const container = document.createElement("div");
@@ -65,7 +65,7 @@ describe("SignalChatPage", () => {
     });
 
     expect(searchUtterancesMock).toHaveBeenCalledWith("Summarize communication risks in the latest transcript windows.", 10);
-    expect(chatMock).toHaveBeenCalledWith("Summarize communication risks in the latest transcript windows.", "rag");
+    expect(chatMock).toHaveBeenCalledWith("Summarize communication risks in the latest transcript windows.", "rag_chat");
     expect(container.textContent).toContain("Risk appears elevated around comm dropouts.");
     expect(container.textContent).toContain("Potential comms risk called out");
   });

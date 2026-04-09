@@ -196,10 +196,10 @@ export const createApiRouter = (
       const body = z
         .object({
           query: z.string().trim().min(1),
-          mode: z.enum(["rag", "all"]).optional()
+          mode: z.enum(["rag_chat", "llm_chat"]).optional()
         })
         .parse(req.body);
-      const result = await analysisService.chat(body.query, body.mode ?? "all");
+      const result = await analysisService.chat(body.query, body.mode ?? "rag_chat");
       res.json(result);
     } catch (error) {
       next(error);

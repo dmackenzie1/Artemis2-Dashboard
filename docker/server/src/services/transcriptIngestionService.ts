@@ -5,6 +5,7 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 import { parse, type CsvError, type Info } from "csv-parse";
 import { TranscriptUtterance } from "../entities/TranscriptUtterance.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
+import { tokenizeUtterance } from "../lib/tokenizer.js";
 
 type CsvRow = {
   Date: string;
@@ -35,6 +36,10 @@ const BATCH_SIZE = 750;
 const ingestFile = async (filePath: string, em: EntityManager): Promise<IngestFileResult> => {
   const sourceFile = path.basename(filePath);
   let parseErrors = 0;
+  serverLogger.info("Starting transcript file ingest", {
+    sourceFile,
+    step: "reading-file"
+  });
   const parser = createReadStream(filePath).pipe(
     parse({
       columns: true,
@@ -60,7 +65,12 @@ const ingestFile = async (filePath: string, em: EntityManager): Promise<IngestFi
 
   let inserted = 0;
   let skipped = 0;
+  let tokenized = 0;
   let batch: Array<Omit<TranscriptUtterance, "id">> = [];
+  serverLogger.info("Beginning transcript tokenization for file", {
+    sourceFile,
+    step: "tokenizing"
+  });
 
   for await (const parsed of parser as AsyncIterable<{ record: CsvRow; info: Info }>) {
     const { record: row, info } = parsed;
@@ -85,9 +95,20 @@ const ingestFile = async (filePath: string, em: EntityManager): Promise<IngestFi
       continue;
     }
 
-    batch.push(entity);
+    const tokens = tokenizeUtterance(entity.text);
+    tokenized += 1;
+
+    batch.push({
+      ...entity,
+      tokens
+    });
 
     if (batch.length >= BATCH_SIZE) {
+      serverLogger.info("Persisting transcript batch", {
+        sourceFile,
+        step: "inserting-into-database",
+        batchSize: batch.length
+      });
       await em.insertMany(TranscriptUtterance, batch);
       inserted += batch.length;
       serverLogger.info("Inserted transcript batch into database", {
@@ -100,6 +121,11 @@ const ingestFile = async (filePath: string, em: EntityManager): Promise<IngestFi
   }
 
   if (batch.length > 0) {
+    serverLogger.info("Persisting transcript batch", {
+      sourceFile,
+      step: "inserting-into-database",
+      batchSize: batch.length
+    });
     await em.insertMany(TranscriptUtterance, batch);
     inserted += batch.length;
     serverLogger.info("Inserted transcript batch into database", {
@@ -108,6 +134,15 @@ const ingestFile = async (filePath: string, em: EntityManager): Promise<IngestFi
       insertedSoFar: inserted
     });
   }
+
+  serverLogger.info("Completed transcript file ingest", {
+    sourceFile,
+    step: "done",
+    inserted,
+    tokenized,
+    skipped,
+    parseErrors
+  });
 
   return { inserted, skipped, parseErrors };
 };
