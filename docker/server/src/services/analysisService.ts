@@ -73,6 +73,21 @@ type ServiceConfig = {
   loadDailySummaryForDay?: (day: string) => Promise<string | null>;
 };
 
+type PromptUtterance = {
+  timestamp: string;
+  day: string;
+  hour: string;
+  channel: string;
+  text: string;
+};
+
+type TopicWindow = {
+  label: string;
+  startHour: number;
+  endHour: number;
+  entries: TranscriptUtterance[];
+};
+
 export class AnalysisService {
   private utterances: TranscriptUtterance[] = [];
   private cache: DashboardCache | null = null;
@@ -100,6 +115,63 @@ export class AnalysisService {
   }>(2 * 60 * 1000);
 
   constructor(private readonly config: ServiceConfig) {}
+
+  private toPromptUtterance(entry: TranscriptUtterance): PromptUtterance {
+    return {
+      timestamp: entry.timestamp,
+      day: entry.day,
+      hour: entry.hour,
+      channel: entry.channel,
+      text: entry.text
+    };
+  }
+
+  private parseHourNumber(value: string): number {
+    const hourSegment = value.split(":")[0] ?? "0";
+    const parsed = Number.parseInt(hourSegment, 10);
+    if (Number.isNaN(parsed)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.min(23, parsed));
+  }
+
+  private splitEntriesIntoTopicWindows(entries: TranscriptUtterance[]): TopicWindow[] {
+    const firstHalf = entries.filter((entry) => this.parseHourNumber(entry.hour) <= 11);
+    const secondHalf = entries.filter((entry) => this.parseHourNumber(entry.hour) >= 12);
+    const windows: TopicWindow[] = [];
+
+    if (firstHalf.length > 0) {
+      windows.push({
+        label: "00-11",
+        startHour: 0,
+        endHour: 11,
+        entries: firstHalf
+      });
+    }
+
+    if (secondHalf.length > 0) {
+      windows.push({
+        label: "12-23",
+        startHour: 12,
+        endHour: 23,
+        entries: secondHalf
+      });
+    }
+
+    if (windows.length > 0) {
+      return windows;
+    }
+
+    return [
+      {
+        label: "00-23",
+        startHour: 0,
+        endHour: 23,
+        entries
+      }
+    ];
+  }
 
   private updateCorpusVersion(utterances: TranscriptUtterance[]): void {
     const latestTimestamp = utterances.length > 0 ? utterances[utterances.length - 1]?.timestamp ?? "none" : "none";
@@ -171,7 +243,7 @@ export class AnalysisService {
               .map((hour) => ({
                 hour,
                 utteranceCount: byHour[hour].length,
-                sample: byHour[hour].slice(0, 8)
+                utterances: byHour[hour].map((entry) => this.toPromptUtterance(entry))
               }))
           }),
           componentId: `analysis/hourly_summary/${day}`
@@ -186,11 +258,51 @@ export class AnalysisService {
         );
 
         const topicsPrompt = await getPrompt(this.config.promptsDir, "top_topics.txt");
-        serverLogger.info("Prompting top topics", { day, utteranceCount: entries.length });
+        serverLogger.info("Prompting top topics", {
+          day,
+          utteranceCount: entries.length,
+          windowingStrategy: "half-day"
+        });
+        const topicWindows = this.splitEntriesIntoTopicWindows(entries);
+        const windowOutputs: Array<{ label: string; startHour: number; endHour: number; topicsRaw: string }> = [];
+
+        for (const window of topicWindows) {
+          const topicsRaw = await this.config.llmClient.generateText({
+            systemPrompt: topicsPrompt,
+            userPrompt: JSON.stringify({
+              mode: "top-topics-window",
+              day,
+              window: {
+                label: window.label,
+                startHour: window.startHour,
+                endHour: window.endHour
+              },
+              utteranceCount: window.entries.length,
+              entries: window.entries.map((entry) => this.toPromptUtterance(entry))
+            }),
+            componentId: `analysis/top_topics/${day}/window/${window.label}`
+          });
+          windowOutputs.push({
+            label: window.label,
+            startHour: window.startHour,
+            endHour: window.endHour,
+            topicsRaw
+          });
+        }
+
         const topicsRaw = await this.config.llmClient.generateText({
           systemPrompt: topicsPrompt,
-          userPrompt: JSON.stringify({ day, entries }),
-          componentId: `analysis/top_topics/${day}`
+          userPrompt: JSON.stringify({
+            mode: "top-topics-day-rollup",
+            day,
+            windows: windowOutputs.map((output) => ({
+              label: output.label,
+              startHour: output.startHour,
+              endHour: output.endHour,
+              topics: this.config.llmClient.parseTopics(output.topicsRaw)
+            }))
+          }),
+          componentId: `analysis/top_topics/${day}/rollup`
         });
         serverLogger.info("Prompt received for top topics", { day });
 

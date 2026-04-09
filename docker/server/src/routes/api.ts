@@ -23,10 +23,10 @@ export const createApiRouter = (
   router.post("/ingest", async (_req, res, next) => {
     try {
       serverLogger.info("Ingest endpoint invoked");
-      const dashboard = await analysisService.ingestAndAnalyze();
       if (onIngestionComplete) {
         await onIngestionComplete();
       }
+      const dashboard = await analysisService.ingestAndAnalyze();
       serverLogger.info("Ingest endpoint completed", { generatedAt: dashboard.generatedAt, totalDays: dashboard.days.length });
       res.json(dashboard);
     } catch (error) {
