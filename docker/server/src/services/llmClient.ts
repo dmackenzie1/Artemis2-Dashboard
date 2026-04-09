@@ -22,7 +22,7 @@ type CacheLookupResult = {
   cacheState: "fresh" | "stale";
 };
 
-const defaultMaxUserPromptCharacters = 500_000;
+const defaultMaxUserPromptCharacters = 800_000;
 
 type GenerateOptions = {
   systemPrompt: string;

@@ -16,7 +16,8 @@ const { groupBy, uniq } = lodash;
 const notableSignalPattern = /\b(abort|risk|issue|anomaly|dropout|dropouts|fail|failure|fault|leak|warning|urgent|off-nominal|degraded|concern)\b/i;
 const dailySummaryPlaceholder =
   "Daily summary pending pipeline generation. Trigger pipeline execution to populate the canonical summary.";
-const hourlyPromptMaxUtterancesPerHour = 120;
+const hourlyPromptMaxUtterancesPerHour = 60;
+const hourlyPromptTopUtterancesPerHour = 10;
 const topicPromptMaxUtterancesPerWindow = 260;
 
 
@@ -165,6 +166,34 @@ export class AnalysisService {
     ];
   }
 
+  private scoreHourlyPromptUtterance(entry: TranscriptUtterance): number {
+    const signalScore = notableSignalPattern.test(entry.text) ? 3 : 0;
+    const channelScore = /manager|flight|fdo|eec|eclss|gnc/i.test(entry.channel) ? 2 : 0;
+    const wordCount = entry.text.trim().split(/\s+/).filter(Boolean).length;
+    const lengthScore = wordCount >= 6 && wordCount <= 60 ? 1 : 0;
+    return signalScore + channelScore + lengthScore;
+  }
+
+  private summarizeHour(entries: TranscriptUtterance[]): string {
+    if (entries.length === 0) {
+      return "Low activity hour; no notable transcript evidence in source records.";
+    }
+
+    const channelCounts = entries.reduce<Map<string, number>>((counts, entry) => {
+      const key = entry.channel.trim().length > 0 ? entry.channel.trim() : "UNKNOWN";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      return counts;
+    }, new Map<string, number>());
+    const topChannels = [...channelCounts.entries()]
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .slice(0, 3)
+      .map(([channel]) => channel);
+    const anomalyCount = entries.filter((entry) => notableSignalPattern.test(entry.text)).length;
+    const anomalyPhrase = anomalyCount > 0 ? `${anomalyCount} anomaly/risk-signaling utterances` : "no explicit anomaly/risk terms";
+    const channelPhrase = topChannels.length > 0 ? topChannels.join(", ") : "UNKNOWN";
+    return `${entries.length} utterances; primary channels: ${channelPhrase}; ${anomalyPhrase}.`;
+  }
+
   private sampleEntriesForPrompt(entries: TranscriptUtterance[], maxEntries: number): TranscriptUtterance[] {
     if (entries.length <= maxEntries) {
       return entries;
@@ -259,9 +288,18 @@ export class AnalysisService {
               .map((hour) => ({
                 hour,
                 utteranceCount: byHour[hour].length,
+                hourSynopsis: this.summarizeHour(byHour[hour]),
                 utterances: this.sampleEntriesForPrompt(byHour[hour], hourlyPromptMaxUtterancesPerHour).map((entry) =>
                   this.toPromptUtterance(entry)
-                )
+                ),
+                topUtterances: [...byHour[hour]]
+                  .sort(
+                    (left, right) =>
+                      this.scoreHourlyPromptUtterance(right) - this.scoreHourlyPromptUtterance(left) ||
+                      left.timestamp.localeCompare(right.timestamp)
+                  )
+                  .slice(0, hourlyPromptTopUtterancesPerHour)
+                  .map((entry) => this.toPromptUtterance(entry))
               }))
           }),
           componentId: `analysis/hourly_summary/${day}`
