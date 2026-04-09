@@ -1,29 +1,11 @@
 import type { FunctionComponent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchNotableMoments, type NotableMoment, type NotableMomentsData } from "../api";
+import { fetchNotableMoments, type NotableMomentsData } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./NotableMomentsPage.module.css";
 import { clientLogger } from "../utils/logging/clientLogger";
 import { subscribeToLiveUpdates } from "../utils/live/liveEvents";
-
-type NotableMomentsDay = {
-  day: string;
-  moments: NotableMoment[];
-};
-
-const parseDayPayload = (rawDay: string): NotableMomentsDay | null => {
-  try {
-    const parsed = JSON.parse(rawDay) as NotableMomentsDay;
-    if (!parsed.day || !Array.isArray(parsed.moments)) {
-      return null;
-    }
-
-    return parsed;
-  } catch (_error) {
-    return null;
-  }
-};
 
 export const NotableMomentsPage: FunctionComponent = () => {
   const [data, setData] = useState<NotableMomentsData | null>(null);
@@ -58,7 +40,7 @@ export const NotableMomentsPage: FunctionComponent = () => {
   }, [loadNotableMoments]);
 
   const days = useMemo(() => {
-    return (data?.days ?? []).map(parseDayPayload).filter((entry): entry is NotableMomentsDay => Boolean(entry));
+    return data?.days ?? [];
   }, [data]);
 
   const scrollToDay = (day: string): void => {

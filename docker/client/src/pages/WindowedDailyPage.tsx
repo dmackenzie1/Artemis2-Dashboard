@@ -34,6 +34,14 @@ export const WindowedDailyPage: FC<WindowedDailyPageProps> = ({ componentKey, pa
     };
 
     void load();
+    const onGlobalRefresh = (): void => {
+      void load();
+    };
+    window.addEventListener("global-data-refresh-requested", onGlobalRefresh);
+
+    return () => {
+      window.removeEventListener("global-data-refresh-requested", onGlobalRefresh);
+    };
   }, [windowHours]);
 
   return (

@@ -59,6 +59,14 @@ export const SystemLogsPage: FunctionComponent = () => {
 
   useEffect(() => {
     void loadLogs();
+    const onGlobalRefresh = (): void => {
+      void loadLogs();
+    };
+    window.addEventListener("global-data-refresh-requested", onGlobalRefresh);
+
+    return () => {
+      window.removeEventListener("global-data-refresh-requested", onGlobalRefresh);
+    };
   }, [loadLogs]);
 
   const onLogSelect = async (entry: SystemLogEntry): Promise<void> => {

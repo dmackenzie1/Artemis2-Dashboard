@@ -27,9 +27,14 @@ export const DailyPage: FC = () => {
     };
 
     void loadDailyDashboard();
+    const onGlobalRefresh = (): void => {
+      void loadDailyDashboard();
+    };
+    window.addEventListener("global-data-refresh-requested", onGlobalRefresh);
 
     return () => {
       isMounted = false;
+      window.removeEventListener("global-data-refresh-requested", onGlobalRefresh);
     };
   }, []);
 

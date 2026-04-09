@@ -5,6 +5,7 @@ import {
   fetchNotableUtterances,
   fetchTimeline,
   type NotableMoment,
+  type NotableMomentsDay,
   type NotableUtterancesResponse,
   type TimelineDayEntry
 } from "../api";
@@ -46,11 +47,6 @@ const MAX_NOTABLE_UTTERANCES = 160;
 const MAX_NOTABLE_UTTERANCES_PER_DAY = 8;
 const MIN_NOTABLE_MOMENTS_PER_DAY = 3;
 const MAX_NOTABLE_MOMENTS_PER_DAY = 24;
-
-type NotableMomentsDay = {
-  day: string;
-  moments: NotableMoment[];
-};
 
 const formatDateLabel = (timestamp: number): string =>
   new Intl.DateTimeFormat("en-US", {
@@ -118,21 +114,6 @@ const toSummaryHighlights = (summary: string): string[] => {
 
   return sentenceChunks.slice(0, MAX_SUMMARY_HIGHLIGHTS_PER_DAY);
 };
-
-const parseNotableMomentsDays = (rawDays: string[]): NotableMomentsDay[] =>
-  rawDays
-    .map((rawDay) => {
-      try {
-        const parsed = JSON.parse(rawDay) as NotableMomentsDay;
-        if (!parsed.day || !Array.isArray(parsed.moments)) {
-          return null;
-        }
-        return parsed;
-      } catch (_error) {
-        return null;
-      }
-    })
-    .filter((entry): entry is NotableMomentsDay => Boolean(entry));
 
 const buildTimelineItems = (
   days: TimelineDayEntry[],
@@ -321,7 +302,7 @@ export const TimelinePage: FC = () => {
 
         setTimelineDays(timelinePayload);
         setNotableUtterances(notablePayload);
-        setNotableMomentsDays(parseNotableMomentsDays(notableMomentsPayload?.days ?? []));
+        setNotableMomentsDays(notableMomentsPayload?.days ?? []);
       } catch (loadError) {
         if (!active) {
           return;
@@ -337,9 +318,14 @@ export const TimelinePage: FC = () => {
     };
 
     void loadTimeline();
+    const onGlobalRefresh = (): void => {
+      void loadTimeline();
+    };
+    window.addEventListener("global-data-refresh-requested", onGlobalRefresh);
 
     return () => {
       active = false;
+      window.removeEventListener("global-data-refresh-requested", onGlobalRefresh);
     };
   }, []);
 
