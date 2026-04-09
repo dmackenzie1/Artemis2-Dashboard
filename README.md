@@ -12,7 +12,7 @@ TalkyBot source system: https://talkybot.fit.nasa.gov/
 
 ## Repository layout
 
-- `docker/client`: React 19 + Vite frontend workspace.
+- `docker/client`: React 19 + Vite client workspace.
 - `docker/server`: Express 5 + TypeScript backend workspace.
 - `docker/nginx`: Reverse proxy used in Dockerized runs.
 - `prompts`: Prompt templates used by pipeline jobs.
@@ -22,7 +22,7 @@ TalkyBot source system: https://talkybot.fit.nasa.gov/
 ## Project documentation map (single-source, no duplication)
 
 - Top-level setup and operations: this file.
-- Frontend implementation map: `docker/client/README.md` and `docker/client/ARCHITECTURE.md`.
+- Client implementation map: `docker/client/README.md` and `docker/client/ARCHITECTURE.md`.
 - Backend implementation map: `docker/server/README.md` and `docker/server/ARCHITECTURE.md`.
 - UI visual direction and guardrails: `docs/ui-design-guidance.md`.
 

@@ -1,4 +1,4 @@
-# Client (frontend workspace)
+# Client workspace
 
 React 19 + Vite client for the TalkyBot Transcript Review Dashboard.
 
@@ -9,7 +9,7 @@ This workspace owns:
 - Dashboard panel composition with component-owned API/poll/error/result state
 - Parent-page refresh notification wiring (admin refresh signal only, no centralized overview fetch controller)
 - Typed API client wrappers for `/api/*`
-- Shared frontend formatting/logging helpers
+- Shared client formatting/logging helpers
 
 ## Commands
 
@@ -17,9 +17,9 @@ From repository root:
 
 ```bash
 npm run dev:client
-npm run lint -w frontend
-npm run test -w frontend
-npm run build -w frontend
+npm run lint -w client
+npm run test -w client
+npm run build -w client
 ```
 
 ## Runtime contracts
