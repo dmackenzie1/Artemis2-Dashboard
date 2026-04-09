@@ -25,80 +25,6 @@ import { TranscriptUtterance } from "./entities/TranscriptUtterance.js";
 import { SummaryArtifact } from "./entities/SummaryArtifact.js";
 import { loadTranscriptCandidates } from "./services/transcriptCandidateService.js";
 
-const ensurePromptExecutionSubmittedTextColumn = async (orm: MikroORM): Promise<void> => {
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
-    add column if not exists "submitted_text" text;
-  `);
-
-  await orm.em.getConnection().execute(`
-    update "prompt_executions"
-    set "submitted_text" = ''
-    where "submitted_text" is null;
-  `);
-
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
-    alter column "submitted_text" set default '',
-    alter column "submitted_text" set not null;
-  `);
-
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
-    add column if not exists "component_id" varchar(128);
-  `);
-  await orm.em.getConnection().execute(`
-    update "prompt_executions"
-    set "component_id" = 'unknown-component'
-    where "component_id" is null;
-  `);
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
-    alter column "component_id" set not null;
-  `);
-
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
-    add column if not exists "cache_hit" boolean default false;
-  `);
-  await orm.em.getConnection().execute(`
-    update "prompt_executions"
-    set "cache_hit" = false
-    where "cache_hit" is null;
-  `);
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
-    alter column "cache_hit" set not null;
-  `);
-
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
-    add column if not exists "response_day" varchar(64);
-  `);
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
-    add column if not exists "sent_at" timestamp;
-  `);
-  await orm.em.getConnection().execute(`
-    update "prompt_executions"
-    set "sent_at" = "started_at"
-    where "sent_at" is null;
-  `);
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
-    alter column "sent_at" set not null;
-  `);
-  await orm.em.getConnection().execute(`
-    alter table "prompt_executions"
-    add column if not exists "received_at" timestamp;
-  `);
-  await orm.em.getConnection().execute(`
-    update "prompt_executions"
-    set "received_at" = "finished_at"
-    where "received_at" is null and "finished_at" is not null;
-  `);
-};
-
 const ensureTranscriptSearchIndexes = async (orm: MikroORM): Promise<void> => {
   await orm.em.getConnection().execute(`
     create index if not exists "idx_transcript_utterances_tokens_gin"
@@ -614,7 +540,6 @@ if (env.TRANSCRIPTS_DB_ENABLED) {
     database: env.DB_NAME
   });
   await orm.getSchemaGenerator().updateSchema();
-  await ensurePromptExecutionSubmittedTextColumn(orm);
   await ensureTranscriptSearchIndexes(orm);
   app.use((req, res, next) => RequestContext.create(orm.em, next));
   const getEntityManager = (): EntityManager => (RequestContext.getEntityManager() as EntityManager | undefined) ?? orm.em.fork();
