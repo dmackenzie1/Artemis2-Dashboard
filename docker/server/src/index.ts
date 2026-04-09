@@ -277,8 +277,8 @@ const runAutoIngestion = async (): Promise<void> => {
       reason,
       sourcePath
     });
-    const dashboard = await analysisService.ingestAndAnalyze();
     await runTranscriptAndPipelineRefresh();
+    const dashboard = await analysisService.ingestAndAnalyze();
     statsService?.invalidateCaches();
     timeWindowSummaryService?.invalidateCache();
     if (statsService) {
