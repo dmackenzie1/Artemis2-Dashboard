@@ -386,8 +386,9 @@ export const fetchStatsHourlyByChannel = async (days = 7): Promise<MissionHourly
   }
 };
 
-export const fetchStatsDailyVolume = async (days = 5): Promise<MissionDailyVolumeData | null> => {
-  const response = await fetch(`${base}/stats/daily-volume?days=${days}`);
+export const fetchStatsDailyVolume = async (days?: number): Promise<MissionDailyVolumeData | null> => {
+  const queryString = typeof days === "number" ? `?days=${days}` : "";
+  const response = await fetch(`${base}/stats/daily-volume${queryString}`);
   if (!response.ok) {
     clientLogger.warn("Daily transcript volume unavailable", { status: response.status, days });
     return null;

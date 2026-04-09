@@ -116,9 +116,9 @@ export class StatsService {
     });
   }
 
-  async getDailyVolume(days = 5): Promise<MissionStatsDailyVolume> {
-    const safeDays = Math.min(Math.max(Math.floor(days), 1), 30);
+  async getDailyVolume(days?: number): Promise<MissionStatsDailyVolume> {
     const entries = await this.getStatsByDay();
+    const safeDays = typeof days === "number" ? Math.min(Math.max(Math.floor(days), 1), 30) : entries.length;
     const slicedEntries = entries.slice(Math.max(entries.length - safeDays, 0)).reverse();
 
     return {

@@ -108,8 +108,8 @@ describe("api helpers", () => {
     };
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => payload } as Response);
 
-    await expect(fetchStatsDailyVolume(5)).resolves.toEqual(payload);
-    expect(mockFetch).toHaveBeenCalledWith("/api/stats/daily-volume?days=5");
+    await expect(fetchStatsDailyVolume()).resolves.toEqual(payload);
+    expect(mockFetch).toHaveBeenCalledWith("/api/stats/daily-volume");
   });
 
   it("deduplicates in-flight hourly stats requests for the same day range", async () => {

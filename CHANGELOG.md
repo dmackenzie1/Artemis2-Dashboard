@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: switch Overview Daily Transcript Volume to request/display all available days by default (while keeping optional `days` query support for bounded API calls). Intent: Ensure operators see complete day-level transcript coverage instead of a truncated last-5-day snapshot.
 - refactor: remove prompt-execution startup SQL backfill helper and rely on normal schema/index startup flow only (`updateSchema` + transcript search indexes). Intent: Eliminate one-off runtime DDL/backfill side effects now that all required `prompt_executions` columns already exist in deployed environments.
 - refactor: replace client window-level live-update `CustomEvent` fanout/listeners with a React `LiveUpdatesProvider` context + hook, and migrate page refresh/event consumers to typed reactive context state. Intent: Align live-update propagation with React lifecycle semantics so pages subscribe declaratively without manual DOM listener bookkeeping.
 - feat: persist prompt matrix lifecycle metadata (`response_day`, `sent_at`, `received_at`), expose `latestIngestAt` plus per-cell sent/received timestamps from `/api/pipeline/prompt-matrix-state`, and switch System Status matrix refresh to debounced server snapshot re-fetch with compact UTC (`YYYYMMDDTHHmmss`) cell timing. Intent: Keep prompt/day status rendering grounded in durable database truth with clear second-level operator timing and resilient refresh behavior after reconnects or ingest churn.

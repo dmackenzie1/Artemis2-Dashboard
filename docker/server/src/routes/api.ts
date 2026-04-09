@@ -138,14 +138,14 @@ export const createApiRouter = (
   router.get("/stats/daily-volume", async (req, res, next) => {
     try {
       const query = z.object({ days: z.coerce.number().int().min(1).max(30).optional() }).parse(req.query);
-      serverLogger.info("Daily transcript volume requested", { days: query.days ?? 5 });
+      serverLogger.info("Daily transcript volume requested", { days: query.days ?? "all" });
       const statsService = getStatsService?.();
       if (!statsService) {
         res.status(503).json({ message: "Stats DB is disabled. Enable TRANSCRIPTS_DB_ENABLED for database-backed stats." });
         return;
       }
 
-      const payload = await statsService.getDailyVolume(query.days ?? 5);
+      const payload = await statsService.getDailyVolume(query.days);
       res.json(payload);
     } catch (error) {
       serverLogger.error("Daily transcript volume request failed", { error: serializeUnknownError(error) });

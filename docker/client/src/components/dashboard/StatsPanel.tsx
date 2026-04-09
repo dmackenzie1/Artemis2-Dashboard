@@ -9,7 +9,6 @@ import { StatusBadge } from "./primitives/StatusBadge";
 import { clientLogger } from "../../utils/logging/clientLogger";
 
 const DASHBOARD_POLL_INTERVAL_MS = 30 * 60 * 1000;
-const DAILY_VOLUME_DAYS = 5;
 
 const formatMetricValue = (value: number): string => {
   return value.toLocaleString();
@@ -24,7 +23,7 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
   const loadStats = useCallback(async (): Promise<void> => {
     const [statsSummaryResult, dailyVolumeResult, hourlyResult] = await Promise.allSettled([
       fetchStatsSummary(),
-      fetchStatsDailyVolume(DAILY_VOLUME_DAYS),
+      fetchStatsDailyVolume(),
       fetchStatsHourlyByChannel(30)
     ]);
 
@@ -150,7 +149,7 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
           ))}
           {dailyTranscriptVolume.length > 0 ? (
             <section className={styles["stats-group"]}>
-              <p className={styles["stats-group-label"]}>Daily Transcript Volume (Last {DAILY_VOLUME_DAYS} Days)</p>
+              <p className={styles["stats-group-label"]}>Daily Transcript Volume (All Days)</p>
               <table className={styles["daily-volume-table"]}>
                 <colgroup>
                   <col className={styles["snapshot-day-col"]} />
@@ -175,7 +174,7 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
                 </tbody>
                 <tfoot>
                   <tr>
-                    <th scope="row">Total ({dailyTranscriptVolume.length}d)</th>
+                    <th scope="row">Total ({dailyTranscriptVolume.length} days)</th>
                     <td>{formatMetricValue(dailyVolumeTotals.utterances)}</td>
                     <td>{formatMetricValue(dailyVolumeTotals.words)}</td>
                   </tr>
