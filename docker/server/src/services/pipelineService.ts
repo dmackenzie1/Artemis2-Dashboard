@@ -420,6 +420,13 @@ export class PipelineService {
 
   private async generateNotableMomentsOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
     const dayGroups = this.buildDailyGroups(sourceContext);
+    const em = this.getEntityManager();
+    const persistedDailySummaries = await em.find(
+      DailySummary,
+      { channelGroup: canonicalChannelGroup, day: { $in: dayGroups.map((group) => group.day) } },
+      { orderBy: { day: "asc" } }
+    );
+    const summaryByDay = new Map(persistedDailySummaries.map((summary) => [summary.day, summary.summary]));
     const dayOutputs: string[] = [];
     serverLogger.info("Starting notable moments generation", {
       groupedDayCount: dayGroups.length,
@@ -435,6 +442,7 @@ export class PipelineService {
             mode: "daily-notable-moments",
             day: group.day,
             targetMoments,
+            dailySummary: summaryByDay.get(group.day) ?? null,
             sourceDocuments: group.documents.map((document) => ({
               path: document.path,
               content: document.content

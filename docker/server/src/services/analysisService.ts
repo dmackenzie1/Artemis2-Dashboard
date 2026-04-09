@@ -220,9 +220,21 @@ export class AnalysisService {
         const entries = byDay[day];
         const byHour = groupBy(entries, (item) => item.hour);
         const hourlyUtterances: Record<string, number> = {};
+        const hourlyChannelLeads: Record<string, string[]> = {};
 
         for (const hour of Object.keys(byHour).sort()) {
-          hourlyUtterances[hour] = byHour[hour].length;
+          const hourEntries = byHour[hour];
+          hourlyUtterances[hour] = hourEntries.length;
+          const channelCounts = hourEntries.reduce<Map<string, number>>((counts, entry) => {
+            const key = entry.channel.trim().length > 0 ? entry.channel.trim() : "UNKNOWN";
+            counts.set(key, (counts.get(key) ?? 0) + 1);
+            return counts;
+          }, new Map<string, number>());
+
+          hourlyChannelLeads[hour] = [...channelCounts.entries()]
+            .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+            .slice(0, 4)
+            .map(([channel]) => channel);
         }
 
         const persistedDailySummary = this.config.loadDailySummaryForDay
@@ -315,7 +327,8 @@ export class AnalysisService {
             utteranceCount: entries.length,
             wordCount: entries.reduce((count, item) => count + item.text.split(/\s+/).length, 0),
             channelCount: uniq(entries.map((item) => item.channel)).length,
-            hourlyUtterances
+            hourlyUtterances,
+            hourlyChannelLeads
           }
         });
       }

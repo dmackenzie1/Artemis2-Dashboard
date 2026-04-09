@@ -1,6 +1,6 @@
 import type { FC } from "react";
-import { useEffect, useState } from "react";
-import { fetchDashboard, type DashboardData } from "../api";
+import { useEffect, useMemo, useState } from "react";
+import { fetchDashboard, fetchPipelineDailySummaries, type DashboardData, type PipelineDailySummariesData } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./DailyPage.module.css";
@@ -9,17 +9,24 @@ import { clientLogger } from "../utils/logging/clientLogger";
 
 export const DailyPage: FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [pipelineDailySummaries, setPipelineDailySummaries] = useState<PipelineDailySummariesData | null>(null);
   const { componentId, componentUid } = useComponentIdentity("daily-page");
   const days = data?.days ?? [];
+
+  const pipelineSummaryByDay = useMemo(
+    () => new Map((pipelineDailySummaries?.days ?? []).map((entry) => [entry.day, entry.summary])),
+    [pipelineDailySummaries]
+  );
 
   useEffect(() => {
     let isMounted = true;
 
     const loadDailyDashboard = async (): Promise<void> => {
       try {
-        const payload = await fetchDashboard();
+        const [dashboardPayload, pipelineDailyPayload] = await Promise.all([fetchDashboard(), fetchPipelineDailySummaries()]);
         if (isMounted) {
-          setData(payload);
+          setData(dashboardPayload);
+          setPipelineDailySummaries(pipelineDailyPayload);
         }
       } catch (error) {
         clientLogger.error("Failed to load daily dashboard", { error });
@@ -69,7 +76,12 @@ export const DailyPage: FC = () => {
             data-component-uid={`${componentUid}-${day.day}`}
           >
             <h2>{day.day}</h2>
-            <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(day.summary, sharedStyles["formatted-list"])}</div>
+            <div className={sharedStyles["formatted-copy"]}>
+              {renderStructuredText(
+                pipelineSummaryByDay.get(day.day) ?? day.summary,
+                sharedStyles["formatted-list"]
+              )}
+            </div>
             <p>
               Utterances: {day.stats.utteranceCount} | Words: {day.stats.wordCount} | Channels: {day.stats.channelCount}
             </p>
@@ -78,6 +90,9 @@ export const DailyPage: FC = () => {
               {Object.entries(day.hourly).map(([hour, summary]) => (
                 <section className={styles["hourly-highlight-card"]} key={hour}>
                   <p className={styles["hourly-highlight-hour"]}>{hour}</p>
+                  <p className={sharedStyles.subtle}>
+                    Channels: {(day.stats.hourlyChannelLeads?.[hour] ?? []).join(" • ") || "No dominant channels detected"}
+                  </p>
                   <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(summary, sharedStyles["formatted-list"])}</div>
                 </section>
               ))}
