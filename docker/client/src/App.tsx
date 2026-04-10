@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { clearServerCaches, triggerIngest } from "./api";
 import { useComponentIdentity } from "./components/dashboard/primitives/useComponentIdentity";
@@ -13,14 +13,10 @@ import { SystemLogsPage } from "./pages/SystemLogsPage";
 import { SignalChatPage } from "./pages/SignalChatPage";
 import { AboutPage } from "./pages/AboutPage";
 import { clientLogger } from "./utils/logging/clientLogger";
-import type { EmsspressobotController } from "./utils/emsspressobot";
-import { installEmsspressobot } from "./utils/emsspressobot";
 import { useLiveUpdates } from "./context/LiveUpdatesContext";
 
 export const App: FC = () => {
   const [isAdminRefreshRunning, setIsAdminRefreshRunning] = useState(false);
-  const [isEspressoBotVisible, setIsEspressoBotVisible] = useState(false);
-  const emsspressobotRef = useRef<EmsspressobotController | null>(null);
   const location = useLocation();
   const { requestAdminRefresh } = useLiveUpdates();
   const { componentId, componentUid } = useComponentIdentity("app-shell");
@@ -29,21 +25,6 @@ export const App: FC = () => {
     const adminQueryValue = new URLSearchParams(location.search).get("admin");
     return adminQueryValue === "true";
   }, [location.search]);
-
-  useEffect(() => {
-    if (isEspressoBotVisible) {
-      emsspressobotRef.current = installEmsspressobot();
-      return () => {
-        emsspressobotRef.current?.remove();
-        emsspressobotRef.current = null;
-      };
-    }
-
-    emsspressobotRef.current?.remove();
-    emsspressobotRef.current = null;
-
-    return undefined;
-  }, [isEspressoBotVisible]);
 
   useEffect(() => {
     const cacheClearValue = new URLSearchParams(location.search).get("cacheClear");
@@ -122,17 +103,6 @@ export const App: FC = () => {
           <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer">
             TalkyBot
           </a>
-          <button
-            type="button"
-            className={styles["espresso-toggle-button"]}
-            aria-pressed={isEspressoBotVisible}
-            onClick={() => {
-              setIsEspressoBotVisible((visible) => !visible);
-            }}
-            title={isEspressoBotVisible ? "Hide EMSSpressoBot" : "Show EMSSpressoBot"}
-          >
-            ☕
-          </button>
           {adminMode ? (
             <button
               type="button"
