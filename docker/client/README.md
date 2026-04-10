@@ -31,3 +31,9 @@ npm run build -w client
 ## Architecture docs
 
 For implementation-level file-by-file details, see `docker/client/ARCHITECTURE.md`.
+
+## Documentation contracts
+
+- Keep this README focused on workspace scope, commands, and runtime contracts.
+- Keep file-level ownership and flow details in `ARCHITECTURE.md`.
+- Preserve the panel-isolation contract: each dashboard panel owns its own loading/error/result state and API lifecycle; parent pages only broadcast refresh notifications.

@@ -20,7 +20,7 @@ This document is the implementation map for `docker/client/src`.
 | `api.ts` | Typed HTTP client layer for all backend endpoints consumed by the UI. |
 | `api.test.ts` | API helper regression tests (request/response behavior). |
 | `app.test.ts` | App shell/routing behavior tests. |
-| `styles.module.css` | Global mission-themed layout and component styling classes. |
+| `App.module.css` | Global mission-themed layout and component styling classes. |
 | `types.d.ts` | TypeScript ambient declarations used by Vite/client compilation. |
 | `utils/logging/clientLogger.ts` | Structured client logging facade (info/warn/error). |
 | `utils/formatting/renderStructuredText.tsx` | Structured text renderer for multiline LLM output blocks. |
@@ -67,3 +67,9 @@ This document is the implementation map for `docker/client/src`.
 - Removed unused `DashboardToolbar` component file; dashboard top controls now live in `App.tsx`.
 - Removed unused API helper/types for pipeline stats (`fetchPipelineStats`, `PipelineStatsData`) that had no call sites.
 - Removed unused exported `NotableMomentsDay` type from `api.ts`; page-local parser keeps its own local shape.
+
+## Architecture guardrails
+
+- Keep dashboard panels independently fetch-driven to avoid coupling failure domains.
+- Keep route pages focused on route state and layout composition; avoid reintroducing centralized dashboard data controllers.
+- Keep API consumption inside `api.ts` wrappers so page/component code remains typed and transport-agnostic.
