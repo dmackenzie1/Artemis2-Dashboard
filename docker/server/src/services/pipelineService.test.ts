@@ -76,4 +76,40 @@ describe("PipelineService prompt matrix state", () => {
     expect(payload.prompts[0]?.key).toBe("daily_summary");
     expect(payload.prompts[0]?.cells[0]?.state).toBe("none");
   });
+
+  it("maps dayGroups from submitted payload when responseDay is null", async () => {
+    const fakeEntityManager = {
+      find: async (entity: { name?: string }) => {
+        if (entity?.name === "PromptDefinition") {
+          return [{ key: "daily_summary_am" }];
+        }
+        return [];
+      },
+      getConnection: () => ({
+        execute: async () => [
+          {
+            id: 777,
+            promptKey: "daily_summary_am",
+            responseDay: null,
+            sentAt: new Date("2026-04-10T00:00:00Z"),
+            startedAt: new Date("2026-04-10T00:00:00Z"),
+            receivedAt: new Date("2026-04-10T00:01:00Z"),
+            status: "success",
+            errorMessage: null,
+            submittedText: JSON.stringify({
+              dayGroups: [{ day: "2026-04-01" }, { day: "2026-04-02" }]
+            })
+          }
+        ]
+      })
+    } as unknown as EntityManager;
+
+    const service = createPipelineService(fakeEntityManager);
+    (service as unknown as { listTranscriptDays: (limit: number) => Promise<string[]> }).listTranscriptDays = async () => [];
+    (service as unknown as { getLatestIngestAt: () => Promise<string | null> }).getLatestIngestAt = async () => null;
+
+    const payload = await service.getPromptMatrixState(20);
+    expect(payload.days).toEqual(["2026-04-01", "2026-04-02"]);
+    expect(payload.prompts[0]?.cells.map((cell) => cell.state)).toEqual(["received", "received"]);
+  });
 });
