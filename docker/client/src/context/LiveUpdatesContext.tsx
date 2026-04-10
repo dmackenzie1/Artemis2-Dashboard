@@ -1,6 +1,6 @@
 import type { FunctionComponent, PropsWithChildren } from "react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { subscribeToLiveUpdates, type LiveUpdateEvent } from "../utils/live/liveEvents";
+import { GLOBAL_REFRESH_TRIGGER_EVENT_TYPES, subscribeToLiveUpdates, type LiveUpdateEvent } from "../utils/live/liveEvents";
 import { clientLogger } from "../utils/logging/clientLogger";
 
 type LiveUpdatesContextValue = {
@@ -14,22 +14,6 @@ type LiveUpdatesContextValue = {
 };
 
 const MAX_RECENT_EVENTS = 150;
-const GLOBAL_REFRESH_EVENT_TYPES: ReadonlySet<LiveUpdateEvent["type"]> = new Set([
-  "dashboard.cache.updated",
-  "stats.updated",
-  "time-window-summary.updated",
-  "pipeline.run.completed",
-  "date.updated",
-  "day.ingested",
-  "day.llm.loaded",
-  "day.notable-queries.updated",
-  "sql.file.load.completed",
-  "sql.jobs.completed",
-  "llm.day.processing.completed",
-  "llm.days.completed",
-  "prompt.received",
-  "prompt.error"
-]);
 
 const LiveUpdatesContext = createContext<LiveUpdatesContextValue | null>(null);
 
@@ -59,7 +43,7 @@ export const LiveUpdatesProvider: FunctionComponent<PropsWithChildren> = ({ chil
         });
         setLastEvent(event);
         setRecentEvents((previous) => [event, ...previous].slice(0, MAX_RECENT_EVENTS));
-        if (GLOBAL_REFRESH_EVENT_TYPES.has(event.type)) {
+        if (GLOBAL_REFRESH_TRIGGER_EVENT_TYPES.has(event.type)) {
           requestGlobalRefresh();
         }
       },

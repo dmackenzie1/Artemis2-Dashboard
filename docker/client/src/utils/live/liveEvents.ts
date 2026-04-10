@@ -1,32 +1,6 @@
 import { clientLogger } from "../logging/clientLogger";
 
-export type LiveUpdateEvent = {
-  type:
-    | "dashboard.cache.updated"
-    | "stats.updated"
-    | "time-window-summary.updated"
-    | "pipeline.run.started"
-    | "pipeline.run.completed"
-    | "pipeline.run.failed"
-    | "llm.connectivity.changed"
-    | "day.ingested"
-    | "day.llm.loaded"
-    | "day.notable-queries.updated"
-    | "date.updated"
-    | "sql.file.load.started"
-    | "sql.file.load.completed"
-    | "sql.jobs.completed"
-    | "llm.day.processing.started"
-    | "llm.day.processing.completed"
-    | "llm.days.completed"
-    | "prompt.sent"
-    | "prompt.received"
-    | "prompt.error";
-  emittedAt: string;
-  payload?: Record<string, unknown>;
-};
-
-export const LIVE_UPDATE_EVENT_TYPES: LiveUpdateEvent["type"][] = [
+export const LIVE_UPDATE_EVENT_TYPES = [
   "dashboard.cache.updated",
   "stats.updated",
   "time-window-summary.updated",
@@ -47,7 +21,32 @@ export const LIVE_UPDATE_EVENT_TYPES: LiveUpdateEvent["type"][] = [
   "prompt.sent",
   "prompt.received",
   "prompt.error"
-];
+] as const;
+
+export type LiveUpdateEventType = (typeof LIVE_UPDATE_EVENT_TYPES)[number];
+
+export type LiveUpdateEvent = {
+  type: LiveUpdateEventType;
+  emittedAt: string;
+  payload?: Record<string, unknown>;
+};
+
+export const GLOBAL_REFRESH_TRIGGER_EVENT_TYPES: ReadonlySet<LiveUpdateEventType> = new Set([
+  "dashboard.cache.updated",
+  "stats.updated",
+  "time-window-summary.updated",
+  "pipeline.run.completed",
+  "date.updated",
+  "day.ingested",
+  "day.llm.loaded",
+  "day.notable-queries.updated",
+  "sql.file.load.completed",
+  "sql.jobs.completed",
+  "llm.day.processing.completed",
+  "llm.days.completed",
+  "prompt.received",
+  "prompt.error"
+]);
 
 export const subscribeToLiveUpdates = (
   onEvent: (event: LiveUpdateEvent) => void,
