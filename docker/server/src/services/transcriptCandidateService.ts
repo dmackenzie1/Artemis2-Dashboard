@@ -54,18 +54,21 @@ export const loadTranscriptCandidates = async (
         u.source_file as "sourceFile",
         u.tokens
       from transcript_utterances u
+      -- Use a CROSS JOIN LATERAL to materialise the token overlap count once
+      -- per row rather than as a correlated subquery re-evaluated per sort
+      -- comparison. This avoids O(n * sort_comparisons) unnest evaluations on
+      -- the candidate set.
+      cross join lateral (
+        select count(*)::int as token_overlap_count
+        from unnest(u.tokens) as t(token)
+        where token = any(array[?]::text[])
+      ) as overlap
       where u.tokens && array[?]::text[]
         and (?::text is null or lower(u.channel) = lower(?::text))
-      order by
-        (
-          select count(*)::int
-          from unnest(u.tokens) as token
-          where token = any(array[?]::text[])
-        ) desc,
-        u.timestamp desc
+      order by overlap.token_overlap_count desc, u.timestamp desc
       limit ?;
     `,
-    [queryTokens, channelFilter, channelFilter, queryTokens, candidateLimit]
+    [queryTokens, queryTokens, channelFilter, channelFilter, candidateLimit]
   );
 
   return rows.map((row) => {

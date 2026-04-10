@@ -26,6 +26,10 @@ export type ServerAppOptions = {
   onClearServerCaches: () => Promise<void>;
   getStatsService: () => StatsService | null;
   getTimeWindowSummaryService: () => TimeWindowSummaryService | null;
+  // When provided, a per-request MikroORM RequestContext is created before the
+  // /api router so every downstream service calling getEntityManager() receives
+  // a properly scoped EntityManager instead of falling back to a shared fork.
+  orm?: MikroORM;
 };
 
 export const createServerApp = (options: ServerAppOptions): express.Express => {
@@ -33,6 +37,14 @@ export const createServerApp = (options: ServerAppOptions): express.Express => {
 
   app.use(cors({ origin: options.corsOrigin }));
   app.use(express.json({ limit: "4mb" }));
+
+  // Register the MikroORM RequestContext middleware BEFORE mounting any /api
+  // routes. This ensures all services downstream of those routes resolve
+  // getEntityManager() to a per-request identity map rather than falling back
+  // to a shared fork whose state accumulates across requests.
+  if (options.orm) {
+    app.use(((req, _res, next) => RequestContext.create(options.orm!.em, next)) as RequestHandler);
+  }
 
   app.use("/api", (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store, max-age=0");
@@ -84,7 +96,8 @@ export const attachDatabaseRoutes = (
     orm: MikroORM;
   }
 ): { getEntityManager: () => EntityManager } => {
-  app.use(((req, _res, next) => RequestContext.create(options.orm.em, next)) as RequestHandler);
+  // RequestContext is registered in createServerApp (when orm is passed in) so
+  // it covers all routes including /api/transcripts mounted here.
   const getEntityManager = (): EntityManager =>
     (RequestContext.getEntityManager() as EntityManager | undefined) ?? options.orm.em.fork();
 

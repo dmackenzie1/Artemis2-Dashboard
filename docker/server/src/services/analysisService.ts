@@ -224,7 +224,10 @@ export class AnalysisService {
   async ingestAndAnalyze(): Promise<DashboardCache> {
     if (this.isIngesting) {
       if (this.cache) {
-        serverLogger.info("Ingestion already in progress, returning cache");
+        serverLogger.warn("ingestAndAnalyze called while ingestion already in progress; returning stale cache to concurrent caller", {
+          corpusVersion: this.corpusVersion,
+          cachedAt: this.cache.generatedAt
+        });
         return this.cache;
       }
       throw new Error("Ingestion already in progress and no cache available");

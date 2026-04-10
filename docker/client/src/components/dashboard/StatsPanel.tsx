@@ -27,10 +27,23 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
       fetchStatsHourlyByChannel(30)
     ]);
 
+    // Only flip the error badge when the primary summary fetch fails or returns
+    // null (e.g. DB disabled / 503). Secondary fetches (daily volume, hourly)
+    // are non-critical: their failure degrades specific sub-sections but the
+    // panel still renders with core summary data.
     let encounteredFailure = false;
 
     if (statsSummaryResult.status === "fulfilled") {
-      setStatsSummary(statsSummaryResult.value);
+      if (statsSummaryResult.value === null) {
+        // fetchStatsSummary returns null on non-ok responses rather than
+        // throwing. Treat null as a failure so operators can distinguish
+        // "DB unavailable" from "initial loading" (both show stats.length === 0
+        // otherwise, making them visually indistinguishable).
+        encounteredFailure = true;
+        clientLogger.warn("Stats summary returned null; DB may be unavailable or disabled");
+      } else {
+        setStatsSummary(statsSummaryResult.value);
+      }
     } else {
       encounteredFailure = true;
       clientLogger.error("Failed to fetch stats summary for stats panel", { error: statsSummaryResult.reason });
@@ -45,14 +58,14 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
         }))
       );
     } else {
-      encounteredFailure = true;
+      // Non-critical — log but do not flip the error badge.
       clientLogger.error("Failed to fetch daily transcript volume for stats panel", { error: dailyVolumeResult.reason });
     }
 
     if (hourlyResult.status === "fulfilled") {
       setTimelineHours(new Set(hourlyResult.value.map((entry) => entry.hour)).size);
     } else {
-      encounteredFailure = true;
+      // Non-critical — log but do not flip the error badge.
       clientLogger.error("Failed to fetch hourly stats for stats panel", { error: hourlyResult.reason });
     }
 

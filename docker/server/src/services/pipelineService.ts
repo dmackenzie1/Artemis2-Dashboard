@@ -388,9 +388,22 @@ export class PipelineService {
       .join("\n\n");
   }
 
-  private async buildSourceContextFromTranscriptDatabase(): Promise<SourceContextDocument[]> {
+  private async buildSourceContextFromTranscriptDatabase(dayKeys?: Set<string>): Promise<SourceContextDocument[]> {
     const em = this.getEntityManager();
-    const utterances = await em.find(TranscriptUtterance, {}, { orderBy: { timestamp: "asc", id: "asc" } });
+    // When a specific set of changed day keys is provided, scope the query to
+    // only those days so we avoid a full table scan on large corpora. Fall back
+    // to a full load when dayKeys is absent or empty (e.g. first run, manual
+    // ingest with no change tracking, or mission_summary which needs all days).
+    const where =
+      dayKeys && dayKeys.size > 0
+        ? {
+            $and: [
+              { timestamp: { $gte: dayjs(Math.min(...[...dayKeys].map((d) => new Date(d).getTime()))).utc().startOf("day").toDate() } },
+              { timestamp: { $lte: dayjs(Math.max(...[...dayKeys].map((d) => new Date(d).getTime()))).utc().endOf("day").toDate() } }
+            ]
+          }
+        : {};
+    const utterances = await em.find(TranscriptUtterance, where, { orderBy: { timestamp: "asc", id: "asc" } });
     const groupedByDay = utterances.reduce<Map<string, TranscriptUtterance[]>>((grouped, utterance) => {
       const dayKey = dayjs(utterance.timestamp).utc().format("YYYY-MM-DD");
       const existing = grouped.get(dayKey) ?? [];
@@ -523,10 +536,13 @@ export class PipelineService {
     const em = this.getEntityManager();
     const allPrompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
     const prompts = this.buildPromptQueue(allPrompts);
-    const sourceContext = options?.sourceContext ?? (await this.buildSourceContextFromTranscriptDatabase());
     const changedDayKeys = options?.changedDayKeys ?? new Set<string>();
     const changedPromptKeys = options?.changedPromptKeys ?? new Set<string>();
     const sourceDocumentsChanged = options?.sourceDocumentsChanged ?? true;
+    // When source context is not provided externally, build it from the DB.
+    // Pass changedDayKeys so the query is scoped to only the affected days
+    // rather than scanning every row in the table.
+    const sourceContext = options?.sourceContext ?? (await this.buildSourceContextFromTranscriptDatabase(changedDayKeys));
     let latestSummaryArtifactOutput: string | null = null;
 
     for (const prompt of prompts) {
@@ -735,13 +751,15 @@ export class PipelineService {
     const em = this.getEntityManager();
     const safeDaysLimit = Math.max(1, Math.min(Math.trunc(daysLimit), 20));
     const prompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
+    // Scope the execution query to the window we actually need instead of
+    // loading up to 10 000 rows unconditionally and discarding old ones later.
+    const cutoffDate = dayjs().utc().subtract(safeDaysLimit, "day").startOf("day").toDate();
     const executions = await em.find(
       PromptExecution,
-      {},
+      { startedAt: { $gte: cutoffDate } },
       {
         populate: ["prompt"],
-        orderBy: { startedAt: "desc", id: "desc" },
-        limit: 10_000
+        orderBy: { startedAt: "desc", id: "desc" }
       }
     );
     const latestIngestAt = await this.getLatestIngestAt();
@@ -882,55 +900,61 @@ export class PipelineService {
     }
 
     const em = this.getEntityManager();
-    const [{ minTimestamp, maxTimestamp, utterances, words }] = await em.getConnection().execute<{
-      minTimestamp: string | null;
-      maxTimestamp: string | null;
-      utterances: string;
-      words: string;
-    }[]>(
-      `
-        select
-          min(timestamp) as "minTimestamp",
-          max(timestamp) as "maxTimestamp",
-          count(*)::text as "utterances",
-          coalesce(sum(word_count), 0)::text as "words"
-        from transcript_utterances
-      `
-    );
-
-    const [{ dataDays }] = await em.getConnection().execute<{ dataDays: string }[]>(
-      `
-        select count(distinct date(timestamp at time zone 'utc'))::text as "dataDays"
-        from transcript_utterances
-      `
-    );
-
-    const utterancesPerHourRaw = await em.getConnection().execute<{ hour: string; utterances: string }[]>(
-      `
-        with bounds as (
+    // Run all three read-only aggregate queries concurrently — they are fully
+    // independent and each requires its own full scan, so parallelism cuts the
+    // wall-clock time roughly by 3×.
+    const [aggregateRows, dataDaysRows, utterancesPerHourRaw] = await Promise.all([
+      em.getConnection().execute<{
+        minTimestamp: string | null;
+        maxTimestamp: string | null;
+        utterances: string;
+        words: string;
+      }[]>(
+        `
           select
-            date_trunc('hour', min(timestamp)) as min_hour,
-            date_trunc('hour', max(timestamp)) as max_hour
+            min(timestamp) as "minTimestamp",
+            max(timestamp) as "maxTimestamp",
+            count(*)::text as "utterances",
+            coalesce(sum(word_count), 0)::text as "words"
           from transcript_utterances
-        ),
-        hours as (
-          select generate_series(bounds.min_hour, bounds.max_hour, interval '1 hour') as hour
-          from bounds
-          where bounds.min_hour is not null and bounds.max_hour is not null
-        ),
-        grouped as (
-          select date_trunc('hour', timestamp) as hour, count(*)::int as utterances
+        `
+      ),
+      em.getConnection().execute<{ dataDays: string }[]>(
+        `
+          select count(distinct date(timestamp at time zone 'utc'))::text as "dataDays"
           from transcript_utterances
-          group by 1
-        )
-        select
-          to_char(hours.hour at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as hour,
-          coalesce(grouped.utterances, 0)::text as utterances
-        from hours
-        left join grouped on grouped.hour = hours.hour
-        order by hours.hour asc
-      `
-    );
+        `
+      ),
+      em.getConnection().execute<{ hour: string; utterances: string }[]>(
+        `
+          with bounds as (
+            select
+              date_trunc('hour', min(timestamp)) as min_hour,
+              date_trunc('hour', max(timestamp)) as max_hour
+            from transcript_utterances
+          ),
+          hours as (
+            select generate_series(bounds.min_hour, bounds.max_hour, interval '1 hour') as hour
+            from bounds
+            where bounds.min_hour is not null and bounds.max_hour is not null
+          ),
+          grouped as (
+            select date_trunc('hour', timestamp) as hour, count(*)::int as utterances
+            from transcript_utterances
+            group by 1
+          )
+          select
+            to_char(hours.hour at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as hour,
+            coalesce(grouped.utterances, 0)::text as utterances
+          from hours
+          left join grouped on grouped.hour = hours.hour
+          order by hours.hour asc
+        `
+      )
+    ]);
+
+    const [{ minTimestamp, maxTimestamp, utterances, words }] = aggregateRows;
+    const [{ dataDays }] = dataDaysRows;
 
     const payload: MissionStatsView = {
       generatedAt: dayjs().utc().toISOString(),

@@ -67,6 +67,12 @@ export const createServerRuntime = async (): Promise<ServerRuntime> => {
         return [];
       }
 
+      // Fetch DESC + LIMIT to get the *most recent* IN_MEMORY_UTTERANCE_LIMIT
+      // rows efficiently using the timestamp index, then re-sort ASC so the
+      // analysis service receives utterances in chronological order. A single
+      // ASC query with LIMIT would return the oldest rows, which is incorrect.
+      // The in-memory re-sort is O(n log n) on at most IN_MEMORY_UTTERANCE_LIMIT
+      // items and is intentional — do not remove it.
       const rows = await transcriptOrm.em.fork().find(
         TranscriptUtterance,
         {},
@@ -132,29 +138,9 @@ export const createServerRuntime = async (): Promise<ServerRuntime> => {
   const backgroundWorkers = new BackgroundWorkersService({ llmClient, ingestionScheduler });
   await backgroundWorkers.initializeLlmConnectivityStatus();
 
-  const app = createServerApp({
-    corsOrigin: env.CORS_ORIGIN,
-    analysisService,
-    systemLogsService,
-    getLlmConnectivityStatus: () => backgroundWorkers.getLlmConnectivityStatus(),
-    onManualIngest: async () => {
-      await ingestionScheduler.runManualIngestion();
-    },
-    onClearServerCaches: async () => {
-      analysisService.clearAnalysisCache();
-      statsService?.invalidateCaches();
-      timeWindowSummaryService?.invalidateCache();
-      liveUpdateBus.publish({
-        type: "dashboard.cache.updated",
-        payload: { trigger: "manual:/api/cache/clear", generatedAt: null, totalDays: null }
-      });
-      liveUpdateBus.publish({ type: "stats.updated", payload: { trigger: "manual:/api/cache/clear" } });
-      liveUpdateBus.publish({ type: "time-window-summary.updated", payload: { trigger: "manual:/api/cache/clear" } });
-    },
-    getStatsService: () => statsService,
-    getTimeWindowSummaryService: () => timeWindowSummaryService
-  });
-
+  // When the transcript DB is enabled, initialise the ORM before creating the
+  // Express app so we can pass it into createServerApp and have the
+  // RequestContext middleware registered before any /api routes are mounted.
   if (env.TRANSCRIPTS_DB_ENABLED) {
     serverLogger.info("Transcript database mode enabled");
     const orm = await MikroORM.init(ormConfig);
@@ -167,6 +153,31 @@ export const createServerRuntime = async (): Promise<ServerRuntime> => {
 
     await orm.getSchemaGenerator().updateSchema();
     await runRuntimeMigrations(orm);
+
+    const app = createServerApp({
+      corsOrigin: env.CORS_ORIGIN,
+      analysisService,
+      systemLogsService,
+      getLlmConnectivityStatus: () => backgroundWorkers.getLlmConnectivityStatus(),
+      onManualIngest: async () => {
+        await ingestionScheduler.runManualIngestion();
+      },
+      onClearServerCaches: async () => {
+        analysisService.clearAnalysisCache();
+        statsService?.invalidateCaches();
+        timeWindowSummaryService?.invalidateCache();
+        liveUpdateBus.publish({
+          type: "dashboard.cache.updated",
+          payload: { trigger: "manual:/api/cache/clear", generatedAt: null, totalDays: null }
+        });
+        liveUpdateBus.publish({ type: "stats.updated", payload: { trigger: "manual:/api/cache/clear" } });
+        liveUpdateBus.publish({ type: "time-window-summary.updated", payload: { trigger: "manual:/api/cache/clear" } });
+      },
+      getStatsService: () => statsService,
+      getTimeWindowSummaryService: () => timeWindowSummaryService,
+      // Pass orm so RequestContext middleware is registered before /api routes.
+      orm
+    });
 
     const { getEntityManager } = attachDatabaseRoutes(app, { orm });
 
@@ -185,11 +196,48 @@ export const createServerRuntime = async (): Promise<ServerRuntime> => {
       }
     });
     attachPipelineRoutes(app, pipelineService);
-  } else {
-    serverLogger.warn("Transcript database mode disabled");
-    attachDatabaseDisabledRoutes(app);
+    attachErrorHandler(app);
+
+    return {
+      app,
+      onServerReady: async () => {
+        await backgroundWorkers.startOnServerReady();
+      },
+      shutdown: async () => {
+        backgroundWorkers.stop();
+        if (redisLlmCache) {
+          await redisLlmCache.disconnect();
+        }
+      }
+    };
   }
 
+  // DB-disabled path: build the app without ORM/RequestContext wiring.
+  const app = createServerApp({
+    corsOrigin: env.CORS_ORIGIN,
+    analysisService,
+    systemLogsService,
+    getLlmConnectivityStatus: () => backgroundWorkers.getLlmConnectivityStatus(),
+    onManualIngest: async () => {
+      await ingestionScheduler.runManualIngestion();
+    },
+    onClearServerCaches: async () => {
+      analysisService.clearAnalysisCache();
+      // statsService and timeWindowSummaryService are null in the DB-disabled
+      // path so there is nothing to invalidate here.
+      liveUpdateBus.publish({
+        type: "dashboard.cache.updated",
+        payload: { trigger: "manual:/api/cache/clear", generatedAt: null, totalDays: null }
+      });
+      liveUpdateBus.publish({ type: "stats.updated", payload: { trigger: "manual:/api/cache/clear" } });
+      liveUpdateBus.publish({ type: "time-window-summary.updated", payload: { trigger: "manual:/api/cache/clear" } });
+    },
+    getStatsService: () => statsService,
+    getTimeWindowSummaryService: () => timeWindowSummaryService
+  });
+
+  serverLogger.warn("Transcript database mode disabled");
+  attachDatabaseDisabledRoutes(app);
   attachErrorHandler(app);
 
   return {
