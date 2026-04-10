@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- refactor: remove runtime migration modules from server startup and consolidate repeated cache-clear/shutdown bootstrap handlers in `createServerRuntime` while keeping schema sync via MikroORM `updateSchema` only. Intent: Simplify backend startup flow for a flat database deployment and reduce repeated server bootstrap code paths that were adding maintenance overhead.
 - fix: replace `getLatestIngestAt` single-row lookup from `em.findOne(..., {})` to `em.find(..., { limit: 1 })` so empty-source-file states no longer throw MikroORM's empty-where validation error when loading `/api/pipeline/prompt-matrix-state`. Intent: Keep System Status prompt-matrix reads stable on fresh/empty databases where no ingestion source files exist yet.
 - fix: avoid full prompt dashboard hydration for notable moments and switch prompt-matrix execution reads to a targeted SQL projection, reducing heavy `prompt_executions` materialization on Timeline/Notable/System Status loads. Intent: Restore responsive rendering and prompt matrix visibility as execution-history volume grows so operator pages do not stall for tens of seconds.
 - fix: guard prompt-matrix row hydration against orphaned `prompt_executions` rows whose prompt relation no longer resolves, skipping those records instead of throwing in `/api/pipeline/prompt-matrix-state`. Intent: Keep the System Status prompt matrix endpoint resilient so operators can still load page data even when historical execution rows reference missing prompt definitions.

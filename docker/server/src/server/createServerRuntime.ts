@@ -2,7 +2,6 @@ import type express from "express";
 import { EntityManager, MikroORM } from "@mikro-orm/postgresql";
 import { env } from "../env.config.js";
 import { dayjs } from "../lib/dayjs.js";
-import { runRuntimeMigrations } from "../migrations/runtime/index.js";
 import ormConfig from "../mikro-orm.config.js";
 import { attachDatabaseDisabledRoutes, attachDatabaseRoutes, attachErrorHandler, attachPipelineRoutes, createServerApp } from "../app.js";
 import { AnalysisService } from "../services/analysisService.js";
@@ -27,6 +26,42 @@ export type ServerRuntime = {
 };
 
 const IN_MEMORY_UTTERANCE_LIMIT = 50_000;
+
+const publishCacheClearedEvents = (): void => {
+  liveUpdateBus.publish({
+    type: "dashboard.cache.updated",
+    payload: { trigger: "manual:/api/cache/clear", generatedAt: null, totalDays: null }
+  });
+  liveUpdateBus.publish({ type: "stats.updated", payload: { trigger: "manual:/api/cache/clear" } });
+  liveUpdateBus.publish({ type: "time-window-summary.updated", payload: { trigger: "manual:/api/cache/clear" } });
+};
+
+const createCacheClearHandler = (
+  analysisService: AnalysisService,
+  options?: {
+    statsService?: () => StatsService | null;
+    timeWindowSummaryService?: () => TimeWindowSummaryService | null;
+  }
+): (() => Promise<void>) => {
+  return async () => {
+    analysisService.clearAnalysisCache();
+    options?.statsService?.()?.invalidateCaches();
+    options?.timeWindowSummaryService?.()?.invalidateCache();
+    publishCacheClearedEvents();
+  };
+};
+
+const createShutdownHandler = (
+  backgroundWorkers: BackgroundWorkersService,
+  redisLlmCache: RedisLlmCache | null
+): (() => Promise<void>) => {
+  return async () => {
+    backgroundWorkers.stop();
+    if (redisLlmCache) {
+      await redisLlmCache.disconnect();
+    }
+  };
+};
 
 export const createServerRuntime = async (): Promise<ServerRuntime> => {
   const redisLlmCache = env.REDIS_CACHE_ENABLED ? new RedisLlmCache(env.REDIS_URL) : null;
@@ -152,7 +187,6 @@ export const createServerRuntime = async (): Promise<ServerRuntime> => {
     });
 
     await orm.getSchemaGenerator().updateSchema();
-    await runRuntimeMigrations(orm);
 
     const app = createServerApp({
       corsOrigin: env.CORS_ORIGIN,
@@ -162,17 +196,10 @@ export const createServerRuntime = async (): Promise<ServerRuntime> => {
       onManualIngest: async () => {
         await ingestionScheduler.runManualIngestion();
       },
-      onClearServerCaches: async () => {
-        analysisService.clearAnalysisCache();
-        statsService?.invalidateCaches();
-        timeWindowSummaryService?.invalidateCache();
-        liveUpdateBus.publish({
-          type: "dashboard.cache.updated",
-          payload: { trigger: "manual:/api/cache/clear", generatedAt: null, totalDays: null }
-        });
-        liveUpdateBus.publish({ type: "stats.updated", payload: { trigger: "manual:/api/cache/clear" } });
-        liveUpdateBus.publish({ type: "time-window-summary.updated", payload: { trigger: "manual:/api/cache/clear" } });
-      },
+      onClearServerCaches: createCacheClearHandler(analysisService, {
+        statsService: () => statsService,
+        timeWindowSummaryService: () => timeWindowSummaryService
+      }),
       getStatsService: () => statsService,
       getTimeWindowSummaryService: () => timeWindowSummaryService,
       // Pass orm so RequestContext middleware is registered before /api routes.
@@ -203,12 +230,7 @@ export const createServerRuntime = async (): Promise<ServerRuntime> => {
       onServerReady: async () => {
         await backgroundWorkers.startOnServerReady();
       },
-      shutdown: async () => {
-        backgroundWorkers.stop();
-        if (redisLlmCache) {
-          await redisLlmCache.disconnect();
-        }
-      }
+      shutdown: createShutdownHandler(backgroundWorkers, redisLlmCache)
     };
   }
 
@@ -221,17 +243,7 @@ export const createServerRuntime = async (): Promise<ServerRuntime> => {
     onManualIngest: async () => {
       await ingestionScheduler.runManualIngestion();
     },
-    onClearServerCaches: async () => {
-      analysisService.clearAnalysisCache();
-      // statsService and timeWindowSummaryService are null in the DB-disabled
-      // path so there is nothing to invalidate here.
-      liveUpdateBus.publish({
-        type: "dashboard.cache.updated",
-        payload: { trigger: "manual:/api/cache/clear", generatedAt: null, totalDays: null }
-      });
-      liveUpdateBus.publish({ type: "stats.updated", payload: { trigger: "manual:/api/cache/clear" } });
-      liveUpdateBus.publish({ type: "time-window-summary.updated", payload: { trigger: "manual:/api/cache/clear" } });
-    },
+    onClearServerCaches: createCacheClearHandler(analysisService),
     getStatsService: () => statsService,
     getTimeWindowSummaryService: () => timeWindowSummaryService
   });
@@ -245,11 +257,6 @@ export const createServerRuntime = async (): Promise<ServerRuntime> => {
     onServerReady: async () => {
       await backgroundWorkers.startOnServerReady();
     },
-    shutdown: async () => {
-      backgroundWorkers.stop();
-      if (redisLlmCache) {
-        await redisLlmCache.disconnect();
-      }
-    }
+    shutdown: createShutdownHandler(backgroundWorkers, redisLlmCache)
   };
 };

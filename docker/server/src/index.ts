@@ -4,13 +4,14 @@ import { serverLogger } from "./utils/logging/serverLogger.js";
 
 const serverRuntime = await createServerRuntime();
 
-process.on("SIGINT", () => {
-  void serverRuntime.shutdown().finally(() => process.exit(0));
-});
+const registerShutdownSignal = (signal: NodeJS.Signals): void => {
+  process.on(signal, () => {
+    void serverRuntime.shutdown().finally(() => process.exit(0));
+  });
+};
 
-process.on("SIGTERM", () => {
-  void serverRuntime.shutdown().finally(() => process.exit(0));
-});
+registerShutdownSignal("SIGINT");
+registerShutdownSignal("SIGTERM");
 
 serverRuntime.app.listen(env.PORT, () => {
   void (async () => {
