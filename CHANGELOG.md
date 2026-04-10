@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- refactor: remove runtime migration modules from server startup and consolidate repeated cache-clear/shutdown bootstrap handlers in `createServerRuntime` while keeping schema sync via MikroORM `updateSchema` only. Intent: Simplify backend startup flow for a flat database deployment and reduce repeated server bootstrap code paths that were adding maintenance overhead.
 - docs: consolidate direction notes into maintained README/AGENTS docs, refresh client/server architecture guidance, and remove ad-hoc notes files. Intent: Keep mission intent and documentation ownership discoverable in canonical docs so architecture expectations stay consistent as the dashboard evolves.
 - fix: replace `getLatestIngestAt` single-row lookup from `em.findOne(..., {})` to `em.find(..., { limit: 1 })` so empty-source-file states no longer throw MikroORM's empty-where validation error when loading `/api/pipeline/prompt-matrix-state`. Intent: Keep System Status prompt-matrix reads stable on fresh/empty databases where no ingestion source files exist yet.
 - fix: avoid full prompt dashboard hydration for notable moments and switch prompt-matrix execution reads to a targeted SQL projection, reducing heavy `prompt_executions` materialization on Timeline/Notable/System Status loads. Intent: Restore responsive rendering and prompt matrix visibility as execution-history volume grows so operator pages do not stall for tens of seconds.
