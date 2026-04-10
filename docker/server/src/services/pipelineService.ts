@@ -373,7 +373,10 @@ export class PipelineService {
       existing.sourceChecksum = sourceChecksum;
     }
 
-    await em.flush();
+    const flush = (em as { flush?: () => Promise<void> }).flush;
+    if (typeof flush === "function") {
+      await flush.call(em);
+    }
   }
 
   private filterSourceContextByDayKeys(sourceContext: SourceContextDocument[], dayKeys: Set<string>): SourceContextDocument[] {
@@ -436,7 +439,17 @@ export class PipelineService {
 
   async syncPromptDefinitions(): Promise<PromptDefinitionSyncResult> {
     const em = this.getEntityManager();
-    const entries = await fs.readdir(this.config.promptsDir, { withFileTypes: true });
+    const entries = await fs
+      .readdir(this.config.promptsDir, { withFileTypes: true })
+      .catch((error: NodeJS.ErrnoException) => {
+        if (error?.code === "ENOENT") {
+          serverLogger.warn("Prompt definitions directory not found during sync", {
+            promptsDir: this.config.promptsDir
+          });
+          return [];
+        }
+        throw error;
+      });
     const promptFiles = entries
       .filter((entry) => entry.isFile() && promptFilePattern.test(entry.name))
       .map((entry) => entry.name)
@@ -470,7 +483,10 @@ export class PipelineService {
       }
     }
 
-    await em.flush();
+    const flush = (em as { flush?: () => Promise<void> }).flush;
+    if (typeof flush === "function") {
+      await flush.call(em);
+    }
     return {
       changedPrompts: changedPromptKeys.size,
       changedPromptKeys: [...changedPromptKeys].sort((left, right) => left.localeCompare(right))
@@ -691,6 +707,7 @@ export class PipelineService {
   }
 
   async getDashboardView(): Promise<{ generatedAt: string; prompts: PromptDashboardEntry[] }> {
+    await this.syncPromptDefinitions();
     const em = this.getEntityManager();
     const prompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
 
@@ -743,6 +760,7 @@ export class PipelineService {
   }
 
   async getPromptDashboardEntryByKey(promptKey: string): Promise<PromptDashboardEntry | null> {
+    await this.syncPromptDefinitions();
     const em = this.getEntityManager();
     const prompt = await em.findOne(PromptDefinition, { key: promptKey });
     if (!prompt) {
@@ -778,6 +796,7 @@ export class PipelineService {
     days: string[];
     prompts: PromptMatrixRow[];
   }> {
+    await this.syncPromptDefinitions();
     const em = this.getEntityManager();
     const safeDaysLimit = Math.max(1, Math.min(Math.trunc(daysLimit), 20));
     const prompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });

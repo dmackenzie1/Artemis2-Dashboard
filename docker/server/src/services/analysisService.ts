@@ -75,6 +75,13 @@ type TopicWindow = {
   entries: TranscriptUtterance[];
 };
 
+type TopicSeed = {
+  title: string;
+  channel: string;
+  mentionTimestamps: string[];
+  evidence: string[];
+};
+
 export class AnalysisService {
   private utterances: TranscriptUtterance[] = [];
   private cache: DashboardCache | null = null;
@@ -188,6 +195,59 @@ export class AnalysisService {
     return `${entries.length} utterances; primary channels: ${channelPhrase}; ${anomalyPhrase}.`;
   }
 
+  private buildFallbackTopicTitle(channel: string): string {
+    if (/flight/i.test(channel)) {
+      return "Flight Control Coordination";
+    }
+    if (/fdo/i.test(channel)) {
+      return "Trajectory and Orbit Updates";
+    }
+    if (/gnc/i.test(channel)) {
+      return "Guidance Navigation and Control";
+    }
+    if (/eec|eclss/i.test(channel)) {
+      return "Vehicle Systems Health";
+    }
+    if (/prop|propulsion/i.test(channel)) {
+      return "Propulsion Performance";
+    }
+    return `${channel} Loop Activity`;
+  }
+
+  private buildFallbackTopics(entries: TranscriptUtterance[]): DayInsights["topics"] {
+    if (entries.length === 0) {
+      return [];
+    }
+
+    const seedsByChannel = entries.reduce<Map<string, TopicSeed>>((grouped, entry) => {
+      const channel = entry.channel.trim().length > 0 ? entry.channel.trim() : "UNKNOWN";
+      const existing = grouped.get(channel) ?? {
+        title: this.buildFallbackTopicTitle(channel),
+        channel,
+        mentionTimestamps: [],
+        evidence: []
+      };
+      if (existing.mentionTimestamps.length < 4) {
+        existing.mentionTimestamps.push(entry.timestamp);
+      }
+      if (existing.evidence.length < 2) {
+        existing.evidence.push(entry.text.trim());
+      }
+      grouped.set(channel, existing);
+      return grouped;
+    }, new Map<string, TopicSeed>());
+
+    return [...seedsByChannel.values()]
+      .sort((left, right) => right.mentionTimestamps.length - left.mentionTimestamps.length || left.channel.localeCompare(right.channel))
+      .slice(0, 6)
+      .map((seed) => ({
+        title: seed.title,
+        description: `${seed.channel}: ${seed.evidence[0] ?? "No excerpt available."}`,
+        channels: [seed.channel],
+        mentionTimestamps: seed.mentionTimestamps
+      }));
+  }
+
   private sampleEntriesForPrompt(entries: TranscriptUtterance[], maxEntries: number): TranscriptUtterance[] {
     if (entries.length <= maxEntries) {
       return entries;
@@ -274,98 +334,122 @@ export class AnalysisService {
           : null;
         const dailySummary = persistedDailySummary ?? dailySummaryPlaceholder;
 
-        const hourlyPrompt = await getPrompt(this.config.promptsDir, "hourly_summary.txt");
-        serverLogger.info("Prompting hourly highlights", { day, hours: Object.keys(byHour).length });
-        const hourlyRaw = await this.config.llmClient.generateText({
-          systemPrompt: hourlyPrompt,
-          userPrompt: JSON.stringify({
-            day,
-            hours: Object.keys(byHour)
-              .sort()
-              .map((hour) => ({
-                hour,
-                utteranceCount: byHour[hour].length,
-                hourSynopsis: this.summarizeHour(byHour[hour]),
-                utterances: this.sampleEntriesForPrompt(byHour[hour], hourlyPromptMaxUtterancesPerHour).map((entry) =>
-                  this.toPromptUtterance(entry)
-                ),
-                topUtterances: [...byHour[hour]]
-                  .sort(
-                    (left, right) =>
-                      this.scoreHourlyPromptUtterance(right) - this.scoreHourlyPromptUtterance(left) ||
-                      left.timestamp.localeCompare(right.timestamp)
-                  )
-                  .slice(0, hourlyPromptTopUtterancesPerHour)
-                  .map((entry) => this.toPromptUtterance(entry))
-              }))
-          }),
-          componentId: `analysis/hourly_summary/${day}`
-        });
-        serverLogger.info("Prompt received for hourly highlights", { day });
-
-        const parsedHourly = parseHourlyHighlights(hourlyRaw);
-        const hourly = Object.fromEntries(
+        let hourly: Record<string, string> = Object.fromEntries(
           Object.keys(byHour)
             .sort()
-            .map((hour) => [hour, parsedHourly[hour] ?? "No highlight generated for this hour."])
+            .map((hour) => [hour, this.summarizeHour(byHour[hour])])
         );
-
-        const topicsPrompt = await getPrompt(this.config.promptsDir, "top_topics.txt");
-        serverLogger.info("Prompting top topics", {
-          day,
-          utteranceCount: entries.length,
-          windowingStrategy: "half-day"
-        });
-        const topicWindows = this.splitEntriesIntoTopicWindows(entries);
-        const windowOutputs: Array<{ label: string; startHour: number; endHour: number; topicsRaw: string }> = [];
-
-        for (const window of topicWindows) {
-          const topicsRaw = await this.config.llmClient.generateText({
-            systemPrompt: topicsPrompt,
+        try {
+          const hourlyPrompt = await getPrompt(this.config.promptsDir, "hourly_summary.txt");
+          serverLogger.info("Prompting hourly highlights", { day, hours: Object.keys(byHour).length });
+          const hourlyRaw = await this.config.llmClient.generateText({
+            systemPrompt: hourlyPrompt,
             userPrompt: JSON.stringify({
-              mode: "top-topics-window",
               day,
-              window: {
-                label: window.label,
-                startHour: window.startHour,
-                endHour: window.endHour
-              },
-              utteranceCount: window.entries.length,
-              entries: this.sampleEntriesForPrompt(window.entries, topicPromptMaxUtterancesPerWindow).map((entry) =>
-                this.toPromptUtterance(entry)
-              )
+              hours: Object.keys(byHour)
+                .sort()
+                .map((hour) => ({
+                  hour,
+                  utteranceCount: byHour[hour].length,
+                  hourSynopsis: this.summarizeHour(byHour[hour]),
+                  utterances: this.sampleEntriesForPrompt(byHour[hour], hourlyPromptMaxUtterancesPerHour).map((entry) =>
+                    this.toPromptUtterance(entry)
+                  ),
+                  topUtterances: [...byHour[hour]]
+                    .sort(
+                      (left, right) =>
+                        this.scoreHourlyPromptUtterance(right) - this.scoreHourlyPromptUtterance(left) ||
+                        left.timestamp.localeCompare(right.timestamp)
+                    )
+                    .slice(0, hourlyPromptTopUtterancesPerHour)
+                    .map((entry) => this.toPromptUtterance(entry))
+                }))
             }),
-            componentId: `analysis/top_topics/${day}/window/${window.label}`
+            componentId: `analysis/hourly_summary/${day}`
           });
-          windowOutputs.push({
-            label: window.label,
-            startHour: window.startHour,
-            endHour: window.endHour,
-            topicsRaw
+          serverLogger.info("Prompt received for hourly highlights", { day });
+
+          const parsedHourly = parseHourlyHighlights(hourlyRaw);
+          hourly = Object.fromEntries(
+            Object.keys(byHour)
+              .sort()
+              .map((hour) => [hour, parsedHourly[hour] ?? this.summarizeHour(byHour[hour])])
+          );
+        } catch (error) {
+          serverLogger.warn("Hourly highlights prompt failed; using deterministic fallback", {
+            day,
+            error: error instanceof Error ? error.message : "Unknown error"
           });
         }
 
-        const topicsRaw = await this.config.llmClient.generateText({
-          systemPrompt: topicsPrompt,
-          userPrompt: JSON.stringify({
-            mode: "top-topics-day-rollup",
+        let topics: DayInsights["topics"] = this.buildFallbackTopics(entries);
+        try {
+          const topicsPrompt = await getPrompt(this.config.promptsDir, "top_topics.txt");
+          serverLogger.info("Prompting top topics", {
             day,
-            windows: windowOutputs.map((output) => ({
-              label: output.label,
-              startHour: output.startHour,
-              endHour: output.endHour,
-              topics: this.config.llmClient.parseTopics(output.topicsRaw)
-            }))
-          }),
-          componentId: `analysis/top_topics/${day}/rollup`
-        });
-        serverLogger.info("Prompt received for top topics", { day });
+            utteranceCount: entries.length,
+            windowingStrategy: "half-day"
+          });
+          const topicWindows = this.splitEntriesIntoTopicWindows(entries);
+          const windowOutputs: Array<{ label: string; startHour: number; endHour: number; topicsRaw: string }> = [];
+
+          for (const window of topicWindows) {
+            const topicsRaw = await this.config.llmClient.generateText({
+              systemPrompt: topicsPrompt,
+              userPrompt: JSON.stringify({
+                mode: "top-topics-window",
+                day,
+                window: {
+                  label: window.label,
+                  startHour: window.startHour,
+                  endHour: window.endHour
+                },
+                utteranceCount: window.entries.length,
+                entries: this.sampleEntriesForPrompt(window.entries, topicPromptMaxUtterancesPerWindow).map((entry) =>
+                  this.toPromptUtterance(entry)
+                )
+              }),
+              componentId: `analysis/top_topics/${day}/window/${window.label}`
+            });
+            windowOutputs.push({
+              label: window.label,
+              startHour: window.startHour,
+              endHour: window.endHour,
+              topicsRaw
+            });
+          }
+
+          const topicsRaw = await this.config.llmClient.generateText({
+            systemPrompt: topicsPrompt,
+            userPrompt: JSON.stringify({
+              mode: "top-topics-day-rollup",
+              day,
+              windows: windowOutputs.map((output) => ({
+                label: output.label,
+                startHour: output.startHour,
+                endHour: output.endHour,
+                topics: this.config.llmClient.parseTopics(output.topicsRaw)
+              }))
+            }),
+            componentId: `analysis/top_topics/${day}/rollup`
+          });
+          serverLogger.info("Prompt received for top topics", { day });
+          const llmTopics = this.config.llmClient.parseTopics(topicsRaw);
+          if (llmTopics.length > 0) {
+            topics = llmTopics;
+          }
+        } catch (error) {
+          serverLogger.warn("Top topics prompt failed; using deterministic fallback", {
+            day,
+            error: error instanceof Error ? error.message : "Unknown error"
+          });
+        }
 
         days.push({
           day,
           summary: dailySummary,
           hourly,
-          topics: this.config.llmClient.parseTopics(topicsRaw),
+          topics,
           stats: {
             utteranceCount: entries.length,
             wordCount: entries.reduce((count, item) => count + item.text.split(/\s+/).length, 0),
