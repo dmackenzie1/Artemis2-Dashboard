@@ -67,6 +67,31 @@ const formatCellTime = (value: string): string => {
   return `${hour}:${minute}`;
 };
 
+const promptDisplayNameByKey: Record<string, string> = {
+  option_b_db_candidate_retrieval_prompt: "Option B DB Candidate Retriever Prompt",
+  query_console_aggregate: "Console Query Aggregate",
+  query_console_day_extract: "Console Query Day Extract",
+  daily_summary: "Daily Summary",
+  notable_moments: "Notable Moments",
+  mission_summary: "Mission Summary",
+  recent_changes: "Recent Changes",
+  top_topics: "Top Topics",
+  hourly_summary: "Hourly Summary"
+};
+
+const formatPromptDisplayName = (key: string): string => {
+  const explicit = promptDisplayNameByKey[key];
+  if (explicit) {
+    return explicit;
+  }
+
+  return key
+    .split("_")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => `${segment[0]?.toUpperCase() ?? ""}${segment.slice(1)}`)
+    .join(" ");
+};
+
 export const SystemLogsPage: FunctionComponent = () => {
   const location = useLocation();
   const [data, setData] = useState<SystemLogListResponse | null>(null);
@@ -295,7 +320,7 @@ export const SystemLogsPage: FunctionComponent = () => {
               <tbody>
                 {matrixRows.map((row) => (
                   <tr key={row.key}>
-                    <th>{row.key}</th>
+                    <th title={row.key}>{formatPromptDisplayName(row.key)}</th>
                     {row.cells.map((cell) => (
                       <td
                         key={`${row.key}-${cell.day}`}
