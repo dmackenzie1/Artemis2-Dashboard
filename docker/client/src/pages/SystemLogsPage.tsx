@@ -224,6 +224,32 @@ export const SystemLogsPage: FunctionComponent = () => {
 
   const matrixDays = promptMatrix?.days ?? [];
   const matrixRows = promptMatrix?.prompts ?? [];
+  const matrixRowsByDay = useMemo(
+    () =>
+      matrixRows.map((row) => {
+        const cellByDay = new Map(row.cells.map((cell) => [cell.day, cell]));
+        return {
+          ...row,
+          cells: matrixDays.map((day) => {
+            const matchedCell = cellByDay.get(day);
+            if (matchedCell) {
+              return matchedCell;
+            }
+
+            return {
+              day,
+              state: "none" as const,
+              sentAt: null,
+              receivedAt: null,
+              responseDay: null,
+              executionId: null,
+              errorMessage: null
+            };
+          })
+        };
+      }),
+    [matrixDays, matrixRows]
+  );
   const symbolByState: Record<"none" | "sent" | "received" | "error", string> = {
     none: "-",
     sent: "/",
@@ -323,7 +349,7 @@ export const SystemLogsPage: FunctionComponent = () => {
                 </tr>
               </thead>
               <tbody>
-                {matrixRows.map((row) => (
+                {matrixRowsByDay.map((row) => (
                   <tr key={row.key}>
                     <th title={row.key}>{formatPromptDisplayName(row.key)}</th>
                     {row.cells.map((cell) => (
