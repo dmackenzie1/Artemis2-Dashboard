@@ -32,12 +32,12 @@ const toRankedUtterance = (utterance: TranscriptUtterance, score: number): Ranke
   score: Number(score.toFixed(4))
 });
 
-const clampLimit = (limit: number, defaultLimit = 8): number => {
+const clampLimit = (limit: number, defaultLimit = 20): number => {
   if (!Number.isFinite(limit)) {
     return defaultLimit;
   }
 
-  return Math.min(Math.max(Math.trunc(limit), 1), 80);
+  return Math.min(Math.max(Math.trunc(limit), 1), 40);
 };
 
 const scoreChannelPriority = (channel: string): number => {
@@ -90,12 +90,12 @@ const rankUtterances = (queryTokens: string[], utterances: TranscriptUtterance[]
 export const retrieveRankedUtterances = (
   query: string,
   utterances: TranscriptUtterance[],
-  limit = 8
+  limit: number | null = 20
 ): RetrievalResult => {
   const queryTokens = tokenizeQuery(query);
-  const ranked = rankUtterances(queryTokens, utterances)
-    .slice(0, clampLimit(limit))
-    .map(({ utterance, score }) => toRankedUtterance(utterance, score));
+  const rankedEntries = rankUtterances(queryTokens, utterances);
+  const limitedRankedEntries = limit === null ? rankedEntries : rankedEntries.slice(0, clampLimit(limit));
+  const ranked = limitedRankedEntries.map(({ utterance, score }) => toRankedUtterance(utterance, score));
 
   const daysQueried = new Set(ranked.map((entry) => entry.day)).size;
 

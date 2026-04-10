@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- fix: remove search/chat pre-ranking transcript candidate caps, allow chat retrieval ranking over the full scoped corpus, and retune search result defaults/clamps to 20/40 after deterministic sort. Intent: Ensure query and chat evidence selection evaluates the full available transcript set before applying bounded operator-facing result presentation limits.
 - fix: restore System Status prompt-matrix table-cell layout semantics and add SSE generic-message fallback parsing for known live-update payloads when intermediaries collapse custom event names. Intent: Ensure prompt matrix cells render under the correct day columns and keep Live Socket Event Stream visibility resilient across proxy/event-delivery variations.
 - fix: replace Postgres-style `$1/$2` placeholders with Knex/MikroORM positional `?` bindings in the rolling time-window transcript query so bound window dates are passed correctly to `execute(...)` instead of triggering `there is no parameter $1`. Intent: Restore reliable `/api/time-window-summary` generation by ensuring the SQL driver receives the window bound parameters.
 - fix: anchor time-window summary (3h/6h/12h) to `MAX(timestamp)` from `transcript_utterances` instead of wall clock, switch the SQL window bounds to parameterized `$1/$2` values, and return a clean no-LLM empty payload when the table is empty. Intent: Ensure Overview window summaries always describe the most recent available data range and operators never see a window that silently drifts forward past the last ingested transcript.

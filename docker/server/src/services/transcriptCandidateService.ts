@@ -8,9 +8,9 @@ export type TranscriptCandidateFilters = {
   candidateLimit?: number;
 };
 
-const clampCandidateLimit = (value: number | undefined): number => {
+const normalizeCandidateLimit = (value: number | undefined): number | null => {
   if (!Number.isFinite(value)) {
-    return 2000;
+    return null;
   }
 
   return Math.min(Math.max(Math.trunc(value ?? 2000), 100), 5000);
@@ -28,7 +28,7 @@ export const loadTranscriptCandidates = async (
 
   const normalizedChannel = filters.channel?.trim() ?? "";
   const channelFilter = normalizedChannel.length > 0 ? normalizedChannel : null;
-  const candidateLimit = clampCandidateLimit(filters.candidateLimit);
+  const candidateLimit = normalizeCandidateLimit(filters.candidateLimit);
   const rows = await em.getConnection().execute<{
     id: number;
     timestamp: string | Date;
@@ -66,7 +66,7 @@ export const loadTranscriptCandidates = async (
       where u.tokens && array[?]::text[]
         and (?::text is null or lower(u.channel) = lower(?::text))
       order by overlap.token_overlap_count desc, u.timestamp desc
-      limit ?;
+      limit coalesce(?::int, 2147483647);
     `,
     [queryTokens, queryTokens, channelFilter, channelFilter, candidateLimit]
   );
