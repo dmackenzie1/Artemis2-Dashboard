@@ -20,7 +20,8 @@ const notableMomentsDaySchema = z.object({
 });
 
 const extractJsonObject = (raw: string): string | null => {
-  const fencedMatch = raw.match(/```json\s*([\s\S]*?)```/iu);
+  // Strip code-fenced blocks with or without a language label (```json...``` or ```...```).
+  const fencedMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/iu);
   if (fencedMatch?.[1]) {
     return fencedMatch[1].trim();
   }
@@ -34,8 +35,20 @@ const extractJsonObject = (raw: string): string | null => {
   return null;
 };
 
-const parseNotableMomentsDay = (rawDay: unknown): z.infer<typeof notableMomentsDaySchema> | null => {
+// Attempt to parse a single day's notable moments output from the LLM.
+// The `dayHint` is used as a fallback `day` value when the LLM returns a
+// bare array (i.e. the moments list without the outer day wrapper object).
+const parseNotableMomentsDay = (
+  rawDay: unknown,
+  dayHint?: string
+): z.infer<typeof notableMomentsDaySchema> | null => {
+  // 1. Already an object — try to validate it directly.
   if (typeof rawDay === "object" && rawDay !== null) {
+    // Handle a bare array: [{rank, title, ...}, ...]
+    if (Array.isArray(rawDay) && dayHint) {
+      const wrapped = notableMomentsDaySchema.safeParse({ day: dayHint, moments: rawDay });
+      return wrapped.success ? wrapped.data : null;
+    }
     const parsed = notableMomentsDaySchema.safeParse(rawDay);
     return parsed.success ? parsed.data : null;
   }
@@ -44,24 +57,44 @@ const parseNotableMomentsDay = (rawDay: unknown): z.infer<typeof notableMomentsD
     return null;
   }
 
-  const directParse = notableMomentsDaySchema.safeParse((() => {
+  // 2. Try direct JSON.parse then validate.
+  const directParsed = (() => {
     try {
       return JSON.parse(rawDay) as unknown;
     } catch (_error) {
       return null;
     }
-  })());
-  if (directParse.success) {
-    return directParse.data;
+  })();
+
+  if (directParsed !== null) {
+    // Handle bare array from direct parse.
+    if (Array.isArray(directParsed) && dayHint) {
+      const wrapped = notableMomentsDaySchema.safeParse({ day: dayHint, moments: directParsed });
+      if (wrapped.success) {
+        return wrapped.data;
+      }
+    }
+    const directSchema = notableMomentsDaySchema.safeParse(directParsed);
+    if (directSchema.success) {
+      return directSchema.data;
+    }
   }
 
+  // 3. Try extracting JSON from a fenced or wrapped string.
   const extractedJson = extractJsonObject(rawDay);
   if (!extractedJson) {
     return null;
   }
 
   try {
-    const extractedParsed = notableMomentsDaySchema.safeParse(JSON.parse(extractedJson) as unknown);
+    const extractedValue = JSON.parse(extractedJson) as unknown;
+    if (Array.isArray(extractedValue) && dayHint) {
+      const wrapped = notableMomentsDaySchema.safeParse({ day: dayHint, moments: extractedValue });
+      if (wrapped.success) {
+        return wrapped.data;
+      }
+    }
+    const extractedParsed = notableMomentsDaySchema.safeParse(extractedValue);
     return extractedParsed.success ? extractedParsed.data : null;
   } catch (_error) {
     return null;
@@ -171,7 +204,15 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
 
       const parsed = parsedSchema.parse(JSON.parse(notableMomentsPrompt.output));
       const normalizedDays = parsed.days
-        .map((rawDay) => parseNotableMomentsDay(rawDay))
+        .map((rawDay) => {
+          // Extract a day hint from the raw object when available so the bare-array
+          // recovery path in parseNotableMomentsDay can assign the correct day key.
+          const dayHint =
+            typeof rawDay === "object" && rawDay !== null && "day" in rawDay && typeof (rawDay as Record<string, unknown>)["day"] === "string"
+              ? (rawDay as Record<string, unknown>)["day"] as string
+              : undefined;
+          return parseNotableMomentsDay(rawDay, dayHint);
+        })
         .filter((entry): entry is z.infer<typeof notableMomentsDaySchema> => Boolean(entry));
       const droppedDayCount = Math.max(parsed.days.length - normalizedDays.length, 0);
 

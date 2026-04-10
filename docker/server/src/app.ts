@@ -56,6 +56,9 @@ export const createServerApp = (options: ServerAppOptions): express.Express => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
+    // Tell nginx (and any other reverse proxy) not to buffer this response so
+    // SSE frames are forwarded to the browser immediately.
+    res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
     res.write(`event: ready\ndata: ${JSON.stringify({ ok: true, connectedAt: new Date().toISOString() })}\n\n`);
 

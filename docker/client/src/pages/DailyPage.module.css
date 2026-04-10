@@ -1,3 +1,9 @@
+.daily-top-narrative {
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid rgba(120, 190, 255, 0.12);
+}
+
 .daily-notable-section {
   margin-top: 0.8rem;
 }

@@ -1,27 +1,111 @@
-import type { FC } from "react";
+import type { FunctionComponent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  fetchDashboard,
   fetchNotableMoments,
   fetchPipelineSummaries,
-  type DashboardData,
+  fetchPipelineSummariesCatalog,
   type NotableMoment,
   type NotableMomentsData
 } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import sharedStyles from "../styles/shared.module.css";
 import styles from "./DailyPage.module.css";
-import { renderStructuredText } from "../utils/formatting/renderStructuredText";
 import { clientLogger } from "../utils/logging/clientLogger";
 import { useLiveUpdates } from "../context/LiveUpdatesContext";
 
-export const DailyPage: FC = () => {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [pipelineSummaryByDay, setPipelineSummaryByDay] = useState<Map<string, string>>(new Map());
+// ---------------------------------------------------------------------------
+// HTML-section parser
+// ---------------------------------------------------------------------------
+// The pipeline daily_full summary is stored as HTML produced by the LLM
+// (semantic tags: <h3>, <p>, <ul>, <li>). We parse it with DOMParser to
+// extract a structured two-section view:
+//   - topNarrative : first block(s) of <p> text before the first <h3>
+//   - sections     : each <h3> heading paired with its following body text
+// This replaces the previous dependency on the legacy analysis-cache
+// `fetchDashboard()` path for hourly highlights, giving operators a single
+// canonical data source without a second round-trip.
+// ---------------------------------------------------------------------------
+
+type DailySection = {
+  heading: string;
+  body: string;
+};
+
+type ParsedDailySummary = {
+  topNarrative: string;
+  sections: DailySection[];
+};
+
+const parseDailySummaryHtml = (html: string): ParsedDailySummary => {
+  if (typeof window === "undefined" || !html.trim()) {
+    return { topNarrative: html, sections: [] };
+  }
+
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const body = doc.body;
+
+  const topParagraphs: string[] = [];
+  const sections: DailySection[] = [];
+  let currentHeading: string | null = null;
+  let currentBodyParts: string[] = [];
+  let seenFirstHeading = false;
+
+  for (const child of Array.from(body.childNodes)) {
+    const el = child as HTMLElement;
+    const tag = el.tagName?.toUpperCase?.() ?? "";
+
+    if (tag === "H3" || tag === "H4") {
+      if (seenFirstHeading && currentHeading !== null) {
+        sections.push({ heading: currentHeading, body: currentBodyParts.join(" ").trim() });
+      }
+      currentHeading = el.textContent?.trim() ?? "";
+      currentBodyParts = [];
+      seenFirstHeading = true;
+    } else if (!seenFirstHeading) {
+      const text = el.textContent?.trim() ?? "";
+      if (text.length > 0) {
+        topParagraphs.push(text);
+      }
+    } else if (currentHeading !== null) {
+      const text = el.textContent?.trim() ?? "";
+      if (text.length > 0) {
+        currentBodyParts.push(text);
+      }
+    }
+  }
+
+  // Flush the last in-progress section.
+  if (currentHeading !== null) {
+    sections.push({ heading: currentHeading, body: currentBodyParts.join(" ").trim() });
+  }
+
+  // If DOMParser produced nothing useful (e.g. raw text without tags), fall
+  // back to treating the entire string as the top narrative.
+  const topNarrative =
+    topParagraphs.length > 0
+      ? topParagraphs.join("\n\n")
+      : sections.length === 0
+        ? html
+        : "";
+
+  return { topNarrative, sections };
+};
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+type DayEntry = {
+  day: string;
+  summary: string;
+};
+
+export const DailyPage: FunctionComponent = () => {
+  const [dayEntries, setDayEntries] = useState<DayEntry[]>([]);
   const [notableMoments, setNotableMoments] = useState<NotableMomentsData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { componentId, componentUid } = useComponentIdentity("daily-page");
   const { globalRefreshVersion, lastEvent } = useLiveUpdates();
-  const days = data?.days ?? [];
 
   const notableMomentsByDay = useMemo(
     () => new Map((notableMoments?.days ?? []).map((entry) => [entry.day, entry.moments])),
@@ -29,40 +113,43 @@ export const DailyPage: FC = () => {
   );
 
   const loadDailyDashboard = useCallback(async (): Promise<void> => {
+    setIsLoading(true);
     try {
-      const dashboardPayload = await fetchDashboard();
-      const dayEntries = dashboardPayload?.days ?? [];
+      // 1. Load the summary catalog to discover which days have daily_full
+      //    pipeline artifacts — no full summary bodies, just metadata.
+      const catalogPayload = await fetchPipelineSummariesCatalog();
+      const availableDays = Array.from(
+        new Set(
+          (catalogPayload?.entries ?? [])
+            .filter((entry) => entry.summaryType === "daily_full" && entry.channelGroup === "*")
+            .map((entry) => entry.day)
+        )
+      ).sort((left, right) => left.localeCompare(right));
 
-      const daySummaryResponses = await Promise.all(
-        dayEntries.map(async (dayEntry) => {
-          const daySummaryPayload = await fetchPipelineSummaries({
-            summaryType: "daily_full",
-            channelGroup: "*",
-            day: dayEntry.day
-          });
-          const canonicalDaySummary = daySummaryPayload?.summaries.find(
-            (summaryEntry) => summaryEntry.summaryType === "daily_full" && summaryEntry.channelGroup === "*" && summaryEntry.day === dayEntry.day
-          );
-          return {
-            day: dayEntry.day,
-            summary: canonicalDaySummary?.summary
-          };
-        })
-      );
+      // 2. Fetch each day's full summary in parallel.
+      const [daySummaryResults, notableMomentsPayload] = await Promise.all([
+        Promise.all(
+          availableDays.map(async (day) => {
+            const payload = await fetchPipelineSummaries({
+              summaryType: "daily_full",
+              channelGroup: "*",
+              day
+            });
+            const canonical = payload?.summaries.find(
+              (entry) => entry.summaryType === "daily_full" && entry.channelGroup === "*" && entry.day === day
+            );
+            return { day, summary: canonical?.summary ?? "" };
+          })
+        ),
+        fetchNotableMoments()
+      ]);
 
-      const daySummaryMap = new Map<string, string>();
-      for (const daySummaryEntry of daySummaryResponses) {
-        if (daySummaryEntry.summary && daySummaryEntry.summary.trim().length > 0) {
-          daySummaryMap.set(daySummaryEntry.day, daySummaryEntry.summary);
-        }
-      }
-
-      const notableMomentsPayload = await fetchNotableMoments();
-      setData(dashboardPayload);
-      setPipelineSummaryByDay(daySummaryMap);
+      setDayEntries(daySummaryResults.filter((entry) => entry.summary.trim().length > 0));
       setNotableMoments(notableMomentsPayload);
     } catch (error) {
       clientLogger.error("Failed to load daily dashboard", { error });
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -70,8 +157,7 @@ export const DailyPage: FC = () => {
     void loadDailyDashboard();
     const refreshIntervalHandle = window.setInterval(() => {
       void loadDailyDashboard();
-    }, 60000);
-
+    }, 60_000);
     return () => {
       window.clearInterval(refreshIntervalHandle);
     };
@@ -97,88 +183,104 @@ export const DailyPage: FC = () => {
     section?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  if (isLoading) {
+    return (
+      <div className={sharedStyles.stack} data-component-id={componentId} data-component-uid={componentUid}>
+        <p className={sharedStyles.subtle}>Loading daily summaries…</p>
+      </div>
+    );
+  }
+
+  if (dayEntries.length === 0) {
+    return (
+      <div className={sharedStyles.stack} data-component-id={componentId} data-component-uid={componentUid}>
+        <p className={styles["daily-empty"]}>No data yet. Run the pipeline from the Overview page, then return here.</p>
+      </div>
+    );
+  }
+
   return (
     <div className={sharedStyles.stack} data-component-id={componentId} data-component-uid={componentUid}>
-      {days.length ? (
-        <nav className={sharedStyles["day-shortcuts-nav"]} aria-label="Daily sections">
-          {days.map((day) => (
-            <button
-              className={sharedStyles["day-shortcuts-nav-button"]}
-              key={`daily-nav-${day.day}`}
-              onClick={() => scrollToDay(day.day)}
-              type="button"
-            >
-              Day {day.day}
-            </button>
-          ))}
-        </nav>
-      ) : null}
-      {days.length ? (
-        days.map((day) => {
-          const dayNotableMoments: NotableMoment[] = notableMomentsByDay.get(day.day) ?? [];
-          const canonicalDailySummary = pipelineSummaryByDay.get(day.day);
+      <nav className={sharedStyles["day-shortcuts-nav"]} aria-label="Daily sections">
+        {dayEntries.map((entry) => (
+          <button
+            className={sharedStyles["day-shortcuts-nav-button"]}
+            key={`daily-nav-${entry.day}`}
+            onClick={() => scrollToDay(entry.day)}
+            type="button"
+          >
+            Day {entry.day}
+          </button>
+        ))}
+      </nav>
 
-          return (
-            <article
-              className={sharedStyles.panel}
-              id={`daily-day-${day.day}`}
-              key={day.day}
-              data-component-id="daily-day-panel"
-              data-component-uid={`${componentUid}-${day.day}`}
-            >
-              <h2>{day.day}</h2>
-              <div className={sharedStyles["formatted-copy"]}>
-                {canonicalDailySummary ? (
-                  renderStructuredText(canonicalDailySummary, sharedStyles["formatted-list"])
-                ) : (
-                  <p className={sharedStyles.subtle}>
-                    Daily full summary is not ready for this day yet. Run pipeline and refresh once `daily_full` completes.
-                  </p>
-                )}
+      {dayEntries.map((entry) => {
+        const dayNotableMoments: NotableMoment[] = notableMomentsByDay.get(entry.day) ?? [];
+        const parsed = parseDailySummaryHtml(entry.summary);
+
+        return (
+          <article
+            className={sharedStyles.panel}
+            id={`daily-day-${entry.day}`}
+            key={entry.day}
+            data-component-id="daily-day-panel"
+            data-component-uid={`${componentUid}-${entry.day}`}
+          >
+            <h2>{entry.day}</h2>
+
+            {/* Top narrative — opening mission overview paragraphs */}
+            {parsed.topNarrative ? (
+              <div className={`${sharedStyles["formatted-copy"]} ${styles["daily-top-narrative"]}`}>
+                <p>{parsed.topNarrative}</p>
               </div>
-              <p>
-                Utterances: {day.stats.utteranceCount} | Words: {day.stats.wordCount} | Channels: {day.stats.channelCount}
-              </p>
+            ) : null}
 
-
+            {/* Hour-by-hour milestone sections extracted from pipeline HTML */}
+            {parsed.sections.length > 0 ? (
               <section className={styles["daily-notable-section"]}>
-                <h3>Notable Moments</h3>
-                {dayNotableMoments.length ? (
-                  <div className={styles["daily-notable-grid"]}>
-                    {dayNotableMoments.map((moment) => (
-                      <article className={styles["daily-notable-card"]} key={`${day.day}-${moment.rank}-${moment.title}`}>
-                        <p className={styles["daily-notable-rank"]}>#{moment.rank}</p>
-                        <h4>{moment.title}</h4>
-                        <blockquote>{moment.quote}</blockquote>
-                        <p className={sharedStyles.subtle}>{moment.timestamp ?? "timestamp n/a"} • {moment.channel ?? "channel n/a"}</p>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <p className={sharedStyles.subtle}>Notable moments are not available yet for this day.</p>
-                )}
-              </section>
-
-              <h3>Hourly Highlights</h3>
-              <div className={styles["hourly-highlight-grid"]}>
-                {Object.entries(day.hourly)
-                  .sort(([leftHour], [rightHour]) => leftHour.localeCompare(rightHour))
-                  .map(([hour, summary]) => (
-                    <section className={styles["hourly-highlight-card"]} key={hour}>
-                      <p className={styles["hourly-highlight-hour"]}>{hour}</p>
-                      <p className={sharedStyles.subtle}>
-                        Channels: {(day.stats.hourlyChannelLeads?.[hour] ?? []).join(" • ") || "No dominant channels detected"}
-                      </p>
-                      <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(summary, sharedStyles["formatted-list"])}</div>
+                <h3>Mission Highlights</h3>
+                <div className={styles["hourly-highlight-grid"]}>
+                  {parsed.sections.map((section) => (
+                    <section className={styles["hourly-highlight-card"]} key={`${entry.day}-${section.heading}`}>
+                      <p className={styles["hourly-highlight-hour"]}>{section.heading}</p>
+                      {section.body ? (
+                        <p className={sharedStyles.subtle}>{section.body.length > 320 ? `${section.body.slice(0, 317)}…` : section.body}</p>
+                      ) : null}
                     </section>
                   ))}
+                </div>
+              </section>
+            ) : (
+              // Fallback: render the full summary as structured text when no
+              // <h3> sections were found (plain-text or markdown LLM output).
+              <div className={sharedStyles["formatted-copy"]}>
+                <p className={sharedStyles.subtle}>{entry.summary.slice(0, 800)}</p>
               </div>
-            </article>
-          );
-        })
-      ) : (
-        <p className={styles["daily-empty"]}>No data yet. Trigger ingestion on Overview page.</p>
-      )}
+            )}
+
+            {/* Notable Moments grid */}
+            <section className={styles["daily-notable-section"]}>
+              <h3>Notable Moments</h3>
+              {dayNotableMoments.length > 0 ? (
+                <div className={styles["daily-notable-grid"]}>
+                  {dayNotableMoments.map((moment) => (
+                    <article className={styles["daily-notable-card"]} key={`${entry.day}-${moment.rank}-${moment.title}`}>
+                      <p className={styles["daily-notable-rank"]}>#{moment.rank}</p>
+                      <h4>{moment.title}</h4>
+                      <blockquote>{moment.quote}</blockquote>
+                      <p className={sharedStyles.subtle}>
+                        {moment.timestamp ?? "timestamp n/a"} • {moment.channel ?? "channel n/a"}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className={sharedStyles.subtle}>Notable moments are not available yet for this day.</p>
+              )}
+            </section>
+          </article>
+        );
+      })}
     </div>
   );
 };

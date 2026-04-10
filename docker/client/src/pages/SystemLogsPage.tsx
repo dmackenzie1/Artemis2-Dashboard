@@ -52,6 +52,21 @@ const formatCompactUtc = (value: string): string => {
   return `${year}${month}${day}T${hour}${minute}${second}`;
 };
 
+// Compact HH:MM display used inside matrix cells where space is limited.
+// The full timestamp is always available on hover via the cell's title attribute.
+const formatCellTime = (value: string): string => {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return "";
+  }
+
+  const utcDate = new Date(timestamp);
+  const hour = `${utcDate.getUTCHours()}`.padStart(2, "0");
+  const minute = `${utcDate.getUTCMinutes()}`.padStart(2, "0");
+
+  return `${hour}:${minute}`;
+};
+
 export const SystemLogsPage: FunctionComponent = () => {
   const location = useLocation();
   const [data, setData] = useState<SystemLogListResponse | null>(null);
@@ -294,7 +309,7 @@ export const SystemLogsPage: FunctionComponent = () => {
                         <span className={styles["system-status-matrix-symbol"]}>{symbolByState[cell.state]}</span>
                         {cell.receivedAt || cell.sentAt ? (
                           <small className={styles["system-status-matrix-time"]}>
-                            {formatCompactUtc(cell.receivedAt ?? cell.sentAt ?? "")}
+                            {formatCellTime(cell.receivedAt ?? cell.sentAt ?? "")}
                           </small>
                         ) : null}
                       </td>

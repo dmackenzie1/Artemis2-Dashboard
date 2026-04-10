@@ -813,8 +813,15 @@ export class PipelineService {
     }>;
     const latestIngestAt = await this.getLatestIngestAt();
     const transcriptDays = await this.listTranscriptDays(safeDaysLimit);
-    const executionDays = executions.map((execution) => execution.responseDay ?? dayjs(execution.sentAt ?? execution.startedAt).utc().format("YYYY-MM-DD"));
-    const dayKeys = Array.from(new Set([...transcriptDays, ...executionDays]))
+    const cutoffDayString = dayjs(cutoffDate).utc().format("YYYY-MM-DD");
+    // Guard against malformed or anachronistic responseDay values (e.g. "2006-04-01"
+    // that appear when an execution row has a bad responseDay) by keeping only days
+    // that look like valid ISO dates AND fall within the configured cutoff window.
+    const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/u;
+    const validExecutionDays = executions
+      .map((execution) => execution.responseDay ?? dayjs(execution.sentAt ?? execution.startedAt).utc().format("YYYY-MM-DD"))
+      .filter((day) => isoDatePattern.test(day) && day >= cutoffDayString);
+    const dayKeys = Array.from(new Set([...transcriptDays, ...validExecutionDays]))
       .sort((left, right) => left.localeCompare(right))
       .slice(-safeDaysLimit);
 

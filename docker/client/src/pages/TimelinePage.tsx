@@ -44,8 +44,8 @@ type TimelineDisplayItem =
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 const MAX_TOPICS_PER_DAY = 10;
 const MAX_SUMMARY_HIGHLIGHTS_PER_DAY = 8;
-const MAX_NOTABLE_UTTERANCES = 240;
-const MAX_NOTABLE_UTTERANCES_PER_DAY = 12;
+const MAX_NOTABLE_UTTERANCES = 120;
+const MAX_NOTABLE_UTTERANCES_PER_DAY = 8;
 const MIN_NOTABLE_MOMENTS_PER_DAY = 3;
 const MAX_NOTABLE_MOMENTS_PER_DAY = 24;
 
@@ -162,18 +162,8 @@ const buildTimelineItems = (
       });
     });
 
-    dayEntry.topics.slice(0, MAX_TOPICS_PER_DAY).forEach((topic, topicIndex) => {
-      const topicTimestamp = dayStart + (topicIndex + 1) * 110 * 60 * 1000;
-      contentItems.push({
-        id: `topic-${dayEntry.day}-${topic.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-        timestamp: topicTimestamp,
-        type: "notable-event",
-        title: `Notable Milestone • ${topic}`,
-        timeLabel: formatDateLabel(topicTimestamp),
-        body: `Mission synthesis flagged this as a high-interest milestone for ${formatDayLabel(dayEntry.day)}.`,
-        tags: ["milestone", "public-facing"]
-      });
-    });
+    // Topics remain visible as tags on the day summary card above.
+    // Individual per-topic cards have been removed to reduce boilerplate noise.
 
     const moments = notableMomentsByDay.get(dayEntry.day) ?? [];
     moments.forEach((moment, momentIndex) => {
@@ -331,8 +321,6 @@ export const TimelinePage: FC = () => {
     [timelineDays, notableUtterances, notableMomentsDays]
   );
 
-  const visibleItems = useMemo(() => allItems, [allItems]);
-
   const missionRangeLabel = useMemo(() => {
     if (timelineDays.length === 0) {
       return "No mission timeline loaded.";
@@ -381,17 +369,17 @@ export const TimelinePage: FC = () => {
 
       {!isLoading && error ? <p className={sharedStyles["timeline-error"]}>{error}</p> : null}
 
-      {!isLoading && !error && visibleItems.length === 0 ? (
+      {!isLoading && !error && allItems.length === 0 ? (
         <p className={sharedStyles["timeline-empty"]}>No timeline data available yet. Trigger ingestion from Overview, then return here.</p>
       ) : null}
 
-      {!isLoading && !error && visibleItems.length > 0 ? (
+      {!isLoading && !error && allItems.length > 0 ? (
         <div className={styles["timeline-canvas"]} ref={timelineRootRef}>
           <div className={styles["timeline-spine"]} aria-hidden="true" />
           {(() => {
             let eventIndex = 0;
 
-            return visibleItems.map((item) => {
+            return allItems.map((item) => {
               if (item.type === "day-divider") {
                 return (
                   <article key={item.id} className={styles["timeline-day-divider"]}>

@@ -73,6 +73,12 @@ export const NotableMomentsPage: FunctionComponent = () => {
         <p className={sharedStyles.subtle}>
           Quote-forward daily highlights with a baseline target of {data?.targetMomentsPerDay ?? 10}, scaled up for high-signal days.
         </p>
+        {(data?.droppedDayCount ?? 0) > 0 ? (
+          <p className={sharedStyles.subtle}>
+            Note: {data?.droppedDayCount} day output{(data?.droppedDayCount ?? 0) === 1 ? "" : "s"} could not be parsed and{" "}
+            {(data?.droppedDayCount ?? 0) === 1 ? "is" : "are"} not shown. Re-running the pipeline may resolve this.
+          </p>
+        ) : null}
         <label className={styles["reason-toggle"]}>
           <input
             checked={showReasoning}

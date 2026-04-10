@@ -4,6 +4,10 @@
   display: grid;
   gap: 1rem;
   padding: 0.4rem 0 0.8rem;
+  /* Stable background prevents a flash of unstyled content while CSS custom
+     properties are being resolved on first paint. */
+  background: transparent;
+  min-height: 280px;
 }
 
 .timeline-spine,

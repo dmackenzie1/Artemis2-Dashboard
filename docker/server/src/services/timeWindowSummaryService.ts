@@ -79,7 +79,34 @@ export class TimeWindowSummaryService {
   }
 
   private async computeAndCacheWindowSummary(cacheKey: string, safeHours: number): Promise<TimeWindowSummary> {
-    const windowEnd = dayjs().utc();
+    // Anchor the window to the latest available transcript timestamp rather than
+    // wall-clock time. This prevents the window from silently drifting forward
+    // when no new data has arrived and ensures window.start/end always reflect
+    // the actual data range the operator is reviewing.
+    const anchorRow = await this.getEntityManager().getConnection().execute<Array<{ anchorEnd: string | null }>>(
+      `select to_char(max(timestamp) at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "anchorEnd" from transcript_utterances`
+    );
+    const anchorEndRaw = anchorRow[0]?.anchorEnd ?? null;
+
+    if (!anchorEndRaw) {
+      // Empty table — return a clean empty payload without hitting the LLM.
+      const now = dayjs().utc();
+      const emptyPayload: TimeWindowSummary = {
+        generatedAt: now.toISOString(),
+        window: {
+          hours: safeHours,
+          start: now.subtract(safeHours, "hour").toISOString(),
+          end: now.toISOString()
+        },
+        stats: { utterances: 0, words: 0, channels: 0 },
+        summary: `No transcript utterances are available yet. The ${safeHours}-hour window cannot be computed.`,
+        highlights: []
+      };
+      this.cache.set(cacheKey, emptyPayload);
+      return emptyPayload;
+    }
+
+    const windowEnd = dayjs(anchorEndRaw).utc();
     const windowStart = windowEnd.subtract(safeHours, "hour");
 
     const rows = await this.getEntityManager().getConnection().execute<TimeWindowUtteranceRow[]>(
@@ -92,9 +119,10 @@ export class TimeWindowSummaryService {
           source_file as "sourceFile",
           word_count::text as "wordCount"
         from transcript_utterances
-        where timestamp >= now() - (${safeHours} * interval '1 hour')
+        where timestamp >= $1 and timestamp <= $2
         order by timestamp asc
-      `
+      `,
+      [windowStart.toDate(), windowEnd.toDate()]
     );
 
     const channels = new Set(rows.map((row) => row.channel.trim()).filter((channel) => channel.length > 0));
@@ -113,7 +141,7 @@ export class TimeWindowSummaryService {
           end: windowEnd.toISOString()
         },
         stats: totals,
-        summary: `No transcript utterances were found in the last ${safeHours} hours.`,
+        summary: `No transcript utterances were found in the ${safeHours}-hour window ending at the latest available data (${windowEnd.toISOString()}).`,
         highlights: []
       };
       this.cache.set(cacheKey, emptyPayload);
