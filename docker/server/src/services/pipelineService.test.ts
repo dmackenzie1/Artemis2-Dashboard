@@ -3,13 +3,13 @@ import type { EntityManager } from "@mikro-orm/postgresql";
 import type { LlmClient } from "./llmClient.js";
 import { PipelineService } from "./pipelineService.js";
 
-const createPipelineService = (): PipelineService => {
-  const fakeEntityManager = {} as EntityManager;
+const createPipelineService = (fakeEntityManager?: EntityManager): PipelineService => {
+  const entityManager = fakeEntityManager ?? ({} as EntityManager);
   const llmClient = {
     generateText: async () => "stubbed-response"
   };
 
-  return new PipelineService(() => fakeEntityManager, {
+  return new PipelineService(() => entityManager, {
     promptsDir: "/tmp/prompts",
     promptSubmissionsDir: "/tmp/prompt-submissions",
     llmClient: llmClient as unknown as LlmClient,
@@ -36,5 +36,45 @@ describe("PipelineService prompt queue ordering", () => {
     }).buildPromptQueue(prompts);
 
     expect(orderedPrompts.map((prompt) => prompt.key)).toEqual(["daily_summary", "mission_summary"]);
+  });
+});
+
+describe("PipelineService prompt matrix state", () => {
+  it("skips executions that do not resolve to a prompt key", async () => {
+    const fakeEntityManager = {
+      find: async (entity: { name?: string }) => {
+        if (entity?.name === "PromptDefinition") {
+          return [{ key: "daily_summary" }];
+        }
+
+        if (entity?.name === "PromptExecution") {
+          return [
+            {
+              id: 501,
+              prompt: undefined,
+              responseDay: "2026-04-10",
+              sentAt: new Date("2026-04-10T00:00:00Z"),
+              startedAt: new Date("2026-04-10T00:00:00Z"),
+              receivedAt: new Date("2026-04-10T00:01:00Z"),
+              status: "success"
+            }
+          ];
+        }
+
+        return [];
+      }
+    } as unknown as EntityManager;
+
+    const service = createPipelineService(fakeEntityManager);
+    (service as unknown as { listTranscriptDays: (limit: number) => Promise<string[]> }).listTranscriptDays = async () => [
+      "2026-04-10"
+    ];
+    (service as unknown as { getLatestIngestAt: () => Promise<string | null> }).getLatestIngestAt = async () => null;
+
+    const payload = await service.getPromptMatrixState(1);
+
+    expect(payload.prompts).toHaveLength(1);
+    expect(payload.prompts[0]?.key).toBe("daily_summary");
+    expect(payload.prompts[0]?.cells[0]?.state).toBe("none");
   });
 });
