@@ -11,11 +11,64 @@ const dailyFullSummaryType = "daily_full";
 const canonicalChannelGroup = "*";
 
 export interface SummaryPromptGenerator {
-  readonly promptKey: "daily_summary" | "notable_moments";
+  readonly promptKey: "daily_summary_am" | "daily_summary_pm" | "daily_summary" | "notable_moments";
   generateOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string>;
 }
 
 type LlmTextGenerator = Pick<LlmClient, "generateText">;
+
+export class HalfDaySummaryGenerator implements SummaryPromptGenerator {
+  readonly promptKey: "daily_summary_am" | "daily_summary_pm";
+
+  constructor(
+    promptKey: "daily_summary_am" | "daily_summary_pm",
+    private readonly llmClient: LlmTextGenerator,
+    private readonly transcriptContextBuilder: TranscriptContextBuilder
+  ) {
+    this.promptKey = promptKey;
+  }
+
+  async generateOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
+    const dayGroups = this.transcriptContextBuilder.buildDailyGroups(sourceContext);
+    const segment = this.promptKey === "daily_summary_am" ? "AM (00:00-11:59 UTC)" : "PM (12:00-23:59 UTC)";
+    const days = await Promise.all(
+      dayGroups.map(async (group) => {
+        const summary = await this.llmClient.generateText({
+          systemPrompt: prompt.content,
+          userPrompt: JSON.stringify(
+            {
+              mode: "daily-half-day-synthesis",
+              segment,
+              day: group.day,
+              sourceDocuments: group.documents.map((document) => ({
+                path: document.path,
+                content: document.content
+              }))
+            },
+            null,
+            2
+          ),
+          componentId: `${prompt.key}:${group.day}`
+        });
+
+        return {
+          day: group.day,
+          summary
+        };
+      })
+    );
+
+    return JSON.stringify(
+      {
+        generatedAt: dayjs().utc().toISOString(),
+        segment,
+        days
+      },
+      null,
+      2
+    );
+  }
+}
 
 export class DailySummaryGenerator implements SummaryPromptGenerator {
   readonly promptKey = "daily_summary" as const;
@@ -189,7 +242,9 @@ export const createSummaryPromptGenerators = (dependencies: {
     highSignalPerDay: number;
     maxPerDay: number;
   };
-}): Map<SummaryPromptGenerator["promptKey"], SummaryPromptGenerator> => {
+} ): Map<SummaryPromptGenerator["promptKey"], SummaryPromptGenerator> => {
+  const dailyAmGenerator = new HalfDaySummaryGenerator("daily_summary_am", dependencies.llmClient, dependencies.transcriptContextBuilder);
+  const dailyPmGenerator = new HalfDaySummaryGenerator("daily_summary_pm", dependencies.llmClient, dependencies.transcriptContextBuilder);
   const dailyGenerator = new DailySummaryGenerator(dependencies.llmClient, dependencies.transcriptContextBuilder);
   const notableGenerator = new NotableMomentsGenerator(
     dependencies.llmClient,
@@ -199,6 +254,8 @@ export const createSummaryPromptGenerators = (dependencies: {
   );
 
   return new Map<SummaryPromptGenerator["promptKey"], SummaryPromptGenerator>([
+    [dailyAmGenerator.promptKey, dailyAmGenerator],
+    [dailyPmGenerator.promptKey, dailyPmGenerator],
     [dailyGenerator.promptKey, dailyGenerator],
     [notableGenerator.promptKey, notableGenerator]
   ]);

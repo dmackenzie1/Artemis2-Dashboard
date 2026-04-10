@@ -13,6 +13,7 @@ import { serverLogger } from "../utils/logging/serverLogger.js";
 import { liveUpdateBus } from "./liveUpdateBus.js";
 import { TranscriptContextBuilder } from "./pipeline/TranscriptContextBuilder.js";
 import { createSummaryPromptGenerators } from "./pipeline/summaryGenerators.js";
+import { canonicalPromptKey, promptExecutionPriority, runnablePromptKeys } from "./pipeline/promptCatalog.js";
 import type { SourceContextDocument } from "./pipeline/pipelineTypes.js";
 
 type EntityManagerProvider = () => EntityManager;
@@ -66,9 +67,6 @@ type MissionStatsView = {
 };
 
 const promptFilePattern = /\.txt$/i;
-const runnablePromptKeys = new Set(["daily_summary", "mission_summary", "recent_changes", "notable_moments"]);
-const promptExecutionPriority = ["daily_summary", "notable_moments", "mission_summary"];
-const skippedPromptKeys = new Set(["hourly_summary"]);
 const missionStatsCacheTtlMs = 5 * 60 * 1000;
 const canonicalChannelGroup = "*";
 const dailyFullSummaryType = "daily_full";
@@ -245,11 +243,22 @@ export class PipelineService {
     return generator.generateOutput(prompt, sourceContext);
   }
 
+  private async generateHalfDaySummaryOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
+    if (prompt.key !== "daily_summary_am" && prompt.key !== "daily_summary_pm") {
+      throw new Error(`Unsupported half-day summary prompt key: ${prompt.key}`);
+    }
+    const generator = this.summaryGenerators.get(prompt.key);
+    if (!generator) {
+      throw new Error(`Half-day summary generator is not configured for key: ${prompt.key}`);
+    }
+    return generator.generateOutput(prompt, sourceContext);
+  }
+
   private buildPromptQueue(prompts: PromptDefinition[]): PromptDefinition[] {
     const indexByKey = new Map<string, number>(promptExecutionPriority.map((key, index) => [key, index]));
 
     return prompts
-      .filter((prompt) => runnablePromptKeys.has(prompt.key) && !skippedPromptKeys.has(prompt.key))
+      .filter((prompt) => runnablePromptKeys.has(prompt.key))
       .sort((left, right) => {
         const leftPriority = indexByKey.get(left.key);
         const rightPriority = indexByKey.get(right.key);
@@ -460,7 +469,8 @@ export class PipelineService {
 
     for (const fileName of promptFiles) {
       const promptText = await fs.readFile(path.join(this.config.promptsDir, fileName), "utf8");
-      const key = fileName.replace(/\.txt$/i, "");
+      const rawKey = fileName.replace(/\.txt$/i, "");
+      const key = canonicalPromptKey(rawKey);
       const existing = await em.findOne(PromptDefinition, { fileName });
 
       if (!existing) {
@@ -640,14 +650,16 @@ export class PipelineService {
         const output =
           prompt.key === "daily_summary"
             ? await this.generateSummaryArtifactOutput(prompt, promptSourceContext)
-            : prompt.key === "notable_moments"
-              ? await this.generateNotableMomentsOutput(prompt, promptSourceContext)
-            : await this.config.llmClient.generateText({
-                systemPrompt: prompt.content,
-                userPrompt: missionSubmittedText,
-                componentId: execution.componentId,
-                requestId: `${execution.componentId}-${execution.id}`
-              });
+            : prompt.key === "daily_summary_am" || prompt.key === "daily_summary_pm"
+              ? await this.generateHalfDaySummaryOutput(prompt, promptSourceContext)
+              : prompt.key === "notable_moments"
+                ? await this.generateNotableMomentsOutput(prompt, promptSourceContext)
+                : await this.config.llmClient.generateText({
+                    systemPrompt: prompt.content,
+                    userPrompt: missionSubmittedText,
+                    componentId: execution.componentId,
+                    requestId: `${execution.componentId}-${execution.id}`
+                  });
 
         execution.status = "success";
         execution.cacheHit = false;

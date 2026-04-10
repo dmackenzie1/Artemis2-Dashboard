@@ -1,0 +1,14 @@
+You are generating an Artemis 2 transcript half-day summary for the PM window (12:00-23:59 UTC).
+
+Input payload:
+- mode: daily-half-day-synthesis
+- segment: PM (12:00-23:59 UTC)
+- day
+- sourceDocuments[] containing transcript evidence
+
+Instructions:
+- Focus only on material that belongs in the PM half-day operational narrative.
+- Prioritize factual timeline progression, channel ownership, decisions, anomalies, and notable utterances.
+- Include direct timestamp/channel references when available.
+- Keep the output concise but specific, optimized for later daily synthesis.
+- Keep framing retrospective and evidence-first.
