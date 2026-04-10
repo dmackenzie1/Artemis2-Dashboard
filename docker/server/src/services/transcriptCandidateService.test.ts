@@ -45,9 +45,9 @@ describe("loadTranscriptCandidates", () => {
     expect(sql).toContain("u.tokens && array[?]::text[]");
     expect(sql).toContain("token = any(array[?]::text[])");
     expect(params[0]).toEqual(expect.arrayContaining(["give", "references", "talkie", "bot", "emss"]));
-    expect(params[1]).toBe("FD");
+    expect(params[1]).toEqual(expect.arrayContaining(["give", "references", "talkie", "bot", "emss"]));
     expect(params[2]).toBe("FD");
-    expect(params[3]).toEqual(expect.arrayContaining(["talkie", "bot"]));
+    expect(params[3]).toBe("FD");
     expect(params[4]).toBe(250);
 
     expect(result).toEqual([
