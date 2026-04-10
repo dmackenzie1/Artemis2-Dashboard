@@ -26,6 +26,11 @@ export const App: FC = () => {
     return adminQueryValue === "true";
   }, [location.search]);
 
+  const isSearchRoute = useMemo(
+    () => location.pathname.startsWith("/chat") || location.pathname.startsWith("/search"),
+    [location.pathname]
+  );
+
   useEffect(() => {
     const cacheClearValue = new URLSearchParams(location.search).get("cacheClear");
     if (cacheClearValue !== "true") {
@@ -93,14 +98,40 @@ export const App: FC = () => {
           <h1>TalkyBot Transcript Review</h1>
         </div>
         <nav className={styles["topbar-nav"]}>
-          <NavLink to="/">Overview</NavLink>
-          <NavLink to="/daily">Daily</NavLink>
-          <NavLink to="/timeline">Timeline</NavLink>
-          <NavLink to="/notable">Notable</NavLink>
-          <NavLink to="/chat">Chat</NavLink>
-          <NavLink to="/system-logs">System Status</NavLink>
-          <NavLink to="/about">About</NavLink>
-          <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer">
+          <NavLink to="/overview" className={({ isActive }) => (isActive ? styles["nav-link-selected"] : styles["nav-link"])}>
+            Overview
+          </NavLink>
+          <NavLink to="/daily" className={({ isActive }) => (isActive ? styles["nav-link-selected"] : styles["nav-link"])}>
+            Daily
+          </NavLink>
+          <NavLink
+            to="/timeline"
+            className={({ isActive }) => (isActive ? styles["nav-link-selected"] : styles["nav-link"])}
+          >
+            Timeline
+          </NavLink>
+          <NavLink
+            to="/notable"
+            className={({ isActive }) => (isActive ? styles["nav-link-selected"] : styles["nav-link"])}
+          >
+            Notable
+          </NavLink>
+          <NavLink
+            to="/chat"
+            className={({ isActive }) => (isActive ? styles["nav-link-selected"] : styles["nav-link"])}
+          >
+            Search
+          </NavLink>
+          <NavLink
+            to="/system-logs"
+            className={({ isActive }) => (isActive ? styles["nav-link-selected"] : styles["nav-link"])}
+          >
+            System Status
+          </NavLink>
+          <NavLink to="/about" className={({ isActive }) => (isActive ? styles["nav-link-selected"] : styles["nav-link"])}>
+            About
+          </NavLink>
+          <a href="https://talkybot.fit.nasa.gov/" target="_blank" rel="noreferrer" className={styles["nav-link"]}>
             TalkyBot
           </a>
           {adminMode ? (
@@ -119,17 +150,19 @@ export const App: FC = () => {
         </nav>
       </header>
 
-      <main>
+      <main className={isSearchRoute ? styles["main-fullbleed"] : styles.main}>
         <Routes>
-          <Route path="/" element={<DashboardPage />} />
+          <Route path="/" element={<Navigate to="/chat" replace />} />
+          <Route path="/overview" element={<DashboardPage />} />
           <Route path="/daily" element={<DailyPage />} />
           <Route path="/3-hour" element={<Navigate to="/daily" replace />} />
           <Route path="/6-hour" element={<Navigate to="/daily" replace />} />
           <Route path="/12-hour" element={<Navigate to="/daily" replace />} />
           <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/notable" element={<NotableMomentsPage />} />
-          <Route path="/talkierag" element={<Navigate to="/" replace />} />
+          <Route path="/talkierag" element={<Navigate to="/chat" replace />} />
           <Route path="/chat" element={<SignalChatPage />} />
+          <Route path="/search" element={<Navigate to="/chat" replace />} />
           <Route path="/system-logs" element={<SystemLogsPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/topics/:title" element={<TopicPage />} />

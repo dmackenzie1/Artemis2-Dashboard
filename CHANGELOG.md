@@ -1,6 +1,7 @@
 # Changelog
 
 ## [Unreleased]
+- feat: make Signal Chat the default landing route (`/` -> `/chat`), add a direct `/search` alias, introduce explicit topbar selected-link styling, and rework Signal Chat into a full-width two-pane search workspace with a bottom-anchored composer. Intent: Prioritize transcript/audio search as the primary post-mission workflow while keeping route-state visibility and evidence review immediately legible for operators.
 - fix: remove search/chat pre-ranking transcript candidate caps, allow chat retrieval ranking over the full scoped corpus, and retune search result defaults/clamps to 20/40 after deterministic sort. Intent: Ensure query and chat evidence selection evaluates the full available transcript set before applying bounded operator-facing result presentation limits.
 - fix: restore System Status prompt-matrix table-cell layout semantics and add SSE generic-message fallback parsing for known live-update payloads when intermediaries collapse custom event names. Intent: Ensure prompt matrix cells render under the correct day columns and keep Live Socket Event Stream visibility resilient across proxy/event-delivery variations.
 - fix: replace Postgres-style `$1/$2` placeholders with Knex/MikroORM positional `?` bindings in the rolling time-window transcript query so bound window dates are passed correctly to `execute(...)` instead of triggering `there is no parameter $1`. Intent: Restore reliable `/api/time-window-summary` generation by ensuring the SQL driver receives the window bound parameters.
