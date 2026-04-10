@@ -33,3 +33,9 @@ npm run db:ingest -w backend
 ## Architecture docs
 
 For service-level responsibilities and file-by-file mapping, see `docker/server/ARCHITECTURE.md`.
+
+## Documentation contracts
+
+- Keep this README focused on backend scope, commands, and runtime behavior only.
+- Keep implementation-level service/file ownership in `ARCHITECTURE.md` (single source of truth for backend internals).
+- When changing transcript retrieval/search behavior, preserve evidence priority of `timestamp/date + channel + transcript text` and treat duration/language/translated/filename metadata as optional unless explicitly requested.

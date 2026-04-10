@@ -77,6 +77,11 @@ When an AI agent finishes a task, it must fulfill the EMSS paper trail requireme
 1. **Branch Notes:** Update the `docs/branch-notes/YYYY-MM-DD-<task>.md` file. You must explicitly log "What Did Not Work" if you attempted a solution that failed.
 2. **Intent-Driven Changelog:** Add a line to `CHANGELOG.md` under `## [Unreleased]`. The line MUST end with an `Intent: <explanation>` clause explaining why the change was made for future maintainers.
 
+## Product Direction (Artemis2 Dashboard)
+- Vision: make mission communications operationally legible in minutes instead of hours.
+- UX priorities: summarize first, explain trend changes clearly, keep transcript noise out of the main UI, and preserve drill-down evidence for trust.
+- Current direction backlog: embeddings/vector retrieval for cross-day semantic chat, explicit confidence scoring and low-confidence UX flags, topic co-occurrence graphing, incremental ingestion by source filename hash, and PowerPoint briefing export.
+
 ## Security Rules
 - NEVER hardcode secrets. Always use `env.config.ts` or `env.secret.ts`.
 - When modifying deployment scripts or `docker-compose.yml`, note that we deploy to FIT (Facility for Integration and Testing) servers (carbon, gold, iron, neon, oxygen). Ensure configurations respect this target environment.

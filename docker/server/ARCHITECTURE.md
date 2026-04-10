@@ -38,7 +38,7 @@ This document is the implementation map for `docker/server/src`.
 | `entities/SourceDocument.ts` | Source document persistence model used by prompts. |
 | `entities/PromptDefinition.ts` | Prompt definition persistence model for tracked prompt files. |
 | `entities/PromptExecution.ts` | Prompt execution history/cache persistence model. |
-| `entities/DailySummary.ts` | Persisted day-level summary artifact store (summary + generated metadata + per-day counts). |
+| `entities/SummaryArtifact.ts` | Persisted summary artifact store keyed by prompt/day/channel-group/period metadata. |
 | `lib/csvIngest.ts` | Low-level CSV parsing + row normalization helpers. |
 | `lib/csvIngest.test.ts` | CSV parsing/edge-case unit tests. |
 | `lib/dayjs.ts` | Shared UTC-configured dayjs singleton bootstrap. |
@@ -55,3 +55,9 @@ This document is the implementation map for `docker/server/src`.
 
 - Daily summary prompt output is now parsed and upserted into `daily_summaries` with metadata (`generatedAt`, `wordCount`, `utteranceCount`, `sourceDocumentCount`) for deterministic reuse.
 - Notable moments daily targets are now configurable by environment and can scale up for high-signal days.
+
+## Architecture guardrails
+
+- Keep route modules thin: validation and HTTP shaping in routes, mission logic in services.
+- Keep startup orchestration in runtime/bootstrap services (`createServerRuntime`, `BackgroundWorkersService`) instead of growing `index.ts`.
+- Preserve transcript retrieval evidence ordering around timestamp/date, channel identity, and transcript text so crew-loop vs flight-control context remains explicit in API outputs.
