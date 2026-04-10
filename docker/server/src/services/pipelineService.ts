@@ -789,7 +789,10 @@ export class PipelineService {
     }
 
     for (const execution of executions) {
-      const promptKey = execution.prompt.key;
+      const promptKey = execution.prompt?.key;
+      if (!promptKey) {
+        continue;
+      }
       const row = rowMap.get(promptKey);
       if (!row) {
         continue;
