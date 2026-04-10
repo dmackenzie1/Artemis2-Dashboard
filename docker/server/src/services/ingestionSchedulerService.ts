@@ -82,19 +82,19 @@ export class IngestionSchedulerService {
 
   public async runManualIngestion(): Promise<void> {
     await this.runTranscriptAndPipelineRefresh({ trigger: "manual:/api/ingest", sourcePath: null });
-    const cache = this.options.analysisService.getCache();
+    const dashboard = await this.options.analysisService.ingestAndAnalyze();
     await this.writeIngestionEventLog({
       trigger: "manual:/api/ingest",
       status: "success",
       sourcePath: null,
       details: {
-        generatedAt: cache?.generatedAt ?? null,
-        totalDays: cache?.days.length ?? null
+        generatedAt: dashboard.generatedAt,
+        totalDays: dashboard.days.length
       }
     });
 
     this.invalidateAndPrimeDerivedCaches("manual:/api/ingest");
-    this.publishCacheUpdatedEvents("manual:/api/ingest", cache?.generatedAt ?? null, cache?.days.length ?? null);
+    this.publishCacheUpdatedEvents("manual:/api/ingest", dashboard.generatedAt, dashboard.days.length);
   }
 
   public startBackgroundWorkers(): void {

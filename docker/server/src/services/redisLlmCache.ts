@@ -26,6 +26,14 @@ export class RedisLlmCache implements LlmResponseCache {
       });
     });
 
+    // Reset the connected flag whenever the underlying socket closes so that
+    // a subsequent call to connect() will re-establish the connection instead
+    // of returning early with a stale "already connected" assumption.
+    this.client.on("end", () => {
+      this.connected = false;
+      serverLogger.warn("Redis client connection closed; reconnect will be attempted automatically");
+    });
+
     await this.client.connect();
     this.connected = true;
     serverLogger.info("Redis cache connected", { redisUrl: this.redisUrl });

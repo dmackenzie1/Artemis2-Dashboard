@@ -50,18 +50,23 @@ export const LiveUpdatesProvider: FunctionComponent<PropsWithChildren> = ({ chil
   }, []);
 
   useEffect(() => {
-    const subscription = subscribeToLiveUpdates((event) => {
-      clientLogger.info("Socket live-update event received", {
-        type: event.type,
-        emittedAt: event.emittedAt,
-        payload: event.payload ?? null
-      });
-      setLastEvent(event);
-      setRecentEvents((previous) => [event, ...previous].slice(0, MAX_RECENT_EVENTS));
-      if (GLOBAL_REFRESH_EVENT_TYPES.has(event.type)) {
-        requestGlobalRefresh();
-      }
-    });
+    const subscription = subscribeToLiveUpdates(
+      (event) => {
+        clientLogger.info("Socket live-update event received", {
+          type: event.type,
+          emittedAt: event.emittedAt,
+          payload: event.payload ?? null
+        });
+        setLastEvent(event);
+        setRecentEvents((previous) => [event, ...previous].slice(0, MAX_RECENT_EVENTS));
+        if (GLOBAL_REFRESH_EVENT_TYPES.has(event.type)) {
+          requestGlobalRefresh();
+        }
+      },
+      // When the SSE stream reconnects after a gap, trigger a full refresh so
+      // panels do not silently serve stale data for events missed during the gap.
+      requestGlobalRefresh
+    );
 
     return () => {
       subscription.close();

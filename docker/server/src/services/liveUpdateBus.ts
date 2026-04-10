@@ -32,6 +32,12 @@ const LIVE_UPDATE_EVENT_NAME = "live-update";
 class LiveUpdateBus {
   private readonly emitter = new EventEmitter();
 
+  constructor() {
+    // Allow up to 200 concurrent SSE subscribers without triggering Node.js
+    // MaxListenersExceededWarning (default cap is 10).
+    this.emitter.setMaxListeners(200);
+  }
+
   publish(event: Omit<LiveUpdateEvent, "emittedAt">): void {
     const hydratedEvent = {
       ...event,

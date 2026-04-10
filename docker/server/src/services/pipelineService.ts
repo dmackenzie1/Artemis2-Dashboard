@@ -306,7 +306,24 @@ export class PipelineService {
     const em = this.getEntityManager();
     const dayGroupsByDay = new Map(this.transcriptContextBuilder.buildDailyGroups(sourceContext).map((group) => [group.day, group]));
     const parsedSections = this.parseSummaryArtifactSections(output);
+    if (parsedSections.length === 0) {
+      return;
+    }
+
     const generatedAt = dayjs().utc().toDate();
+
+    // Pre-fetch all existing SummaryArtifact rows that overlap with any of the
+    // parsed sections in a single query, then match by periodStart in memory.
+    // This replaces the previous per-section findOne inside the loop (N+1).
+    const periodStarts = parsedSections.map((section) => dayjs(`${section.day}T00:00:00Z`).utc().toDate());
+    const existingArtifacts = await em.find(SummaryArtifact, {
+      summaryType: dailyFullSummaryType,
+      channelGroup: canonicalChannelGroup,
+      periodStart: { $in: periodStarts }
+    });
+    const existingByPeriodStart = new Map(
+      existingArtifacts.map((artifact) => [artifact.periodStart.getTime(), artifact])
+    );
 
     for (const section of parsedSections) {
       const group = dayGroupsByDay.get(section.day);
@@ -321,12 +338,7 @@ export class PipelineService {
         .createHash("sha256")
         .update(group?.documents.map((document) => `${document.path}:${document.checksum}`).join("|") ?? "")
         .digest("hex");
-      const existing = await em.findOne(SummaryArtifact, {
-        summaryType: dailyFullSummaryType,
-        periodStart,
-        periodEnd,
-        channelGroup: canonicalChannelGroup
-      });
+      const existing = existingByPeriodStart.get(periodStart.getTime()) ?? null;
 
       if (!existing) {
         em.persist(
@@ -665,16 +677,33 @@ export class PipelineService {
   async getDashboardView(): Promise<{ generatedAt: string; prompts: PromptDashboardEntry[] }> {
     const em = this.getEntityManager();
     const prompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
-    const rows: PromptDashboardEntry[] = [];
 
-    for (const prompt of prompts) {
-      const latestExecution = await em.findOne(
-        PromptExecution,
-        { prompt: prompt.id },
-        { orderBy: { startedAt: "desc" } }
-      );
+    // Fetch all executions for every known prompt in a single query, ordered
+    // newest-first so we can cheaply pick the latest per prompt below.
+    const promptIds = prompts.map((p) => p.id);
+    const allExecutions =
+      promptIds.length > 0
+        ? await em.find(
+            PromptExecution,
+            { prompt: { $in: promptIds } },
+            { orderBy: { startedAt: "desc", id: "desc" } }
+          )
+        : [];
 
-      rows.push({
+    // Build a lookup map: promptId → most-recent PromptExecution.
+    // Because allExecutions is already ordered newest-first, the first entry
+    // encountered for each prompt id is definitionally the latest one.
+    const latestByPromptId = new Map<number, PromptExecution>();
+    for (const execution of allExecutions) {
+      const promptId = execution.prompt.id;
+      if (!latestByPromptId.has(promptId)) {
+        latestByPromptId.set(promptId, execution);
+      }
+    }
+
+    const rows: PromptDashboardEntry[] = prompts.map((prompt) => {
+      const latestExecution = latestByPromptId.get(prompt.id) ?? null;
+      return {
         id: prompt.id,
         key: prompt.key,
         componentId: prompt.key,
@@ -688,8 +717,8 @@ export class PipelineService {
         submittedText: latestExecution?.submittedText ?? null,
         output: latestExecution?.status === "success" ? latestExecution.output : null,
         errorMessage: latestExecution?.status === "failed" ? latestExecution.errorMessage : null
-      });
-    }
+      };
+    });
 
     return {
       generatedAt: dayjs().utc().toISOString(),

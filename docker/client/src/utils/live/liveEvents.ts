@@ -50,7 +50,8 @@ export const LIVE_UPDATE_EVENT_TYPES: LiveUpdateEvent["type"][] = [
 ];
 
 export const subscribeToLiveUpdates = (
-  onEvent: (event: LiveUpdateEvent) => void
+  onEvent: (event: LiveUpdateEvent) => void,
+  onReconnect?: () => void
 ): { close: () => void } => {
   if (typeof EventSource === "undefined") {
     clientLogger.warn("Live-update event stream unavailable in this runtime (EventSource missing)");
@@ -62,6 +63,7 @@ export const subscribeToLiveUpdates = (
   }
 
   const eventSource = new EventSource("/api/events");
+  let isFirstReady = true;
 
   const onMessage = (rawEvent: MessageEvent<string>): void => {
     try {
@@ -75,6 +77,21 @@ export const subscribeToLiveUpdates = (
     }
   };
 
+  // The server emits a `ready` event on every new SSE connection, including
+  // after the browser auto-reconnects. After the first connection we treat
+  // subsequent `ready` events as reconnects and trigger a global refresh so
+  // panels do not silently miss events that arrived during the gap.
+  const onReady = (): void => {
+    if (isFirstReady) {
+      isFirstReady = false;
+      return;
+    }
+    clientLogger.info("Live-update event stream reconnected; triggering global refresh");
+    onReconnect?.();
+  };
+
+  eventSource.addEventListener("ready", onReady as EventListener);
+
   for (const eventType of LIVE_UPDATE_EVENT_TYPES) {
     eventSource.addEventListener(eventType, onMessage as EventListener);
   }
@@ -85,6 +102,7 @@ export const subscribeToLiveUpdates = (
 
   return {
     close: () => {
+      eventSource.removeEventListener("ready", onReady as EventListener);
       for (const eventType of LIVE_UPDATE_EVENT_TYPES) {
         eventSource.removeEventListener(eventType, onMessage as EventListener);
       }
