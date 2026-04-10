@@ -16,6 +16,24 @@ TalkyBot source system: https://talkybot.fit.nasa.gov/
 - Metadata such as `duration`, `language`, `translated`, and `filename` is secondary and should only be used when explicitly requested by an operator.
 - Channel identity is mission-critical for interpretation. Keep crew loops (for example OE/XPL/SpaceOE) and flight-control loops (for example Flight Director/ISS/ORION MER manager) distinguishable in retrieval and synthesis outputs.
 
+## Product direction
+
+**Vision:** make mission communications operationally legible in minutes instead of hours.
+
+This prototype prioritizes executive readability and mission tempo awareness:
+- summarize first
+- explain trend changes clearly
+- keep raw transcript noise out of the main UI
+- retain drill-down evidence so trust remains high
+
+### Direction backlog
+
+- Add embeddings + vector retrieval for better cross-day semantic chat.
+- Add confidence scoring to LLM outputs and show low-confidence flags in UI.
+- Add topic co-occurrence graph.
+- Add incremental ingestion by source filename hash.
+- Add export to PowerPoint briefing format for daily mission standup.
+
 ## Repository layout
 
 - `docker/client`: React 19 + Vite client workspace.

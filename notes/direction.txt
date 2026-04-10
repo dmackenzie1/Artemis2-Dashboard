@@ -1,7 +1,0 @@
-Vision: make mission communications operationally legible in minutes instead of hours.
-
-This prototype emphasizes executive readability and mission tempo awareness:
-- summarize first
-- explain trend changes clearly
-- keep raw transcript noise out of the main UI
-- retain drill-down evidence so trust remains high
