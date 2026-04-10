@@ -119,7 +119,7 @@ export class TimeWindowSummaryService {
           source_file as "sourceFile",
           word_count::text as "wordCount"
         from transcript_utterances
-        where timestamp >= $1 and timestamp <= $2
+        where timestamp >= ? and timestamp <= ?
         order by timestamp asc
       `,
       [windowStart.toDate(), windowEnd.toDate()]
