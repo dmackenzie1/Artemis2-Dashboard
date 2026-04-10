@@ -742,6 +742,36 @@ export class PipelineService {
     };
   }
 
+  async getPromptDashboardEntryByKey(promptKey: string): Promise<PromptDashboardEntry | null> {
+    const em = this.getEntityManager();
+    const prompt = await em.findOne(PromptDefinition, { key: promptKey });
+    if (!prompt) {
+      return null;
+    }
+
+    const latestExecution = await em.findOne(
+      PromptExecution,
+      { prompt: prompt.id },
+      { orderBy: { startedAt: "desc", id: "desc" } }
+    );
+
+    return {
+      id: prompt.id,
+      key: prompt.key,
+      componentId: prompt.key,
+      fileName: prompt.fileName,
+      promptUpdatedAt: dayjs(prompt.updatedAt).utc().toISOString(),
+      lastRunAt: latestExecution ? dayjs(latestExecution.startedAt).utc().toISOString() : null,
+      status: latestExecution?.status ?? "never",
+      cacheHit: latestExecution?.cacheHit ?? false,
+      submittedPreview: latestExecution?.submittedText ? this.createPreview(latestExecution.submittedText, 180, 2) : null,
+      outputPreview: latestExecution?.output ? this.createPreview(latestExecution.output, 180, 2) : null,
+      submittedText: latestExecution?.submittedText ?? null,
+      output: latestExecution?.status === "success" ? latestExecution.output : null,
+      errorMessage: latestExecution?.status === "failed" ? latestExecution.errorMessage : null
+    };
+  }
+
   async getPromptMatrixState(daysLimit = 11): Promise<{
     generatedAt: string;
     latestIngestAt: string | null;
@@ -754,19 +784,36 @@ export class PipelineService {
     // Scope the execution query to the window we actually need instead of
     // loading up to 10 000 rows unconditionally and discarding old ones later.
     const cutoffDate = dayjs().utc().subtract(safeDaysLimit, "day").startOf("day").toDate();
-    const executions = await em.find(
-      PromptExecution,
-      { startedAt: { $gte: cutoffDate } },
-      {
-        populate: ["prompt"],
-        orderBy: { startedAt: "desc", id: "desc" }
-      }
-    );
+    const executions = (await em.getConnection().execute(
+      `
+        select
+          pe.id,
+          pd.key as "promptKey",
+          pe.status,
+          pe.response_day as "responseDay",
+          pe.started_at as "startedAt",
+          pe.sent_at as "sentAt",
+          pe.received_at as "receivedAt",
+          pe.error_message as "errorMessage"
+        from prompt_executions pe
+        inner join prompt_definitions pd on pd.id = pe.prompt_id
+        where pe.started_at >= ?
+        order by pe.started_at desc, pe.id desc
+      `,
+      [cutoffDate]
+    )) as Array<{
+      id: number;
+      promptKey: string;
+      status: PromptExecution["status"];
+      responseDay: string | null;
+      startedAt: string | Date;
+      sentAt: string | Date | null;
+      receivedAt: string | Date | null;
+      errorMessage: string | null;
+    }>;
     const latestIngestAt = await this.getLatestIngestAt();
     const transcriptDays = await this.listTranscriptDays(safeDaysLimit);
-    const executionDays = executions.map((execution) =>
-      execution.responseDay ?? dayjs(execution.sentAt ?? execution.startedAt).utc().format("YYYY-MM-DD")
-    );
+    const executionDays = executions.map((execution) => execution.responseDay ?? dayjs(execution.sentAt ?? execution.startedAt).utc().format("YYYY-MM-DD"));
     const dayKeys = Array.from(new Set([...transcriptDays, ...executionDays]))
       .sort((left, right) => left.localeCompare(right))
       .slice(-safeDaysLimit);
@@ -789,10 +836,7 @@ export class PipelineService {
     }
 
     for (const execution of executions) {
-      const promptKey = execution.prompt?.key;
-      if (!promptKey) {
-        continue;
-      }
+      const promptKey = execution.promptKey;
       const row = rowMap.get(promptKey);
       if (!row) {
         continue;

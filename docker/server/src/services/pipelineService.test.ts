@@ -46,23 +46,22 @@ describe("PipelineService prompt matrix state", () => {
         if (entity?.name === "PromptDefinition") {
           return [{ key: "daily_summary" }];
         }
-
-        if (entity?.name === "PromptExecution") {
-          return [
-            {
-              id: 501,
-              prompt: undefined,
-              responseDay: "2026-04-10",
-              sentAt: new Date("2026-04-10T00:00:00Z"),
-              startedAt: new Date("2026-04-10T00:00:00Z"),
-              receivedAt: new Date("2026-04-10T00:01:00Z"),
-              status: "success"
-            }
-          ];
-        }
-
         return [];
-      }
+      },
+      getConnection: () => ({
+        execute: async () => [
+          {
+            id: 501,
+            promptKey: "",
+            responseDay: "2026-04-10",
+            sentAt: new Date("2026-04-10T00:00:00Z"),
+            startedAt: new Date("2026-04-10T00:00:00Z"),
+            receivedAt: new Date("2026-04-10T00:01:00Z"),
+            status: "success",
+            errorMessage: null
+          }
+        ]
+      })
     } as unknown as EntityManager;
 
     const service = createPipelineService(fakeEntityManager);

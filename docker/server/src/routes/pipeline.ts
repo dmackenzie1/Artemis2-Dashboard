@@ -151,8 +151,7 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
 
   router.get("/notable-moments", async (_req, res, next) => {
     try {
-      const payload = await pipelineService.getDashboardView();
-      const notableMomentsPrompt = payload.prompts.find((entry) => entry.key === "notable_moments");
+      const notableMomentsPrompt = await pipelineService.getPromptDashboardEntryByKey("notable_moments");
       const parsedSchema = z.object({
         generatedAt: z.string(),
         targetMomentsPerDay: z.number().int().min(1).optional(),
@@ -161,7 +160,7 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
 
       if (!notableMomentsPrompt?.output) {
         res.json({
-          generatedAt: payload.generatedAt,
+          generatedAt: new Date().toISOString(),
           status: notableMomentsPrompt?.status ?? "never",
           days: [],
           parsedDayCount: 0,
