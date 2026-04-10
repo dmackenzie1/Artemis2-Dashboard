@@ -306,12 +306,14 @@ export const SystemLogsPage: FunctionComponent = () => {
                         }`}
                         data-state={cell.state}
                       >
-                        <span className={styles["system-status-matrix-symbol"]}>{symbolByState[cell.state]}</span>
-                        {cell.receivedAt || cell.sentAt ? (
-                          <small className={styles["system-status-matrix-time"]}>
-                            {formatCellTime(cell.receivedAt ?? cell.sentAt ?? "")}
-                          </small>
-                        ) : null}
+                        <div className={styles["system-status-matrix-cell-content"]}>
+                          <span className={styles["system-status-matrix-symbol"]}>{symbolByState[cell.state]}</span>
+                          {cell.receivedAt || cell.sentAt ? (
+                            <small className={styles["system-status-matrix-time"]}>
+                              {formatCellTime(cell.receivedAt ?? cell.sentAt ?? "")}
+                            </small>
+                          ) : null}
+                        </div>
                       </td>
                     ))}
                   </tr>

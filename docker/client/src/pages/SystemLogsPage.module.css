@@ -26,10 +26,14 @@
 }
 
 .system-status-matrix td {
+  min-width: 110px;
+  vertical-align: middle;
+}
+
+.system-status-matrix-cell-content {
   display: grid;
   justify-items: center;
   gap: 0.12rem;
-  min-width: 110px;
 }
 
 .system-status-matrix th:first-child {
