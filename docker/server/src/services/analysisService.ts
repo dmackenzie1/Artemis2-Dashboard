@@ -531,7 +531,7 @@ export class AnalysisService {
 
   async searchUtterances(
     query: string,
-    limit = 8,
+    limit = 20,
     filters?: {
       channel?: string;
     }
@@ -543,7 +543,7 @@ export class AnalysisService {
     utterances: ReturnType<typeof retrieveRankedUtterances>["ranked"];
   }> {
     const normalizedChannel = filters?.channel?.trim().toLowerCase() ?? "";
-    const normalizedLimit = Math.min(Math.max(limit, 1), 80);
+    const normalizedLimit = Math.min(Math.max(limit, 1), 40);
     const cacheKey = `${this.corpusVersion}|${query.trim().toLowerCase()}|${normalizedLimit}|${normalizedChannel}`;
     const cached = this.searchCache.get(cacheKey);
     if (cached) {
@@ -552,8 +552,7 @@ export class AnalysisService {
 
     const filteredUtterances = this.config.loadTranscriptCandidates
       ? await this.config.loadTranscriptCandidates(query, {
-          channel: normalizedChannel.length > 0 ? normalizedChannel : undefined,
-          candidateLimit: 2000
+          channel: normalizedChannel.length > 0 ? normalizedChannel : undefined
         })
       : normalizedChannel.length > 0
         ? this.utterances.filter((entry) => entry.channel.trim().toLowerCase() === normalizedChannel)
@@ -598,8 +597,7 @@ export class AnalysisService {
     const normalizedChannel = filters?.channel?.trim().toLowerCase() ?? "";
     const scopedUtterances = this.config.loadTranscriptCandidates
       ? await this.config.loadTranscriptCandidates(query, {
-          channel: normalizedChannel.length > 0 ? normalizedChannel : undefined,
-          candidateLimit: 2000
+          channel: normalizedChannel.length > 0 ? normalizedChannel : undefined
         })
       : normalizedChannel.length > 0
         ? this.utterances.filter((entry) => entry.channel.trim().toLowerCase() === normalizedChannel)
@@ -619,11 +617,11 @@ export class AnalysisService {
       return cached;
     }
 
-    const ragRetrieval = retrieveRankedUtterances(query, scopedUtterances, 40);
+    const ragRetrieval = retrieveRankedUtterances(query, scopedUtterances, null);
     const baseEvidence = ragRetrieval.ranked.map((entry) => ({
       ...entry
     }));
-    const fallbackEvidence = scopedUtterances.slice(-40).map((entry) => ({
+    const fallbackEvidence = scopedUtterances.map((entry) => ({
       timestamp: entry.timestamp,
       day: entry.day,
       channel: entry.channel,
@@ -632,8 +630,19 @@ export class AnalysisService {
       source: entry.sourceFile,
       score: 0
     }));
-    const evidenceForPrompt = (baseEvidence.length > 0 ? baseEvidence : fallbackEvidence).slice(0, 40);
-    const daysQueried = new Set(evidenceForPrompt.map((entry) => entry.day)).size;
+    const evidenceForPrompt = baseEvidence.length > 0 ? baseEvidence : fallbackEvidence;
+    const promptEvidenceCharacterBudget = Math.max(24000, Math.floor(this.config.llmMaxTokens * 6));
+    let remainingPromptEvidenceCharacters = promptEvidenceCharacterBudget;
+    const promptEvidence = evidenceForPrompt.filter((entry) => {
+      const estimatedLength = entry.text.length + entry.channel.length + entry.timestamp.length + 24;
+      if (estimatedLength > remainingPromptEvidenceCharacters) {
+        return false;
+      }
+
+      remainingPromptEvidenceCharacters -= estimatedLength;
+      return true;
+    });
+    const daysQueried = new Set(promptEvidence.map((entry) => entry.day)).size;
     let answer = "";
 
     if (mode === "rag_chat") {
@@ -648,7 +657,7 @@ Return valid HTML fragments only using tags such as <h3>, <p>, <ul>, and <li>. D
           mode,
           query,
           queryTokens: ragRetrieval.queryTokens,
-          evidence: evidenceForPrompt.slice(0, 12).map((entry) => ({
+          evidence: promptEvidence.map((entry) => ({
             timestamp: entry.timestamp,
             day: entry.day,
             channel: entry.channel,
@@ -662,16 +671,16 @@ Return valid HTML fragments only using tags such as <h3>, <p>, <ul>, and <li>. D
     } else {
       const perDayTokenBudget = Math.max(128, Math.floor(this.config.llmMaxTokens * 0.1));
       const perDayCharacterBudget = perDayTokenBudget * 4;
-      const groupedByDay = new Map<string, typeof evidenceForPrompt>();
-      for (const entry of evidenceForPrompt) {
+      const groupedByDay = new Map<string, typeof promptEvidence>();
+      for (const entry of promptEvidence) {
         const bucket = groupedByDay.get(entry.day) ?? [];
         bucket.push(entry);
         groupedByDay.set(entry.day, bucket);
       }
 
-      const latestTenDays = [...groupedByDay.keys()].sort().slice(-10);
+      const orderedDays = [...groupedByDay.keys()].sort();
       const dayPassages = await Promise.all(
-        latestTenDays.map(async (day) => {
+        orderedDays.map(async (day) => {
           const dayEntries = groupedByDay.get(day) ?? [];
           let remaining = perDayCharacterBudget;
           const lines: string[] = [];
@@ -721,17 +730,17 @@ Return valid HTML fragments only using tags such as <h3>, <p>, <ul>, and <li>. D
     serverLogger.info("Chat prompt received", {
       mode,
       totalUtterances,
-      contextUtterances: evidenceForPrompt.length,
+      contextUtterances: promptEvidence.length,
       daysQueried
     });
 
     const payload = {
       answer,
-      evidence: evidenceForPrompt,
+      evidence: promptEvidence,
       strategy: {
         mode,
         totalUtterances,
-        contextUtterances: evidenceForPrompt.length,
+        contextUtterances: promptEvidence.length,
         daysQueried
       }
     };

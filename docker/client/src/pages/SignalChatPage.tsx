@@ -1,5 +1,5 @@
 import type { FunctionComponent, FormEvent } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { chat, searchUtterances, type ChatMode, type ChatResponse, type UtteranceSearchResponse } from "../api";
 import { useComponentIdentity } from "../components/dashboard/primitives/useComponentIdentity";
 import sharedStyles from "../styles/shared.module.css";
@@ -27,8 +27,6 @@ export const SignalChatPage: FunctionComponent = () => {
     }
 
     setError(null);
-    setSearchResponse(null);
-    setChatResponse(null);
     setIsThinking(true);
 
     try {
@@ -45,68 +43,51 @@ export const SignalChatPage: FunctionComponent = () => {
     }
   };
 
-  return (
-    <section className={sharedStyles["timeline-page"]} data-component-id={componentId} data-component-uid={componentUid}>
-      <header className={sharedStyles["timeline-header"]}>
-        <p className={sharedStyles["timeline-kicker"]}>Intelligence Interface</p>
-        <h2>Signal Chat</h2>
-        <p className={sharedStyles["timeline-subtitle"]}>Server-ranked transcript retrieval with evidence-aware synthesis.</p>
-      </header>
+  const queryTokenLabel = useMemo(() => {
+    if (!searchResponse) {
+      return "(none)";
+    }
+    return searchResponse.queryTokens.join(", ") || "(none)";
+  }, [searchResponse]);
 
-      <article className={sharedStyles.panel}>
-        <form className={styles["chat-form"]} onSubmit={(event) => void onSubmit(event)}>
-          <label className={styles["field-label"]} htmlFor="signal-chat-query">
-            Query
-          </label>
-          <textarea
-            id="signal-chat-query"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className={styles.textarea}
-            placeholder="Ask about anomalies, decisions, and mission signals."
-            rows={5}
-          />
-          <div className={styles["form-row"]}>
-            <label className={styles["field-label"]} htmlFor="signal-chat-mode">
-              Mode
-            </label>
-            <select id="signal-chat-mode" value={mode} onChange={(event) => setMode(event.target.value as ChatMode)}>
-              <option value="rag_chat">RAG Chat</option>
-              <option value="llm_chat">LLM Chat</option>
-            </select>
-            <button type="submit" disabled={isThinking || query.trim().length === 0}>
-              {isThinking ? "Thinking…" : "Submit"}
-            </button>
-          </div>
-        </form>
-      </article>
+  return (
+    <section className={styles.shell} data-component-id={componentId} data-component-uid={componentUid}>
+      <header className={styles.header}>
+        <div>
+          <p className={sharedStyles["timeline-kicker"]}>Search Workspace</p>
+          <h2>Signal Chat</h2>
+          <p className={sharedStyles["timeline-subtitle"]}>Ask mission questions and review ranked transcript evidence side-by-side.</p>
+        </div>
+      </header>
 
       {error ? <p className={sharedStyles["timeline-error"]}>{error}</p> : null}
 
-      <section className={styles["result-grid"]}>
-        <article className={sharedStyles.panel}>
-          <h3>Answer</h3>
-          {!chatResponse && !isThinking ? <p className={sharedStyles.subtle}>No answer yet. Submit a query to begin.</p> : null}
+      <section className={styles.workspace}>
+        <article className={`${sharedStyles.panel} ${styles["chat-log"]}`}>
+          <h3>Chat Log</h3>
+          {!chatResponse && !isThinking ? (
+            <p className={sharedStyles.subtle}>No answer yet. Submit a query to start the search flow.</p>
+          ) : null}
           {isThinking ? <p className={sharedStyles.subtle}>Synthesizing response from ranked evidence…</p> : null}
           {chatResponse ? (
-            <div className={`${sharedStyles["formatted-copy"]} ${styles.answer}`}>
-              {renderStructuredText(chatResponse.answer, sharedStyles["formatted-list"])}
-            </div>
-          ) : null}
-          {chatResponse ? (
-            <p className={styles.strategy}>
-              mode={chatResponse.strategy.mode} • days={chatResponse.strategy.daysQueried} • context={chatResponse.strategy.contextUtterances}/
-              {chatResponse.strategy.totalUtterances}
-            </p>
+            <>
+              <p className={styles.strategy}>
+                mode={chatResponse.strategy.mode} • days={chatResponse.strategy.daysQueried} • context=
+                {chatResponse.strategy.contextUtterances}/{chatResponse.strategy.totalUtterances}
+              </p>
+              <div className={`${sharedStyles["formatted-copy"]} ${styles.answer}`}>
+                {renderStructuredText(chatResponse.answer, sharedStyles["formatted-list"])}
+              </div>
+            </>
           ) : null}
         </article>
 
-        <article className={sharedStyles.panel}>
+        <article className={`${sharedStyles.panel} ${styles.evidence}`}>
           <h3>Evidence</h3>
-          {!searchResponse && !isThinking ? <p className={sharedStyles.subtle}>Evidence will appear after retrieval.</p> : null}
+          {!searchResponse && !isThinking ? <p className={sharedStyles.subtle}>Evidence appears here after retrieval.</p> : null}
           {searchResponse ? (
             <p className={styles.strategy}>
-              tokens={searchResponse.queryTokens.join(", ") || "(none)"} • results={searchResponse.resultCount}
+              tokens={queryTokenLabel} • results={searchResponse.resultCount}
             </p>
           ) : null}
           <ul className={styles["evidence-list"]}>
@@ -125,6 +106,34 @@ export const SignalChatPage: FunctionComponent = () => {
           </ul>
         </article>
       </section>
+
+      <article className={`${sharedStyles.panel} ${styles.composer}`}>
+        <form className={styles["chat-form"]} onSubmit={(event) => void onSubmit(event)}>
+          <label className={styles["field-label"]} htmlFor="signal-chat-query">
+            Query
+          </label>
+          <textarea
+            id="signal-chat-query"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className={styles.textarea}
+            placeholder="Ask about anomalies, decisions, and mission signals."
+            rows={3}
+          />
+          <div className={styles["form-row"]}>
+            <label className={styles["field-label"]} htmlFor="signal-chat-mode">
+              Mode
+            </label>
+            <select id="signal-chat-mode" value={mode} onChange={(event) => setMode(event.target.value as ChatMode)}>
+              <option value="rag_chat">RAG Chat</option>
+              <option value="llm_chat">LLM Chat</option>
+            </select>
+            <button type="submit" disabled={isThinking || query.trim().length === 0}>
+              {isThinking ? "Thinking…" : "Search"}
+            </button>
+          </div>
+        </form>
+      </article>
     </section>
   );
 };
