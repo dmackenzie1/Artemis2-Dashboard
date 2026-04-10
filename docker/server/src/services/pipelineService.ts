@@ -195,7 +195,7 @@ export class PipelineService {
 
   private async getLatestIngestAt(): Promise<string | null> {
     const em = this.getEntityManager();
-    const latestSourceFile = await em.findOne(IngestionSourceFile, {}, { orderBy: { updatedAt: "desc" } });
+    const [latestSourceFile] = await em.find(IngestionSourceFile, {}, { orderBy: { updatedAt: "desc" }, limit: 1 });
     if (!latestSourceFile) {
       return null;
     }
