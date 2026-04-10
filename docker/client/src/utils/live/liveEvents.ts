@@ -64,12 +64,37 @@ export const subscribeToLiveUpdates = (
   const eventSource = new EventSource("/api/events");
   let isFirstReady = true;
 
-  const onMessage = (rawEvent: MessageEvent<string>): void => {
+  const emitIfKnownEvent = (payload: unknown): void => {
+    if (!payload || typeof payload !== "object") {
+      return;
+    }
+
+    const candidate = payload as Partial<LiveUpdateEvent>;
+    if (!candidate.type || !LIVE_UPDATE_EVENT_TYPES.includes(candidate.type as LiveUpdateEventType) || !candidate.emittedAt) {
+      return;
+    }
+
+    onEvent(candidate as LiveUpdateEvent);
+  };
+
+  const onTypedMessage = (rawEvent: MessageEvent<string>): void => {
     try {
       const parsed = JSON.parse(rawEvent.data) as LiveUpdateEvent;
       onEvent(parsed);
     } catch (error) {
       clientLogger.warn("Failed to parse server live-update event", {
+        error,
+        eventType: rawEvent.type
+      });
+    }
+  };
+
+  const onGenericMessage = (rawEvent: MessageEvent<string>): void => {
+    try {
+      const parsed = JSON.parse(rawEvent.data) as unknown;
+      emitIfKnownEvent(parsed);
+    } catch (error) {
+      clientLogger.warn("Failed to parse generic SSE message", {
         error,
         eventType: rawEvent.type
       });
@@ -92,8 +117,9 @@ export const subscribeToLiveUpdates = (
   eventSource.addEventListener("ready", onReady as EventListener);
 
   for (const eventType of LIVE_UPDATE_EVENT_TYPES) {
-    eventSource.addEventListener(eventType, onMessage as EventListener);
+    eventSource.addEventListener(eventType, onTypedMessage as EventListener);
   }
+  eventSource.addEventListener("message", onGenericMessage as EventListener);
 
   eventSource.addEventListener("error", () => {
     clientLogger.warn("Live-update event stream disconnected; browser will retry automatically");
@@ -103,8 +129,9 @@ export const subscribeToLiveUpdates = (
     close: () => {
       eventSource.removeEventListener("ready", onReady as EventListener);
       for (const eventType of LIVE_UPDATE_EVENT_TYPES) {
-        eventSource.removeEventListener(eventType, onMessage as EventListener);
+        eventSource.removeEventListener(eventType, onTypedMessage as EventListener);
       }
+      eventSource.removeEventListener("message", onGenericMessage as EventListener);
       eventSource.close();
     }
   };
