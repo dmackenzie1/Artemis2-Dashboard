@@ -115,6 +115,18 @@ type PromptMatrixRow = {
   cells: PromptMatrixCell[];
 };
 
+type PromptMatrixExecutionRecord = {
+  id: number;
+  promptKey: string;
+  status: PromptExecution["status"];
+  responseDay: string | null;
+  startedAt: string | Date;
+  sentAt: string | Date | null;
+  receivedAt: string | Date | null;
+  errorMessage: string | null;
+  submittedText: string | null;
+};
+
 export class PipelineService {
   private runInProgress = false;
   private missionStatsCache: { computedAtMs: number; payload: MissionStatsView } | null = null;
@@ -164,6 +176,41 @@ export class PipelineService {
       return "error";
     }
     return "sent";
+  }
+
+  private derivePromptMatrixExecutionDays(
+    execution: PromptMatrixExecutionRecord,
+    cutoffDayString: string
+  ): string[] {
+    const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/u;
+    const normalizedDays: string[] = [];
+    const appendDay = (candidate: string | null | undefined): void => {
+      if (!candidate || !isoDatePattern.test(candidate) || candidate < cutoffDayString || normalizedDays.includes(candidate)) {
+        return;
+      }
+      normalizedDays.push(candidate);
+    };
+
+    appendDay(execution.responseDay);
+
+    if (normalizedDays.length === 0 && execution.submittedText) {
+      try {
+        const parsed = JSON.parse(execution.submittedText) as { dayGroups?: Array<{ day?: unknown }> };
+        if (Array.isArray(parsed.dayGroups)) {
+          for (const group of parsed.dayGroups) {
+            appendDay(typeof group?.day === "string" ? group.day : null);
+          }
+        }
+      } catch (_error) {
+        // Ignore malformed historical payloads and fall through to timestamp-derived day.
+      }
+    }
+
+    if (normalizedDays.length === 0) {
+      appendDay(dayjs(execution.sentAt ?? execution.startedAt).utc().format("YYYY-MM-DD"));
+    }
+
+    return normalizedDays;
   }
 
   private async listTranscriptDays(limit: number): Promise<string[]> {
@@ -825,33 +872,20 @@ export class PipelineService {
           pe.started_at as "startedAt",
           pe.sent_at as "sentAt",
           pe.received_at as "receivedAt",
-          pe.error_message as "errorMessage"
+          pe.error_message as "errorMessage",
+          pe.submitted_text as "submittedText"
         from prompt_executions pe
         inner join prompt_definitions pd on pd.id = pe.prompt_id
         where pe.started_at >= ?
         order by pe.started_at desc, pe.id desc
       `,
       [cutoffDate]
-    )) as Array<{
-      id: number;
-      promptKey: string;
-      status: PromptExecution["status"];
-      responseDay: string | null;
-      startedAt: string | Date;
-      sentAt: string | Date | null;
-      receivedAt: string | Date | null;
-      errorMessage: string | null;
-    }>;
+    )) as PromptMatrixExecutionRecord[];
     const latestIngestAt = await this.getLatestIngestAt();
     const transcriptDays = await this.listTranscriptDays(safeDaysLimit);
     const cutoffDayString = dayjs(cutoffDate).utc().format("YYYY-MM-DD");
-    // Guard against malformed or anachronistic responseDay values (e.g. "2006-04-01"
-    // that appear when an execution row has a bad responseDay) by keeping only days
-    // that look like valid ISO dates AND fall within the configured cutoff window.
-    const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/u;
     const validExecutionDays = executions
-      .map((execution) => execution.responseDay ?? dayjs(execution.sentAt ?? execution.startedAt).utc().format("YYYY-MM-DD"))
-      .filter((day) => isoDatePattern.test(day) && day >= cutoffDayString);
+      .flatMap((execution) => this.derivePromptMatrixExecutionDays(execution, cutoffDayString));
     const dayKeys = Array.from(new Set([...transcriptDays, ...validExecutionDays]))
       .sort((left, right) => left.localeCompare(right))
       .slice(-safeDaysLimit);
@@ -879,18 +913,20 @@ export class PipelineService {
       if (!row) {
         continue;
       }
-      const day = execution.responseDay ?? dayjs(execution.sentAt ?? execution.startedAt).utc().format("YYYY-MM-DD");
-      const cell = row.cells.find((entry) => entry.day === day);
-      if (!cell || cell.executionId !== null) {
-        continue;
-      }
+      const executionDays = this.derivePromptMatrixExecutionDays(execution, cutoffDayString);
+      for (const day of executionDays) {
+        const cell = row.cells.find((entry) => entry.day === day);
+        if (!cell || cell.executionId !== null) {
+          continue;
+        }
 
-      cell.state = this.mapPromptExecutionStatusToMatrixState(execution.status);
-      cell.sentAt = dayjs(execution.sentAt ?? execution.startedAt).utc().toISOString();
-      cell.receivedAt = execution.receivedAt ? dayjs(execution.receivedAt).utc().toISOString() : null;
-      cell.responseDay = execution.responseDay ?? null;
-      cell.executionId = execution.id;
-      cell.errorMessage = execution.status === "failed" ? execution.errorMessage : null;
+        cell.state = this.mapPromptExecutionStatusToMatrixState(execution.status);
+        cell.sentAt = dayjs(execution.sentAt ?? execution.startedAt).utc().toISOString();
+        cell.receivedAt = execution.receivedAt ? dayjs(execution.receivedAt).utc().toISOString() : null;
+        cell.responseDay = execution.responseDay ?? null;
+        cell.executionId = execution.id;
+        cell.errorMessage = execution.status === "failed" ? execution.errorMessage : null;
+      }
     }
 
     return {
