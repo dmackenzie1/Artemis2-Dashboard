@@ -45,6 +45,13 @@
   padding: 0.62rem 0.72rem;
   background: linear-gradient(180deg, rgba(10, 24, 44, 0.5), rgba(8, 16, 32, 0.44));
   min-height: 172px;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.notable-moment-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(146, 217, 255, 0.42);
+  box-shadow: 0 0 14px rgba(83, 173, 240, 0.25);
 }
 
 .notable-moment-card h3 {

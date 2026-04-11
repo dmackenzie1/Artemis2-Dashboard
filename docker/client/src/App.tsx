@@ -101,8 +101,8 @@ export const App: FC = () => {
           <NavLink to="/overview" className={({ isActive }) => (isActive ? styles["nav-link-selected"] : styles["nav-link"])}>
             Overview
           </NavLink>
-          <NavLink to="/daily" className={({ isActive }) => (isActive ? styles["nav-link-selected"] : styles["nav-link"])}>
-            Daily
+          <NavLink to="/dailies" className={({ isActive }) => (isActive ? styles["nav-link-selected"] : styles["nav-link"])}>
+            Dailies
           </NavLink>
           <NavLink
             to="/timeline"
@@ -120,7 +120,7 @@ export const App: FC = () => {
             to="/chat"
             className={({ isActive }) => (isActive ? styles["nav-link-selected"] : styles["nav-link"])}
           >
-            Search
+            Chat
           </NavLink>
           <NavLink
             to="/system-logs"
@@ -154,10 +154,11 @@ export const App: FC = () => {
         <Routes>
           <Route path="/" element={<Navigate to="/overview" replace />} />
           <Route path="/overview" element={<DashboardPage />} />
-          <Route path="/daily" element={<DailyPage />} />
-          <Route path="/3-hour" element={<Navigate to="/daily" replace />} />
-          <Route path="/6-hour" element={<Navigate to="/daily" replace />} />
-          <Route path="/12-hour" element={<Navigate to="/daily" replace />} />
+          <Route path="/daily" element={<Navigate to="/dailies" replace />} />
+          <Route path="/dailies" element={<DailyPage />} />
+          <Route path="/3-hour" element={<Navigate to="/dailies" replace />} />
+          <Route path="/6-hour" element={<Navigate to="/dailies" replace />} />
+          <Route path="/12-hour" element={<Navigate to="/dailies" replace />} />
           <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/notable" element={<NotableMomentsPage />} />
           <Route path="/talkierag" element={<Navigate to="/chat" replace />} />

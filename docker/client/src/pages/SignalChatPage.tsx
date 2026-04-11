@@ -54,7 +54,7 @@ export const SignalChatPage: FunctionComponent = () => {
     <section className={styles.shell} data-component-id={componentId} data-component-uid={componentUid}>
       <header className={styles.header}>
         <div>
-          <p className={sharedStyles["timeline-kicker"]}>Search Workspace</p>
+          <p className={sharedStyles["timeline-kicker"]}>Mission Workspace</p>
           <h2>Signal Chat</h2>
           <p className={sharedStyles["timeline-subtitle"]}>Ask mission questions and review ranked transcript evidence side-by-side.</p>
         </div>
@@ -110,7 +110,7 @@ export const SignalChatPage: FunctionComponent = () => {
       <article className={`${sharedStyles.panel} ${styles.composer}`}>
         <form className={styles["chat-form"]} onSubmit={(event) => void onSubmit(event)}>
           <label className={styles["field-label"]} htmlFor="signal-chat-query">
-            Query
+            Chat Prompt
           </label>
           <textarea
             id="signal-chat-query"
@@ -129,7 +129,7 @@ export const SignalChatPage: FunctionComponent = () => {
               <option value="llm_chat">LLM Chat</option>
             </select>
             <button type="submit" disabled={isThinking || query.trim().length === 0}>
-              {isThinking ? "Thinking…" : "Search"}
+              {isThinking ? "Thinking…" : "Chat"}
             </button>
           </div>
         </form>

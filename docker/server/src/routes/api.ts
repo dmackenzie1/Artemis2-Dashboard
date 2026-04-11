@@ -153,6 +153,22 @@ export const createApiRouter = (
     }
   });
 
+  router.get("/stats/channels/totals", async (_req, res, next) => {
+    try {
+      const statsService = getStatsService?.();
+      if (!statsService) {
+        res.status(503).json({ message: "Stats DB is disabled. Enable TRANSCRIPTS_DB_ENABLED for database-backed stats." });
+        return;
+      }
+
+      const payload = await statsService.getChannelTotals();
+      res.json(payload);
+    } catch (error) {
+      serverLogger.error("Channel totals request failed", { error: serializeUnknownError(error) });
+      next(error);
+    }
+  });
+
 
   router.get("/time-window-summary", async (req, res, next) => {
     try {

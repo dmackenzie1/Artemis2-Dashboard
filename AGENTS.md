@@ -85,3 +85,7 @@ When an AI agent finishes a task, it must fulfill the EMSS paper trail requireme
 ## Security Rules
 - NEVER hardcode secrets. Always use `env.config.ts` or `env.secret.ts`.
 - When modifying deployment scripts or `docker-compose.yml`, note that we deploy to FIT (Facility for Integration and Testing) servers (carbon, gold, iron, neon, oxygen). Ensure configurations respect this target environment.
+
+## Versioning Discipline
+- When shipping dashboard-facing behavior changes, increment package versions using semver (`major.minor.patch`) before finalizing commits.
+- Use a minor bump for feature-focused UI/API enhancements and a major bump only for breaking operational workflow changes.

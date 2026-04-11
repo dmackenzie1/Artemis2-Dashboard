@@ -28,12 +28,19 @@ const renderWindowLabel = (value: WindowOption): string => {
   return `${value}h`;
 };
 
+const missionPromptKeyByWindow: Record<WindowOption, string> = {
+  3: "mission_summary_3h",
+  6: "mission_summary_6h",
+  12: "mission_summary_12h",
+  complete: "mission_summary_complete"
+};
+
 const buildMissionSummary = (dashboardData: DashboardData | null, pipelineData: PipelineDashboardData | null): {
   statusLabel: string;
   summaryText: string;
   lastRunAt: string | null;
 } => {
-  const missionPrompt = pipelineData?.prompts.find((entry) => entry.key === "mission_summary");
+  const missionPrompt = pipelineData?.prompts.find((entry) => entry.key === missionPromptKeyByWindow.complete);
   const fallbackSummary = dashboardData?.missionSummary?.trim();
 
   if (missionPrompt) {
@@ -89,8 +96,18 @@ export const RecentWindowPanel: FunctionComponent<{ refreshToken?: number }> = (
           setHasError(true);
         }
       } else {
-        const payload = await fetchTimeWindowSummary(windowOption);
-        setData(payload);
+        const [windowSummaryResult, pipelineResult] = await Promise.allSettled([fetchTimeWindowSummary(windowOption), fetchPipelineDashboard()]);
+        const payload = windowSummaryResult.status === "fulfilled" ? windowSummaryResult.value : null;
+        if (!payload) {
+          throw new Error("Unable to load time-window summary");
+        }
+
+        const pipelineData = pipelineResult.status === "fulfilled" ? pipelineResult.value : null;
+        const promptOutput = pipelineData?.prompts.find((entry) => entry.key === missionPromptKeyByWindow[windowOption])?.output?.trim() ?? "";
+        setData({
+          ...payload,
+          summary: promptOutput.length > 0 ? promptOutput : payload.summary
+        });
         setMissionData(null);
       }
     } catch (error) {

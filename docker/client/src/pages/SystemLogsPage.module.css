@@ -106,6 +106,18 @@
   box-shadow: 0 0 16px rgba(97, 194, 255, 0.26);
 }
 
+.system-socket-event-row {
+  grid-template-columns: 220px 240px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.system-socket-event-row small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .system-logs-textbox {
   width: 100%;
   min-height: 620px;

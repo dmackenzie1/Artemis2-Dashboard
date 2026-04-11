@@ -1,6 +1,13 @@
 import type { FunctionComponent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchStatsDailyVolume, fetchStatsHourlyByChannel, fetchStatsSummary, type MissionStatsSummaryData } from "../../api";
+import {
+  fetchStatsChannelTotals,
+  fetchStatsDailyVolume,
+  fetchStatsHourlyByChannel,
+  fetchStatsSummary,
+  type MissionChannelTotalsEntry,
+  type MissionStatsSummaryData
+} from "../../api";
 import sharedStyles from "../../styles/shared.module.css";
 import styles from "./StatsPanel.module.css";
 import { DashboardPanel } from "./primitives/DashboardPanel";
@@ -17,14 +24,16 @@ const formatMetricValue = (value: number): string => {
 export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refreshToken = 0 }) => {
   const [statsSummary, setStatsSummary] = useState<MissionStatsSummaryData | null>(null);
   const [dailyTranscriptVolume, setDailyTranscriptVolume] = useState<Array<{ day: string; utterances: number; words: number }>>([]);
+  const [channelTotals, setChannelTotals] = useState<MissionChannelTotalsEntry[]>([]);
   const [timelineHours, setTimelineHours] = useState(0);
   const [hasError, setHasError] = useState(false);
 
   const loadStats = useCallback(async (): Promise<void> => {
-    const [statsSummaryResult, dailyVolumeResult, hourlyResult] = await Promise.allSettled([
+    const [statsSummaryResult, dailyVolumeResult, hourlyResult, channelTotalsResult] = await Promise.allSettled([
       fetchStatsSummary(),
       fetchStatsDailyVolume(),
-      fetchStatsHourlyByChannel(30)
+      fetchStatsHourlyByChannel(30),
+      fetchStatsChannelTotals()
     ]);
 
     // Only flip the error badge when the primary summary fetch fails or returns
@@ -67,6 +76,12 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
     } else {
       // Non-critical — log but do not flip the error badge.
       clientLogger.error("Failed to fetch hourly stats for stats panel", { error: hourlyResult.reason });
+    }
+
+    if (channelTotalsResult.status === "fulfilled") {
+      setChannelTotals(channelTotalsResult.value);
+    } else {
+      clientLogger.error("Failed to fetch channel totals for stats panel", { error: channelTotalsResult.reason });
     }
 
     setHasError(encounteredFailure);
@@ -192,6 +207,29 @@ export const StatsPanel: FunctionComponent<{ refreshToken?: number }> = ({ refre
                     <td>{formatMetricValue(dailyVolumeTotals.words)}</td>
                   </tr>
                 </tfoot>
+              </table>
+            </section>
+          ) : null}
+          {channelTotals.length > 0 ? (
+            <section className={styles["stats-group"]}>
+              <p className={styles["stats-group-label"]}>Channel Totals (All Days)</p>
+              <table className={styles["daily-volume-table"]}>
+                <thead>
+                  <tr>
+                    <th scope="col">Channel</th>
+                    <th scope="col">Utterances</th>
+                    <th scope="col">Words</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {channelTotals.map((entry) => (
+                    <tr key={entry.channel}>
+                      <th scope="row">{entry.channel}</th>
+                      <td>{formatMetricValue(entry.utterances)}</td>
+                      <td>{formatMetricValue(entry.words)}</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </section>
           ) : null}

@@ -417,9 +417,9 @@ export const SystemLogsPage: FunctionComponent = () => {
         <ul className={styles["system-logs-list"]}>
           {recentEvents.map((event, index) => (
             <li key={`${event.type}-${event.emittedAt}-${index}`}>
-              <div className={styles["system-logs-item"]}>
-                <span>{event.type}</span>
+              <div className={`${styles["system-logs-item"]} ${styles["system-socket-event-row"]}`}>
                 <strong>{formatTimestamp(event.emittedAt)} UTC</strong>
+                <span>{event.type}</span>
                 <small>{JSON.stringify(event.payload ?? {}, null, 0)}</small>
               </div>
             </li>

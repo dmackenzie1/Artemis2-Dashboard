@@ -114,6 +114,12 @@ export type MissionDailyVolumeData = {
   }>;
 };
 
+export type MissionChannelTotalsEntry = {
+  channel: string;
+  utterances: number;
+  words: number;
+};
+
 export type TimelineDayEntry = {
   day: string;
   summary: string;
@@ -392,6 +398,16 @@ export const fetchStatsDailyVolume = async (days?: number): Promise<MissionDaily
   }
 
   return (await response.json()) as MissionDailyVolumeData;
+};
+
+export const fetchStatsChannelTotals = async (): Promise<MissionChannelTotalsEntry[]> => {
+  const response = await fetch(`${base}/stats/channels/totals`);
+  if (!response.ok) {
+    clientLogger.warn("Channel totals unavailable", { status: response.status });
+    return [];
+  }
+
+  return (await response.json()) as MissionChannelTotalsEntry[];
 };
 
 
