@@ -152,7 +152,7 @@ export const App: FC = () => {
 
       <main className={isSearchRoute ? styles["main-fullbleed"] : styles.main}>
         <Routes>
-          <Route path="/" element={<Navigate to="/chat" replace />} />
+          <Route path="/" element={<Navigate to="/overview" replace />} />
           <Route path="/overview" element={<DashboardPage />} />
           <Route path="/daily" element={<DailyPage />} />
           <Route path="/3-hour" element={<Navigate to="/daily" replace />} />

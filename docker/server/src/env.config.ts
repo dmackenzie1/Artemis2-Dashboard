@@ -10,6 +10,7 @@ const EnvSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default("opusplan"),
   LLM_MAX_TOKENS: z.coerce.number().int().positive().default(12000),
+  LLM_MAX_USER_PROMPT_CHARACTERS: z.coerce.number().int().positive().default(1_250_000),
   TRANSCRIPTS_DB_ENABLED: z.coerce.boolean().default(true),
   DB_HOST: z.string().default("localhost"),
   DB_PORT: z.coerce.number().int().positive().default(5432),
