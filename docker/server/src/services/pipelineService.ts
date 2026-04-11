@@ -12,8 +12,7 @@ import { LlmClient } from "./llmClient.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 import { liveUpdateBus } from "./liveUpdateBus.js";
 import { TranscriptContextBuilder } from "./pipeline/TranscriptContextBuilder.js";
-import { createSummaryPromptGenerators } from "./pipeline/summaryGenerators.js";
-import { canonicalPromptKey, promptExecutionPriority, runnablePromptKeys } from "./pipeline/promptCatalog.js";
+import { canonicalPromptKey, promptExecutionPriority, runnablePromptKeys, systemStatusPromptKeys } from "./pipeline/promptCatalog.js";
 import type { SourceContextDocument } from "./pipeline/pipelineTypes.js";
 
 type EntityManagerProvider = () => EntityManager;
@@ -33,12 +32,10 @@ type PipelineConfig = {
 type PromptDashboardEntry = {
   id: number;
   key: string;
-  componentId: string;
   fileName: string;
   promptUpdatedAt: string;
   lastRunAt: string | null;
   status: "running" | "success" | "failed" | "never";
-  cacheHit: boolean;
   submittedPreview: string | null;
   outputPreview: string | null;
   submittedText: string | null;
@@ -71,11 +68,6 @@ const missionStatsCacheTtlMs = 5 * 60 * 1000;
 const canonicalChannelGroup = "*";
 const dailyFullSummaryType = "daily_full";
 
-
-type ParsedSummaryArtifactSection = {
-  day: string;
-  summary: string;
-};
 
 type PromptDefinitionSyncResult = {
   changedPrompts: number;
@@ -111,7 +103,6 @@ type PromptMatrixCell = {
 
 type PromptMatrixRow = {
   key: string;
-  componentId: string;
   cells: PromptMatrixCell[];
 };
 
@@ -131,19 +122,12 @@ export class PipelineService {
   private runInProgress = false;
   private missionStatsCache: { computedAtMs: number; payload: MissionStatsView } | null = null;
   private readonly transcriptContextBuilder: TranscriptContextBuilder;
-  private readonly summaryGenerators: ReturnType<typeof createSummaryPromptGenerators>;
 
   constructor(
     private readonly getEntityManager: EntityManagerProvider,
     private readonly config: PipelineConfig
   ) {
     this.transcriptContextBuilder = new TranscriptContextBuilder();
-    this.summaryGenerators = createSummaryPromptGenerators({
-      llmClient: this.config.llmClient,
-      getEntityManager: this.getEntityManager,
-      transcriptContextBuilder: this.transcriptContextBuilder,
-      notableMomentsConfig: this.config.notableMoments
-    });
   }
 
   private async persistPromptSubmission(promptKey: string, submittedText: string): Promise<string> {
@@ -234,10 +218,6 @@ export class PipelineService {
     }
   }
 
-  private derivePromptResponseDay(sourceContext: SourceContextDocument[]): string | null {
-    return this.transcriptContextBuilder.derivePromptResponseDay(sourceContext);
-  }
-
   private async getLatestIngestAt(): Promise<string | null> {
     const em = this.getEntityManager();
     const [latestSourceFile] = await em.find(IngestionSourceFile, {}, { orderBy: { updatedAt: "desc" }, limit: 1 });
@@ -248,58 +228,6 @@ export class PipelineService {
     return dayjs(latestSourceFile.updatedAt).utc().toISOString();
   }
 
-  private async buildPromptSubmission(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
-    if (prompt.key === "daily_summary") {
-      return this.transcriptContextBuilder.buildDailySummarySubmission(sourceContext);
-    }
-
-    if (prompt.key === "recent_changes") {
-      return this.transcriptContextBuilder.buildRecentChangesSubmission(sourceContext);
-    }
-
-    if (prompt.key === "notable_moments") {
-      return this.transcriptContextBuilder.buildNotableMomentsSubmission(
-        sourceContext,
-        this.config.notableMoments.baselinePerDay
-      );
-    }
-
-    return JSON.stringify(
-      {
-        generatedAt: dayjs().utc().toISOString(),
-        sourceDocuments: sourceContext
-      },
-      null,
-      2
-    );
-  }
-
-  private async generateSummaryArtifactOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
-    const generator = this.summaryGenerators.get("daily_summary");
-    if (!generator) {
-      throw new Error("Daily summary generator is not configured.");
-    }
-    return generator.generateOutput(prompt, sourceContext);
-  }
-
-  private async generateNotableMomentsOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
-    const generator = this.summaryGenerators.get("notable_moments");
-    if (!generator) {
-      throw new Error("Notable moments generator is not configured.");
-    }
-    return generator.generateOutput(prompt, sourceContext);
-  }
-
-  private async generateHalfDaySummaryOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
-    if (prompt.key !== "daily_summary_am" && prompt.key !== "daily_summary_pm") {
-      throw new Error(`Unsupported half-day summary prompt key: ${prompt.key}`);
-    }
-    const generator = this.summaryGenerators.get(prompt.key);
-    if (!generator) {
-      throw new Error(`Half-day summary generator is not configured for key: ${prompt.key}`);
-    }
-    return generator.generateOutput(prompt, sourceContext);
-  }
 
   private buildPromptQueue(prompts: PromptDefinition[]): PromptDefinition[] {
     const indexByKey = new Map<string, number>(promptExecutionPriority.map((key, index) => [key, index]));
@@ -333,23 +261,6 @@ export class PipelineService {
       .filter((line) => line.length > 0).length;
   }
 
-  private parseSummaryArtifactSections(output: string): ParsedSummaryArtifactSection[] {
-    const sections: ParsedSummaryArtifactSection[] = [];
-    const sectionPattern = /^##\s+(.+?)\n+([\s\S]*?)(?=^##\s+.+?$|$)/gmu;
-    let match = sectionPattern.exec(output);
-
-    while (match) {
-      const day = match[1]?.trim();
-      const summary = match[2]?.trim() ?? "";
-      if (day && summary) {
-        sections.push({ day, summary });
-      }
-      match = sectionPattern.exec(output);
-    }
-
-    return sections;
-  }
-
   private countWords(text: string): number {
     const trimmed = text.trim();
     if (trimmed.length === 0) {
@@ -358,81 +269,57 @@ export class PipelineService {
     return trimmed.split(/\s+/u).length;
   }
 
-  private async persistSummaryArtifacts(output: string, sourceContext: SourceContextDocument[]): Promise<void> {
+  private async persistSingleDaySummaryArtifact(
+    day: string,
+    summary: string,
+    sourceDocuments: SourceContextDocument[]
+  ): Promise<void> {
     const em = this.getEntityManager();
-    const dayGroupsByDay = new Map(this.transcriptContextBuilder.buildDailyGroups(sourceContext).map((group) => [group.day, group]));
-    const parsedSections = this.parseSummaryArtifactSections(output);
-    if (parsedSections.length === 0) {
+    const periodStart = dayjs(`${day}T00:00:00Z`).utc().toDate();
+    const periodEnd = dayjs(`${day}T23:59:59.999Z`).utc().toDate();
+    const generatedAt = dayjs().utc().toDate();
+    const utteranceCount = sourceDocuments.reduce((total, document) => total + this.countNonEmptyLines(document.content), 0);
+    const sourceChecksum = crypto
+      .createHash("sha256")
+      .update(sourceDocuments.map((document) => `${document.path}:${document.checksum}`).join("|"))
+      .digest("hex");
+    const existing = await em.findOne(SummaryArtifact, {
+      summaryType: dailyFullSummaryType,
+      channelGroup: canonicalChannelGroup,
+      periodStart
+    });
+
+    if (!existing) {
+      em.persist(
+        em.create(SummaryArtifact, {
+          summaryType: dailyFullSummaryType,
+          day,
+          periodStart,
+          periodEnd,
+          channelGroup: canonicalChannelGroup,
+          summary,
+          generatedAt,
+          updatedAt: generatedAt,
+          wordCount: this.countWords(summary),
+          utteranceCount,
+          sourceDocumentCount: sourceDocuments.length,
+          sourceChecksum
+        })
+      );
+      await em.flush();
       return;
     }
 
-    const generatedAt = dayjs().utc().toDate();
-
-    // Pre-fetch all existing SummaryArtifact rows that overlap with any of the
-    // parsed sections in a single query, then match by periodStart in memory.
-    // This replaces the previous per-section findOne inside the loop (N+1).
-    const periodStarts = parsedSections.map((section) => dayjs(`${section.day}T00:00:00Z`).utc().toDate());
-    const existingArtifacts = await em.find(SummaryArtifact, {
-      summaryType: dailyFullSummaryType,
-      channelGroup: canonicalChannelGroup,
-      periodStart: { $in: periodStarts }
-    });
-    const existingByPeriodStart = new Map(
-      existingArtifacts.map((artifact) => [artifact.periodStart.getTime(), artifact])
-    );
-
-    for (const section of parsedSections) {
-      const group = dayGroupsByDay.get(section.day);
-      const utteranceCount = group?.documents.reduce(
-        (total, document) => total + this.countNonEmptyLines(document.content),
-        0
-      ) ?? 0;
-      const sourceDocumentCount = group?.documents.length ?? 0;
-      const periodStart = dayjs(`${section.day}T00:00:00Z`).utc().toDate();
-      const periodEnd = dayjs(`${section.day}T23:59:59.999Z`).utc().toDate();
-      const sourceChecksum = crypto
-        .createHash("sha256")
-        .update(group?.documents.map((document) => `${document.path}:${document.checksum}`).join("|") ?? "")
-        .digest("hex");
-      const existing = existingByPeriodStart.get(periodStart.getTime()) ?? null;
-
-      if (!existing) {
-        em.persist(
-          em.create(SummaryArtifact, {
-            summaryType: dailyFullSummaryType,
-            day: section.day,
-            periodStart,
-            periodEnd,
-            channelGroup: canonicalChannelGroup,
-            summary: section.summary,
-            generatedAt,
-            updatedAt: generatedAt,
-            wordCount: this.countWords(section.summary),
-            utteranceCount,
-            sourceDocumentCount,
-            sourceChecksum
-          })
-        );
-        continue;
-      }
-
-      existing.summaryType = dailyFullSummaryType;
-      existing.summary = section.summary;
-      existing.day = section.day;
-      existing.periodStart = periodStart;
-      existing.periodEnd = periodEnd;
-      existing.generatedAt = generatedAt;
-      existing.updatedAt = generatedAt;
-      existing.wordCount = this.countWords(section.summary);
-      existing.utteranceCount = utteranceCount;
-      existing.sourceDocumentCount = sourceDocumentCount;
-      existing.sourceChecksum = sourceChecksum;
-    }
-
-    const flush = (em as { flush?: () => Promise<void> }).flush;
-    if (typeof flush === "function") {
-      await flush.call(em);
-    }
+    existing.summary = summary;
+    existing.day = day;
+    existing.periodEnd = periodEnd;
+    existing.generatedAt = generatedAt;
+    existing.updatedAt = generatedAt;
+    existing.wordCount = this.countWords(summary);
+    existing.utteranceCount = utteranceCount;
+    existing.sourceDocumentCount = sourceDocuments.length;
+    existing.sourceChecksum = sourceChecksum;
+    await em.flush();
   }
 
   private filterSourceContextByDayKeys(sourceContext: SourceContextDocument[], dayKeys: Set<string>): SourceContextDocument[] {
@@ -590,7 +477,6 @@ export class PipelineService {
     for (const execution of staleExecutions) {
       execution.status = "failed";
       execution.receivedAt = failedAt;
-      execution.finishedAt = failedAt;
       execution.errorMessage = "Recovered after interrupted pipeline run before completion.";
     }
 
@@ -609,166 +495,266 @@ export class PipelineService {
     const em = this.getEntityManager();
     const allPrompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
     const prompts = this.buildPromptQueue(allPrompts);
+    const promptByKey = new Map(prompts.map((prompt) => [prompt.key, prompt]));
     const changedDayKeys = options?.changedDayKeys ?? new Set<string>();
     const changedPromptKeys = options?.changedPromptKeys ?? new Set<string>();
     const sourceDocumentsChanged = options?.sourceDocumentsChanged ?? true;
-    // When source context is not provided externally, build it from the DB.
-    // Pass changedDayKeys so the query is scoped to only the affected days
-    // rather than scanning every row in the table.
     const sourceContext = options?.sourceContext ?? (await this.buildSourceContextFromTranscriptDatabase(changedDayKeys));
-    let latestSummaryArtifactOutput: string | null = null;
+    const dayGroups = this.transcriptContextBuilder.buildDailyGroups(sourceContext);
+    const runDays = dayGroups
+      .map((group) => group.day)
+      .filter((day) => changedDayKeys.size === 0 || changedDayKeys.has(day))
+      .sort((left, right) => left.localeCompare(right));
+    const dayDocumentsByKey = new Map(
+      dayGroups.map((group) => [group.day, this.filterSourceContextByDayKeys(sourceContext, new Set([group.day]))])
+    );
+    const notableDayOutputs: Array<{ day: string; output: string }> = [];
 
-    for (const prompt of prompts) {
-      const promptChanged = changedPromptKeys.has(prompt.key);
-      const shouldRunPrompt =
-        prompt.key === "mission_summary"
-          ? sourceDocumentsChanged || promptChanged || latestSummaryArtifactOutput !== null
-          : sourceDocumentsChanged || promptChanged;
-      if (!shouldRunPrompt) {
-        continue;
-      }
-
+    const runPromptExecution = async (params: {
+      prompt: PromptDefinition;
+      responseDay: string | null;
+      submittedText: string;
+      sourceDocumentCount: number;
+      outputFactory: (execution: PromptExecution) => Promise<string>;
+    }): Promise<string | null> => {
       const startedAt = dayjs().utc().toDate();
-      const promptSourceContext =
-        prompt.key === "daily_summary" && changedDayKeys.size > 0 && !promptChanged
-          ? this.filterSourceContextByDayKeys(sourceContext, changedDayKeys)
-          : sourceContext;
-      if ((prompt.key === "daily_summary" || prompt.key === "notable_moments") && promptSourceContext.length === 0) {
-        continue;
-      }
-
-      const submittedText = await this.buildPromptSubmission(prompt, promptSourceContext);
-      if (prompt.key === "mission_summary" && !latestSummaryArtifactOutput) {
-        const existingDailySummaries = await em.find(
-          SummaryArtifact,
-          { summaryType: dailyFullSummaryType, channelGroup: canonicalChannelGroup },
-          { orderBy: { day: "asc" } }
-        );
-        latestSummaryArtifactOutput = this.buildSummaryArtifactOutputFromCache(existingDailySummaries);
-      }
-      const missionSubmittedText: string =
-        prompt.key === "mission_summary" && latestSummaryArtifactOutput
-          ? JSON.stringify(
-              {
-                generatedAt: dayjs().utc().toISOString(),
-                strategy: "summaries-over-raw-docs",
-                dailySummaryOutput: latestSummaryArtifactOutput
-              },
-              null,
-              2
-            )
-          : submittedText;
-      const responseDay = this.derivePromptResponseDay(promptSourceContext);
       const execution: PromptExecution = em.create(PromptExecution, {
-        prompt,
-        componentId: prompt.key,
-        cacheKey: "",
-        cacheHit: false,
-        responseDay,
+        prompt: params.prompt,
+        responseDay: params.responseDay,
         startedAt,
         sentAt: startedAt,
         receivedAt: null,
-        finishedAt: null,
         status: "running",
-        submittedText: missionSubmittedText,
+        submittedText: params.submittedText,
         output: "",
         errorMessage: null
       });
       em.persist(execution);
       await em.flush();
-      const promptSubmissionPath = await this.persistPromptSubmission(prompt.key, missionSubmittedText);
+      const promptSubmissionPath = await this.persistPromptSubmission(params.prompt.key, params.submittedText);
       liveUpdateBus.publish({
         type: "prompt.sent",
         payload: {
           executionId: execution.id,
-          promptKey: prompt.key,
-          componentId: execution.componentId,
+          promptKey: params.prompt.key,
           day: execution.responseDay ?? dayjs(execution.startedAt).utc().format("YYYY-MM-DD"),
           sentAt: dayjs(execution.sentAt).utc().toISOString()
         }
       });
       serverLogger.info("Prompt execution started", {
-        promptKey: prompt.key,
-        sourceDocumentCount: sourceContext.length,
+        promptKey: params.prompt.key,
+        responseDay: params.responseDay,
+        sourceDocumentCount: params.sourceDocumentCount,
         submissionPath: promptSubmissionPath
       });
 
       try {
-        const output =
-          prompt.key === "daily_summary"
-            ? await this.generateSummaryArtifactOutput(prompt, promptSourceContext)
-            : prompt.key === "daily_summary_am" || prompt.key === "daily_summary_pm"
-              ? await this.generateHalfDaySummaryOutput(prompt, promptSourceContext)
-              : prompt.key === "notable_moments"
-                ? await this.generateNotableMomentsOutput(prompt, promptSourceContext)
-                : await this.config.llmClient.generateText({
-                    systemPrompt: prompt.content,
-                    userPrompt: missionSubmittedText,
-                    componentId: execution.componentId,
-                    requestId: `${execution.componentId}-${execution.id}`
-                  });
-
+        const output = await params.outputFactory(execution);
         execution.status = "success";
-        execution.cacheHit = false;
         execution.output = output;
-        execution.finishedAt = dayjs().utc().toDate();
-        execution.receivedAt = execution.finishedAt;
-        if (prompt.key === "daily_summary") {
-          latestSummaryArtifactOutput = output;
-          await this.persistSummaryArtifacts(output, promptSourceContext);
-        }
-        serverLogger.info("Prompt response received", {
-          promptKey: prompt.key,
-          componentId: execution.componentId,
-          cacheHit: execution.cacheHit,
-          status: execution.status,
-          outputLength: output.length,
-          outputPreview: this.createPreview(output, 220, 2)
-        });
+        execution.receivedAt = dayjs().utc().toDate();
         liveUpdateBus.publish({
           type: "prompt.received",
           payload: {
             executionId: execution.id,
-            promptKey: prompt.key,
-            componentId: execution.componentId,
+            promptKey: params.prompt.key,
             day: execution.responseDay ?? dayjs(execution.startedAt).utc().format("YYYY-MM-DD"),
             sentAt: dayjs(execution.sentAt).utc().toISOString(),
             receivedAt: dayjs(execution.receivedAt).utc().toISOString()
           }
         });
+        await em.flush();
+        return output;
       } catch (error) {
         execution.status = "failed";
         execution.output = "";
         execution.errorMessage = error instanceof Error ? error.message : "Unknown error";
-        execution.finishedAt = dayjs().utc().toDate();
-        execution.receivedAt = execution.finishedAt;
-        serverLogger.error("Prompt response failed", {
-          promptKey: prompt.key,
-          componentId: execution.componentId,
-          errorMessage: execution.errorMessage
-        });
+        execution.receivedAt = dayjs().utc().toDate();
         liveUpdateBus.publish({
           type: "prompt.error",
           payload: {
             executionId: execution.id,
-            promptKey: prompt.key,
-            componentId: execution.componentId,
+            promptKey: params.prompt.key,
             day: execution.responseDay ?? dayjs(execution.startedAt).utc().format("YYYY-MM-DD"),
             sentAt: dayjs(execution.sentAt).utc().toISOString(),
             receivedAt: dayjs(execution.receivedAt).utc().toISOString(),
             errorMessage: execution.errorMessage
           }
         });
+        await em.flush();
+        return null;
+      }
+    };
+
+    const shouldRunDayStage = (promptKey: string): boolean => {
+      return sourceDocumentsChanged || changedPromptKeys.has(promptKey);
+    };
+
+    for (const day of runDays) {
+      const dayDocuments = dayDocumentsByKey.get(day) ?? [];
+      if (dayDocuments.length === 0) {
+        continue;
+      }
+      const daySourceDocuments = dayDocuments.map((document) => ({ path: document.path, content: document.content }));
+      let amSummary: string | null = null;
+      let pmSummary: string | null = null;
+      let dailySummary: string | null = null;
+
+      const amPrompt = promptByKey.get("daily_summary_am");
+      if (amPrompt && shouldRunDayStage(amPrompt.key)) {
+        const submittedText = JSON.stringify(
+          {
+            mode: "daily-half-day-synthesis",
+            day,
+            segment: "AM (00:00-11:59 UTC)",
+            sourceDocuments: daySourceDocuments
+          },
+          null,
+          2
+        );
+        amSummary = await runPromptExecution({
+          prompt: amPrompt,
+          responseDay: day,
+          submittedText,
+          sourceDocumentCount: dayDocuments.length,
+          outputFactory: (execution) =>
+            this.config.llmClient.generateText({
+              systemPrompt: amPrompt.content,
+              userPrompt: submittedText,
+              componentId: `${amPrompt.key}:${day}`
+            })
+        });
       }
 
-      await em.flush();
+      const pmPrompt = promptByKey.get("daily_summary_pm");
+      if (pmPrompt && shouldRunDayStage(pmPrompt.key)) {
+        const submittedText = JSON.stringify(
+          {
+            mode: "daily-half-day-synthesis",
+            day,
+            segment: "PM (12:00-23:59 UTC)",
+            sourceDocuments: daySourceDocuments
+          },
+          null,
+          2
+        );
+        pmSummary = await runPromptExecution({
+          prompt: pmPrompt,
+          responseDay: day,
+          submittedText,
+          sourceDocumentCount: dayDocuments.length,
+          outputFactory: (execution) =>
+            this.config.llmClient.generateText({
+              systemPrompt: pmPrompt.content,
+              userPrompt: submittedText,
+              componentId: `${pmPrompt.key}:${day}`
+            })
+        });
+      }
+
+      const dailyPrompt = promptByKey.get("daily_summary");
+      if (dailyPrompt && shouldRunDayStage(dailyPrompt.key) && amSummary && pmSummary) {
+        const submittedText = JSON.stringify(
+          {
+            mode: "daily-final-from-half-day",
+            day,
+            amSummary,
+            pmSummary,
+            sourceDocuments: daySourceDocuments
+          },
+          null,
+          2
+        );
+        dailySummary = await runPromptExecution({
+          prompt: dailyPrompt,
+          responseDay: day,
+          submittedText,
+          sourceDocumentCount: dayDocuments.length,
+          outputFactory: (execution) =>
+            this.config.llmClient.generateText({
+              systemPrompt: dailyPrompt.content,
+              userPrompt: submittedText,
+              componentId: `${dailyPrompt.key}:${day}:final`
+            })
+        });
+        if (dailySummary) {
+          await this.persistSingleDaySummaryArtifact(day, dailySummary, dayDocuments);
+        }
+      }
+
+      const notablePrompt = promptByKey.get("notable_moments");
+      if (notablePrompt && shouldRunDayStage(notablePrompt.key)) {
+        const submittedText = JSON.stringify(
+          {
+            mode: "daily-notable-moments",
+            day,
+            targetMoments: this.config.notableMoments.baselinePerDay,
+            dailySummary,
+            sourceDocuments: daySourceDocuments
+          },
+          null,
+          2
+        );
+        const notableOutput = await runPromptExecution({
+          prompt: notablePrompt,
+          responseDay: day,
+          submittedText,
+          sourceDocumentCount: dayDocuments.length,
+          outputFactory: (execution) =>
+            this.config.llmClient.generateText({
+              systemPrompt: notablePrompt.content,
+              userPrompt: submittedText,
+              componentId: `${notablePrompt.key}:${day}`,
+              requestId: `${notablePrompt.key}-${execution.id}`
+            })
+        });
+        if (notableOutput) {
+          notableDayOutputs.push({ day, output: notableOutput });
+        }
+      }
+    }
+
+    const missionPrompt = promptByKey.get("mission_summary");
+    if (missionPrompt && (sourceDocumentsChanged || changedPromptKeys.has(missionPrompt.key))) {
+      const existingDailySummaries = await em.find(
+        SummaryArtifact,
+        { summaryType: dailyFullSummaryType, channelGroup: canonicalChannelGroup },
+        { orderBy: { day: "asc" } }
+      );
+      const dailySummaryOutput = this.buildSummaryArtifactOutputFromCache(existingDailySummaries);
+      const submittedText = JSON.stringify(
+        {
+          generatedAt: dayjs().utc().toISOString(),
+          strategy: "summaries-over-raw-docs",
+          partialDayRun: true,
+          dailySummaryOutput,
+          notableMoments: notableDayOutputs
+        },
+        null,
+        2
+      );
+
+      await runPromptExecution({
+        prompt: missionPrompt,
+        responseDay: null,
+        submittedText,
+        sourceDocumentCount: sourceContext.length,
+        outputFactory: (execution) =>
+          this.config.llmClient.generateText({
+            systemPrompt: missionPrompt.content,
+            userPrompt: submittedText,
+            componentId: missionPrompt.key,
+            requestId: `${missionPrompt.key}-${execution.id}`
+          })
+      });
     }
   }
 
   async getDashboardView(): Promise<{ generatedAt: string; prompts: PromptDashboardEntry[] }> {
     await this.syncPromptDefinitions();
     const em = this.getEntityManager();
-    const prompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
+    const prompts = (await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } }))
+      .filter((prompt) => systemStatusPromptKeys.has(prompt.key));
 
     // Fetch all executions for every known prompt in a single query, ordered
     // newest-first so we can cheaply pick the latest per prompt below.
@@ -798,12 +784,10 @@ export class PipelineService {
       return {
         id: prompt.id,
         key: prompt.key,
-        componentId: prompt.key,
         fileName: prompt.fileName,
         promptUpdatedAt: dayjs(prompt.updatedAt).utc().toISOString(),
         lastRunAt: latestExecution ? dayjs(latestExecution.startedAt).utc().toISOString() : null,
         status: latestExecution?.status ?? "never",
-        cacheHit: latestExecution?.cacheHit ?? false,
         submittedPreview: latestExecution?.submittedText ? this.createPreview(latestExecution.submittedText, 180, 2) : null,
         outputPreview: latestExecution?.output ? this.createPreview(latestExecution.output, 180, 2) : null,
         submittedText: latestExecution?.submittedText ?? null,
@@ -835,18 +819,46 @@ export class PipelineService {
     return {
       id: prompt.id,
       key: prompt.key,
-      componentId: prompt.key,
       fileName: prompt.fileName,
       promptUpdatedAt: dayjs(prompt.updatedAt).utc().toISOString(),
       lastRunAt: latestExecution ? dayjs(latestExecution.startedAt).utc().toISOString() : null,
       status: latestExecution?.status ?? "never",
-      cacheHit: latestExecution?.cacheHit ?? false,
       submittedPreview: latestExecution?.submittedText ? this.createPreview(latestExecution.submittedText, 180, 2) : null,
       outputPreview: latestExecution?.output ? this.createPreview(latestExecution.output, 180, 2) : null,
       submittedText: latestExecution?.submittedText ?? null,
       output: latestExecution?.status === "success" ? latestExecution.output : null,
       errorMessage: latestExecution?.status === "failed" ? latestExecution.errorMessage : null
     };
+  }
+
+  async getLatestPromptExecutionsByDay(promptKey: string, daysLimit = 20): Promise<PromptExecution[]> {
+    const em = this.getEntityManager();
+    const prompt = await em.findOne(PromptDefinition, { key: promptKey });
+    if (!prompt) {
+      return [];
+    }
+
+    const executions = await em.find(
+      PromptExecution,
+      { prompt: prompt.id },
+      { orderBy: { startedAt: "desc", id: "desc" }, limit: 2_000 }
+    );
+    const byDay = new Map<string, PromptExecution>();
+    for (const execution of executions) {
+      if (!execution.responseDay || byDay.has(execution.responseDay)) {
+        continue;
+      }
+      byDay.set(execution.responseDay, execution);
+      if (byDay.size >= daysLimit) {
+        break;
+      }
+    }
+
+    return [...byDay.values()].sort((left, right) => {
+      const leftDay = left.responseDay ?? "";
+      const rightDay = right.responseDay ?? "";
+      return leftDay.localeCompare(rightDay);
+    });
   }
 
   async getPromptMatrixState(daysLimit = 11): Promise<{
@@ -858,7 +870,8 @@ export class PipelineService {
     await this.syncPromptDefinitions();
     const em = this.getEntityManager();
     const safeDaysLimit = Math.max(1, Math.min(Math.trunc(daysLimit), 20));
-    const prompts = await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } });
+    const prompts = (await em.find(PromptDefinition, {}, { orderBy: { key: "asc" } }))
+      .filter((prompt) => systemStatusPromptKeys.has(prompt.key));
     // Scope the execution query to the window we actually need instead of
     // loading up to 10 000 rows unconditionally and discarding old ones later.
     const cutoffDate = dayjs().utc().subtract(safeDaysLimit, "day").startOf("day").toDate();
@@ -894,7 +907,6 @@ export class PipelineService {
     for (const prompt of prompts) {
       rowMap.set(prompt.key, {
         key: prompt.key,
-        componentId: prompt.key,
         cells: dayKeys.map((day) => ({
           day,
           state: "none",

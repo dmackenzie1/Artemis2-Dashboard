@@ -9,6 +9,20 @@ Input payload:
 Instructions:
 - Focus only on material that belongs in the PM half-day operational narrative.
 - Prioritize factual timeline progression, channel ownership, decisions, anomalies, and notable utterances.
-- Include direct timestamp/channel references when available.
-- Keep the output concise but specific, optimized for later daily synthesis.
+- Include explicit timestamp/channel references whenever available from evidence.
+- Include enough detail for downstream day synthesis (avoid overly compressed summaries).
 - Keep framing retrospective and evidence-first.
+- Return valid HTML only (no Markdown).
+
+Required output sections (use semantic HTML headings/lists):
+1) Mission Activity Summary
+2) Notable Moments (with timestamp + channel per item when available)
+3) Hourly Timeline Highlights (PM hours only)
+4) Topic/Theme Coverage (top operational topics)
+5) Changes/Inflections Observed in this half-day
+6) Evidence Anchors (3-8 high-signal utterance excerpts with timestamp/channel/source path when available)
+
+Quality bar:
+- Be specific, not generic.
+- Preserve channel-group context (crew loops vs flight-control loops) where inferable from channel naming.
+- Do not invent timestamps/channels; use null/omit only when unavailable in evidence.

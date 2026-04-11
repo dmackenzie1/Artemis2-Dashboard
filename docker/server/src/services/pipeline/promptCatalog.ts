@@ -16,8 +16,7 @@ export const runnablePromptKeys = new Set([
   "daily_summary_pm",
   "daily_summary",
   "notable_moments",
-  "mission_summary",
-  "recent_changes"
+  "mission_summary"
 ]);
 
 export const promptExecutionPriority = [
@@ -25,6 +24,13 @@ export const promptExecutionPriority = [
   "daily_summary_pm",
   "daily_summary",
   "notable_moments",
-  "recent_changes",
   "mission_summary"
 ];
+
+export const systemStatusPromptKeys = new Set([
+  "daily_summary_am",
+  "daily_summary_pm",
+  "daily_summary",
+  "notable_moments",
+  "mission_summary"
+]);
