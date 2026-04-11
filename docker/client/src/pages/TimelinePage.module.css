@@ -99,6 +99,13 @@
   background: linear-gradient(180deg, rgba(11, 26, 49, 0.88), rgba(8, 18, 33, 0.76));
   box-shadow: inset 0 1px 0 rgba(140, 210, 255, 0.14), 0 8px 28px rgba(2, 7, 14, 0.54), 0 0 24px rgba(48, 141, 215, 0.18);
   padding: 0.72rem 0.84rem;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.timeline-event-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(152, 223, 255, 0.46);
+  box-shadow: inset 0 1px 0 rgba(140, 210, 255, 0.18), 0 10px 30px rgba(2, 7, 14, 0.62), 0 0 26px rgba(78, 176, 241, 0.28);
 }
 
 .timeline-event-time {

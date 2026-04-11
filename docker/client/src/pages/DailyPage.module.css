@@ -20,6 +20,13 @@
   border-radius: 10px;
   padding: 0.5rem 0.58rem;
   background: linear-gradient(180deg, rgba(10, 24, 44, 0.5), rgba(8, 16, 32, 0.44));
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.daily-notable-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(142, 214, 255, 0.36);
+  box-shadow: 0 0 14px rgba(78, 172, 241, 0.22);
 }
 
 .daily-notable-card h4 {
@@ -41,22 +48,14 @@
   color: var(--text-micro);
 }
 
-.hourly-highlight-grid {
+.hourly-highlight-narrative {
   margin-top: 0.25rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.45rem;
-}
-
-.hourly-highlight-card {
-  border: 1px solid rgba(130, 200, 255, 0.14);
-  border-radius: 10px;
-  padding: 0.5rem 0.58rem;
-  background: linear-gradient(180deg, rgba(10, 24, 44, 0.5), rgba(8, 16, 32, 0.44));
+  gap: 0.52rem;
 }
 
 .hourly-highlight-hour {
-  margin: 0 0 0.32rem;
+  margin: 0;
   font-size: 0.7rem;
   letter-spacing: 0.13em;
   text-transform: uppercase;

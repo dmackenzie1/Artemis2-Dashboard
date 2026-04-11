@@ -12,7 +12,6 @@
 .dashboard-text-pane,
 .dashboard-side-pane,
 .dashboard-stats-pane,
-.dashboard-chat-pane,
 .dashboard-bottom-row {
   min-height: 0;
 }
@@ -30,19 +29,14 @@
 .dashboard-side-pane {
   grid-area: side;
   min-height: 0;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 0.58rem;
 }
 
-.dashboard-stats-pane,
-.dashboard-chat-pane {
+.dashboard-stats-pane {
   min-height: 0;
   overflow: hidden;
 }
 
-.dashboard-stats-pane > *,
-.dashboard-chat-pane > * {
+.dashboard-stats-pane > * {
   height: 100%;
 }
 

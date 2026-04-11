@@ -38,6 +38,12 @@ export type MissionHourlyChannelEntry = {
   utterances: number;
 };
 
+export type MissionChannelTotalsEntry = {
+  channel: string;
+  utterances: number;
+  words: number;
+};
+
 export type HourlyStatsRequestDiagnostics = {
   requestedDays: number;
   safeDays: number;
@@ -168,6 +174,28 @@ export class StatsService {
         utterances: Number(row.utterances)
       }));
     });
+  }
+
+  async getChannelTotals(): Promise<MissionChannelTotalsEntry[]> {
+    const rows = await this.getEntityManager().getConnection().execute<
+      { channel: string; utterances: string; words: string }[]
+    >(
+      `
+        select
+          coalesce(nullif(trim(channel), ''), 'UNSPECIFIED') as "channel",
+          count(*)::text as "utterances",
+          coalesce(sum(word_count), 0)::text as "words"
+        from transcript_utterances
+        group by 1
+        order by count(*) desc, 1 asc
+      `
+    );
+
+    return rows.map((row) => ({
+      channel: row.channel,
+      utterances: Number(row.utterances),
+      words: Number(row.words)
+    }));
   }
 
   inspectHourlyRequest(days = 7): HourlyStatsRequestDiagnostics {

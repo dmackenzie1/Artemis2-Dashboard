@@ -1,6 +1,5 @@
 import type { FunctionComponent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { MissionChatPanel } from "../components/dashboard/MissionChatPanel";
 import { RecentWindowPanel } from "../components/dashboard/RecentWindowPanel";
 import { StatsPanel } from "../components/dashboard/StatsPanel";
 import { UtterancesTimelinePanel } from "../components/dashboard/UtterancesTimelinePanel";
@@ -31,10 +30,6 @@ export const DashboardPage: FunctionComponent = () => {
       <section className={styles["dashboard-side-pane"]} data-component-id="dashboard-side-pane" data-component-uid={`${componentUid}-side`}>
         <section className={styles["dashboard-stats-pane"]} data-component-id="dashboard-stats-pane" data-component-uid={`${componentUid}-stats`}>
           <StatsPanel refreshToken={refreshToken} />
-        </section>
-
-        <section className={styles["dashboard-chat-pane"]} data-component-id="dashboard-chat-pane" data-component-uid={`${componentUid}-chat`}>
-          <MissionChatPanel />
         </section>
       </section>
 

@@ -68,12 +68,19 @@
 
 .textarea {
   min-height: 88px;
+  border-color: rgba(138, 214, 255, 0.52);
+  background: rgba(12, 32, 60, 0.92);
 }
 
 .form-row {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+.form-row .field-label {
+  margin-right: 0.2rem;
 }
 
 .answer {

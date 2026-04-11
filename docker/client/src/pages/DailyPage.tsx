@@ -239,14 +239,12 @@ export const DailyPage: FunctionComponent = () => {
             {parsed.sections.length > 0 ? (
               <section className={styles["daily-notable-section"]}>
                 <h3>Mission Highlights</h3>
-                <div className={styles["hourly-highlight-grid"]}>
+                <div className={styles["hourly-highlight-narrative"]}>
                   {parsed.sections.map((section) => (
-                    <section className={styles["hourly-highlight-card"]} key={`${entry.day}-${section.heading}`}>
-                      <p className={styles["hourly-highlight-hour"]}>{section.heading}</p>
-                      {section.body ? (
-                        <p className={sharedStyles.subtle}>{section.body.length > 320 ? `${section.body.slice(0, 317)}…` : section.body}</p>
-                      ) : null}
-                    </section>
+                    <p className={sharedStyles.subtle} key={`${entry.day}-${section.heading}`}>
+                      <span className={styles["hourly-highlight-hour"]}>{section.heading}</span>{" "}
+                      {section.body ? section.body : "No additional details recorded for this hour window."}
+                    </p>
                   ))}
                 </div>
               </section>
