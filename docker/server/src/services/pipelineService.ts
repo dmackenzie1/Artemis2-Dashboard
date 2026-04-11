@@ -66,6 +66,7 @@ type MissionStatsView = {
 const promptFilePattern = /\.txt$/i;
 const missionStatsCacheTtlMs = 5 * 60 * 1000;
 const canonicalChannelGroup = "*";
+const globalPromptDayMarker = "*";
 const dailyFullSummaryType = "daily_full";
 
 
@@ -169,7 +170,14 @@ export class PipelineService {
     const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/u;
     const normalizedDays: string[] = [];
     const appendDay = (candidate: string | null | undefined): void => {
-      if (!candidate || !isoDatePattern.test(candidate) || candidate < cutoffDayString || normalizedDays.includes(candidate)) {
+      if (!candidate || normalizedDays.includes(candidate)) {
+        return;
+      }
+      if (candidate === globalPromptDayMarker) {
+        normalizedDays.push(candidate);
+        return;
+      }
+      if (!isoDatePattern.test(candidate) || candidate < cutoffDayString) {
         return;
       }
       normalizedDays.push(candidate);
@@ -520,7 +528,7 @@ export class PipelineService {
       const startedAt = dayjs().utc().toDate();
       const execution: PromptExecution = em.create(PromptExecution, {
         prompt: params.prompt,
-        responseDay: params.responseDay,
+        responseDay: params.responseDay ?? globalPromptDayMarker,
         startedAt,
         sentAt: startedAt,
         receivedAt: null,
@@ -537,7 +545,7 @@ export class PipelineService {
         payload: {
           executionId: execution.id,
           promptKey: params.prompt.key,
-          day: execution.responseDay ?? dayjs(execution.startedAt).utc().format("YYYY-MM-DD"),
+          day: execution.responseDay ?? globalPromptDayMarker,
           sentAt: dayjs(execution.sentAt).utc().toISOString()
         }
       });
@@ -558,7 +566,7 @@ export class PipelineService {
           payload: {
             executionId: execution.id,
             promptKey: params.prompt.key,
-            day: execution.responseDay ?? dayjs(execution.startedAt).utc().format("YYYY-MM-DD"),
+            day: execution.responseDay ?? globalPromptDayMarker,
             sentAt: dayjs(execution.sentAt).utc().toISOString(),
             receivedAt: dayjs(execution.receivedAt).utc().toISOString()
           }
@@ -575,7 +583,7 @@ export class PipelineService {
           payload: {
             executionId: execution.id,
             promptKey: params.prompt.key,
-            day: execution.responseDay ?? dayjs(execution.startedAt).utc().format("YYYY-MM-DD"),
+            day: execution.responseDay ?? globalPromptDayMarker,
             sentAt: dayjs(execution.sentAt).utc().toISOString(),
             receivedAt: dayjs(execution.receivedAt).utc().toISOString(),
             errorMessage: execution.errorMessage
@@ -899,9 +907,11 @@ export class PipelineService {
     const cutoffDayString = dayjs(cutoffDate).utc().format("YYYY-MM-DD");
     const validExecutionDays = executions
       .flatMap((execution) => this.derivePromptMatrixExecutionDays(execution, cutoffDayString));
-    const dayKeys = Array.from(new Set([...transcriptDays, ...validExecutionDays]))
+    const includesGlobalPromptDay = true;
+    const missionDayKeys = Array.from(new Set([...transcriptDays, ...validExecutionDays.filter((day) => day !== globalPromptDayMarker)]))
       .sort((left, right) => left.localeCompare(right))
       .slice(-safeDaysLimit);
+    const dayKeys = includesGlobalPromptDay ? [globalPromptDayMarker, ...missionDayKeys] : missionDayKeys;
 
     const rowMap = new Map<string, PromptMatrixRow>();
     for (const prompt of prompts) {
@@ -941,12 +951,93 @@ export class PipelineService {
       }
     }
 
+    const findLatestExecution = (
+      predicate: (execution: PromptMatrixExecutionRecord) => boolean
+    ): PromptMatrixExecutionRecord | null => executions.find(predicate) ?? null;
+    const applyExecutionToGlobalCell = (rowKey: string, execution: PromptMatrixExecutionRecord | null): void => {
+      const row = rowMap.get(rowKey);
+      if (!row) {
+        return;
+      }
+      const globalCell = row.cells.find((cell) => cell.day === globalPromptDayMarker);
+      if (!globalCell || !execution) {
+        return;
+      }
+      globalCell.state = this.mapPromptExecutionStatusToMatrixState(execution.status);
+      globalCell.sentAt = dayjs(execution.sentAt ?? execution.startedAt).utc().toISOString();
+      globalCell.receivedAt = execution.receivedAt ? dayjs(execution.receivedAt).utc().toISOString() : null;
+      globalCell.responseDay = execution.responseDay ?? globalPromptDayMarker;
+      globalCell.executionId = execution.id;
+      globalCell.errorMessage = execution.status === "failed" ? execution.errorMessage : null;
+    };
+    const addSyntheticGlobalRow = (rowKey: string): void => {
+      if (rowMap.has(rowKey)) {
+        return;
+      }
+      rowMap.set(rowKey, {
+        key: rowKey,
+        cells: dayKeys.map((day) => ({
+          day,
+          state: "none",
+          sentAt: null,
+          receivedAt: null,
+          responseDay: null,
+          executionId: null,
+          errorMessage: null
+        }))
+      });
+    };
+    const matchesTimeWindowHours = (execution: PromptMatrixExecutionRecord, hours: number): boolean => {
+      if (execution.promptKey !== "time_window_summary" || !execution.submittedText) {
+        return false;
+      }
+      try {
+        const payload = JSON.parse(execution.submittedText) as { window?: { hours?: unknown }; hours?: unknown };
+        const explicitWindowHours = typeof payload.window?.hours === "number" ? payload.window.hours : null;
+        const directHours = typeof payload.hours === "number" ? payload.hours : null;
+        return (explicitWindowHours ?? directHours) === hours;
+      } catch (_error) {
+        return false;
+      }
+    };
+
+    addSyntheticGlobalRow("mission_summary_3h");
+    addSyntheticGlobalRow("mission_summary_6h");
+    addSyntheticGlobalRow("mission_summary_12h");
+    addSyntheticGlobalRow("mission_summary_complete");
+    addSyntheticGlobalRow("global_timeline_page");
+    addSyntheticGlobalRow("global_notable_page");
+
+    applyExecutionToGlobalCell("mission_summary_3h", findLatestExecution((execution) => matchesTimeWindowHours(execution, 3)));
+    applyExecutionToGlobalCell("mission_summary_6h", findLatestExecution((execution) => matchesTimeWindowHours(execution, 6)));
+    applyExecutionToGlobalCell("mission_summary_12h", findLatestExecution((execution) => matchesTimeWindowHours(execution, 12)));
+    applyExecutionToGlobalCell(
+      "mission_summary_complete",
+      findLatestExecution((execution) => execution.promptKey === "mission_summary" && execution.responseDay === globalPromptDayMarker)
+    );
+    applyExecutionToGlobalCell(
+      "global_timeline_page",
+      findLatestExecution((execution) => execution.promptKey === "mission_summary" && execution.responseDay === globalPromptDayMarker)
+    );
+    applyExecutionToGlobalCell(
+      "global_notable_page",
+      findLatestExecution((execution) => execution.promptKey === "notable_moments")
+    );
+
     return {
       generatedAt: dayjs().utc().toISOString(),
       latestIngestAt,
       days: dayKeys,
-      prompts: prompts
-        .map((prompt) => rowMap.get(prompt.key))
+      prompts: [
+        ...prompts.map((prompt) => rowMap.get(prompt.key)).filter((row): row is PromptMatrixRow => Boolean(row)),
+        "mission_summary_3h",
+        "mission_summary_6h",
+        "mission_summary_12h",
+        "mission_summary_complete",
+        "global_timeline_page",
+        "global_notable_page"
+      ]
+        .map((row) => (typeof row === "string" ? rowMap.get(row) : row))
         .filter((row): row is PromptMatrixRow => Boolean(row))
     };
   }

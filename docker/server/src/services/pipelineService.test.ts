@@ -72,9 +72,11 @@ describe("PipelineService prompt matrix state", () => {
 
     const payload = await service.getPromptMatrixState(1);
 
-    expect(payload.prompts).toHaveLength(1);
-    expect(payload.prompts[0]?.key).toBe("daily_summary");
-    expect(payload.prompts[0]?.cells[0]?.state).toBe("none");
+    const dailySummaryRow = payload.prompts.find((row) => row.key === "daily_summary");
+    expect(dailySummaryRow).toBeDefined();
+    expect(dailySummaryRow?.cells.find((cell) => cell.day === "2026-04-10")?.state).toBe("none");
+    expect(payload.days[0]).toBe("*");
+    expect(payload.prompts.some((row) => row.key === "mission_summary_3h")).toBe(true);
   });
 
   it("maps dayGroups from submitted payload when responseDay is null", async () => {
@@ -109,7 +111,8 @@ describe("PipelineService prompt matrix state", () => {
     (service as unknown as { getLatestIngestAt: () => Promise<string | null> }).getLatestIngestAt = async () => null;
 
     const payload = await service.getPromptMatrixState(20);
-    expect(payload.days).toEqual(["2026-04-01", "2026-04-02"]);
-    expect(payload.prompts[0]?.cells.map((cell) => cell.state)).toEqual(["received", "received"]);
+    expect(payload.days).toEqual(["*", "2026-04-01", "2026-04-02"]);
+    const row = payload.prompts.find((entry) => entry.key === "daily_summary_am");
+    expect(row?.cells.map((cell) => cell.state)).toEqual(["none", "received", "received"]);
   });
 });

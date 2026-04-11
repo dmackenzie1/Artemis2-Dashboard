@@ -72,7 +72,13 @@ const promptDisplayNameByKey: Record<string, string> = {
   daily_summary_pm: "Daily Summary (PM)",
   daily_summary: "Daily Summary (Final)",
   notable_moments: "Notable Moments",
-  mission_summary: "Mission Summary"
+  mission_summary: "Mission Summary",
+  mission_summary_3h: "Mission Summary (3h)",
+  mission_summary_6h: "Mission Summary (6h)",
+  mission_summary_12h: "Mission Summary (12h)",
+  mission_summary_complete: "Mission Summary (Complete)",
+  global_timeline_page: "Global Timeline Page",
+  global_notable_page: "Global Notable Page"
 };
 
 const formatPromptDisplayName = (key: string): string => {
@@ -335,7 +341,7 @@ export const SystemLogsPage: FunctionComponent = () => {
                 <tr>
                   <th>Prompt</th>
                   {matrixDays.map((day) => (
-                    <th key={`matrix-day-${day}`}>{day}</th>
+                    <th key={`matrix-day-${day}`}>{day === "*" ? "Global (*)" : day}</th>
                   ))}
                 </tr>
               </thead>
