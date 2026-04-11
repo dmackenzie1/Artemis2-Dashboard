@@ -115,4 +115,41 @@ describe("PipelineService prompt matrix state", () => {
     const row = payload.prompts.find((entry) => entry.key === "daily_summary_am");
     expect(row?.cells.map((cell) => cell.state)).toEqual(["none", "received", "received"]);
   });
+
+  it("scopes global notable page status to the latest mission day", async () => {
+    const fakeEntityManager = {
+      find: async (entity: { name?: string }) => {
+        if (entity?.name === "PromptDefinition") {
+          return [{ key: "notable_moments" }];
+        }
+        return [];
+      },
+      getConnection: () => ({
+        execute: async () => [
+          {
+            id: 900,
+            promptKey: "notable_moments",
+            responseDay: "2026-04-09",
+            sentAt: new Date("2026-04-09T00:00:00Z"),
+            startedAt: new Date("2026-04-09T00:00:00Z"),
+            receivedAt: new Date("2026-04-09T00:01:00Z"),
+            status: "success",
+            errorMessage: null,
+            submittedText: null
+          }
+        ]
+      })
+    } as unknown as EntityManager;
+
+    const service = createPipelineService(fakeEntityManager);
+    (service as unknown as { listTranscriptDays: (limit: number) => Promise<string[]> }).listTranscriptDays = async () => [
+      "2026-04-09",
+      "2026-04-10"
+    ];
+    (service as unknown as { getLatestIngestAt: () => Promise<string | null> }).getLatestIngestAt = async () => null;
+
+    const payload = await service.getPromptMatrixState(2);
+    const row = payload.prompts.find((entry) => entry.key === "global_notable_page");
+    expect(row?.cells.find((cell) => cell.day === "*")?.state).toBe("none");
+  });
 });

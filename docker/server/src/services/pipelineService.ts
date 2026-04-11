@@ -1000,6 +1000,9 @@ export class PipelineService {
         return false;
       }
     };
+    const executionIncludesDay = (execution: PromptMatrixExecutionRecord, day: string): boolean =>
+      this.derivePromptMatrixExecutionDays(execution, cutoffDayString).includes(day);
+    const latestMissionDay = missionDayKeys.at(-1) ?? null;
 
     addSyntheticGlobalRow("mission_summary_3h");
     addSyntheticGlobalRow("mission_summary_6h");
@@ -1021,7 +1024,11 @@ export class PipelineService {
     );
     applyExecutionToGlobalCell(
       "global_notable_page",
-      findLatestExecution((execution) => execution.promptKey === "notable_moments")
+      latestMissionDay
+        ? findLatestExecution(
+            (execution) => execution.promptKey === "notable_moments" && executionIncludesDay(execution, latestMissionDay)
+          )
+        : null
     );
 
     return {
