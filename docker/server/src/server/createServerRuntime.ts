@@ -84,7 +84,8 @@ export const createServerRuntime = async (): Promise<ServerRuntime> => {
     env.LLM_MAX_TOKENS,
     redisLlmCache ?? undefined,
     env.REDIS_CACHE_TTL_SECONDS,
-    env.REDIS_CACHE_STALE_TTL_SECONDS
+    env.REDIS_CACHE_STALE_TTL_SECONDS,
+    env.LLM_MAX_USER_PROMPT_CHARACTERS
   );
 
   let transcriptOrm: MikroORM | null = null;
