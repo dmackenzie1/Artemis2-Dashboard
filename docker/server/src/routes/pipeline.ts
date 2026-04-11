@@ -184,17 +184,11 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
 
   router.get("/notable-moments", async (_req, res, next) => {
     try {
-      const notableMomentsPrompt = await pipelineService.getPromptDashboardEntryByKey("notable_moments");
-      const parsedSchema = z.object({
-        generatedAt: z.string(),
-        targetMomentsPerDay: z.number().int().min(1).optional(),
-        days: z.array(z.unknown())
-      });
-
-      if (!notableMomentsPrompt?.output) {
+      const executions = await pipelineService.getLatestPromptExecutionsByDay("notable_moments", 20);
+      if (executions.length === 0) {
         res.json({
           generatedAt: new Date().toISOString(),
-          status: notableMomentsPrompt?.status ?? "never",
+          status: "never",
           days: [],
           parsedDayCount: 0,
           droppedDayCount: 0
@@ -202,32 +196,26 @@ export const createPipelineRouter = (pipelineService: PipelineService): Router =
         return;
       }
 
-      const parsed = parsedSchema.parse(JSON.parse(notableMomentsPrompt.output));
-      const normalizedDays = parsed.days
-        .map((rawDay) => {
-          // Extract a day hint from the raw object when available so the bare-array
-          // recovery path in parseNotableMomentsDay can assign the correct day key.
-          const dayHint =
-            typeof rawDay === "object" && rawDay !== null && "day" in rawDay && typeof (rawDay as Record<string, unknown>)["day"] === "string"
-              ? (rawDay as Record<string, unknown>)["day"] as string
-              : undefined;
-          return parseNotableMomentsDay(rawDay, dayHint);
-        })
+      const normalizedDays = executions
+        .filter((execution) => execution.status === "success" && execution.output.trim().length > 0)
+        .map((execution) => parseNotableMomentsDay(execution.output, execution.responseDay ?? undefined))
         .filter((entry): entry is z.infer<typeof notableMomentsDaySchema> => Boolean(entry));
-      const droppedDayCount = Math.max(parsed.days.length - normalizedDays.length, 0);
+      const droppedDayCount = Math.max(executions.length - normalizedDays.length, 0);
+      const hasFailure = executions.some((execution) => execution.status === "failed");
+      const hasRunning = executions.some((execution) => execution.status === "running");
+      const status: "running" | "success" | "failed" | "never" = hasFailure ? "failed" : hasRunning ? "running" : "success";
 
       if (droppedDayCount > 0) {
         serverLogger.warn("Dropped unparsable notable moments day payload(s)", {
-          totalDays: parsed.days.length,
+          totalDays: executions.length,
           parsedDayCount: normalizedDays.length,
           droppedDayCount
         });
       }
 
       res.json({
-        generatedAt: parsed.generatedAt,
-        status: notableMomentsPrompt.status,
-        targetMomentsPerDay: parsed.targetMomentsPerDay,
+        generatedAt: new Date().toISOString(),
+        status,
         days: normalizedDays,
         parsedDayCount: normalizedDays.length,
         droppedDayCount

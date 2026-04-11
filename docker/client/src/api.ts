@@ -24,12 +24,10 @@ export type PipelineDashboardData = {
   prompts: Array<{
     id: number;
     key: string;
-    componentId: string;
     fileName: string;
     promptUpdatedAt: string;
     lastRunAt: string | null;
     status: "running" | "success" | "failed" | "never";
-    cacheHit: boolean;
     submittedPreview: string | null;
     outputPreview: string | null;
     submittedText: string | null;
@@ -44,7 +42,6 @@ export type PromptMatrixStateData = {
   days: string[];
   prompts: Array<{
     key: string;
-    componentId: string;
     cells: Array<{
       day: string;
       state: "none" | "sent" | "received" | "error";

@@ -12,7 +12,7 @@ export const getPromptDisplay = (
     const output = prompt.output?.trim().length ? prompt.output : "LLM returned an empty response.";
     return {
       text: output,
-      statusLabel: prompt.cacheHit ? "ready (cached)" : "ready",
+      statusLabel: "ready",
       preview: prompt.outputPreview
     };
   }

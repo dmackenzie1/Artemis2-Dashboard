@@ -68,20 +68,11 @@ const formatCellTime = (value: string): string => {
 };
 
 const promptDisplayNameByKey: Record<string, string> = {
-  candidate_retrieval: "Candidate Retrieval",
-  search_aggregate: "Search Aggregate",
-  search_day_extract: "Search Day Extract",
-  rolling_window_summary: "Rolling Window Summary",
-  topic_overview: "Topic Overview",
-  topic_detail: "Topic Detail",
   daily_summary_am: "Daily Summary (AM)",
   daily_summary_pm: "Daily Summary (PM)",
   daily_summary: "Daily Summary (Final)",
   notable_moments: "Notable Moments",
-  mission_summary: "Mission Summary",
-  recent_changes: "Recent Changes",
-  chat_system: "Mission Chat System",
-  hourly_summary: "Hourly Summary (Legacy)"
+  mission_summary: "Mission Summary"
 };
 
 const formatPromptDisplayName = (key: string): string => {
