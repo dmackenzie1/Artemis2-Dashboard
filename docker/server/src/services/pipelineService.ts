@@ -598,129 +598,176 @@ export class PipelineService {
       return sourceDocumentsChanged || changedPromptKeys.has(promptKey);
     };
 
-    for (const day of runDays) {
-      const dayDocuments = dayDocumentsByKey.get(day) ?? [];
-      if (dayDocuments.length === 0) {
-        continue;
-      }
-      const daySourceDocuments = dayDocuments.map((document) => ({ path: document.path, content: document.content }));
-      let amSummary: string | null = null;
-      let pmSummary: string | null = null;
-      let dailySummary: string | null = null;
+    const dayContexts = runDays
+      .map((day) => {
+        const dayDocuments = dayDocumentsByKey.get(day) ?? [];
+        const daySourceDocuments = dayDocuments.map((document) => ({ path: document.path, content: document.content }));
+        return { day, dayDocuments, daySourceDocuments };
+      })
+      .filter((context) => context.dayDocuments.length > 0);
+    const halfDaySummariesByDay = new Map<string, { amSummary: string | null; pmSummary: string | null }>(
+      dayContexts.map((context) => [context.day, { amSummary: null, pmSummary: null }])
+    );
+    const dailySummariesByDay = new Map<string, string | null>(dayContexts.map((context) => [context.day, null]));
 
-      const amPrompt = promptByKey.get("daily_summary_am");
-      if (amPrompt && shouldRunDayStage(amPrompt.key)) {
+    const amPrompt = promptByKey.get("daily_summary_am");
+    const pmPrompt = promptByKey.get("daily_summary_pm");
+    const dailyPrompt = promptByKey.get("daily_summary");
+    const notablePrompt = promptByKey.get("notable_moments");
+    const shouldRunAmStage = Boolean(amPrompt && shouldRunDayStage(amPrompt.key));
+    const shouldRunPmStage = Boolean(pmPrompt && shouldRunDayStage(pmPrompt.key));
+    const shouldRunFinalStage = Boolean(dailyPrompt && shouldRunDayStage(dailyPrompt.key));
+    const shouldRunNotableStage = Boolean(notablePrompt && shouldRunDayStage(notablePrompt.key));
+
+    const halfDayTasks: Array<Promise<void>> = [];
+    for (const context of dayContexts) {
+      if (shouldRunAmStage && amPrompt) {
         const submittedText = JSON.stringify(
           {
             mode: "daily-half-day-synthesis",
-            day,
+            day: context.day,
             segment: "AM (00:00-11:59 UTC)",
-            sourceDocuments: daySourceDocuments
+            sourceDocuments: context.daySourceDocuments
           },
           null,
           2
         );
-        amSummary = await runPromptExecution({
-          prompt: amPrompt,
-          responseDay: day,
-          submittedText,
-          sourceDocumentCount: dayDocuments.length,
-          outputFactory: (execution) =>
-            this.config.llmClient.generateText({
-              systemPrompt: amPrompt.content,
-              userPrompt: submittedText,
-              componentId: `${amPrompt.key}:${day}`
-            })
-        });
+        halfDayTasks.push(
+          (async () => {
+            const amSummary = await runPromptExecution({
+              prompt: amPrompt,
+              responseDay: context.day,
+              submittedText,
+              sourceDocumentCount: context.dayDocuments.length,
+              outputFactory: () =>
+                this.config.llmClient.generateText({
+                  systemPrompt: amPrompt.content,
+                  userPrompt: submittedText,
+                  componentId: `${amPrompt.key}:${context.day}`
+                })
+            });
+            const daySummaries = halfDaySummariesByDay.get(context.day);
+            if (daySummaries) {
+              daySummaries.amSummary = amSummary;
+            }
+          })()
+        );
       }
 
-      const pmPrompt = promptByKey.get("daily_summary_pm");
-      if (pmPrompt && shouldRunDayStage(pmPrompt.key)) {
+      if (shouldRunPmStage && pmPrompt) {
         const submittedText = JSON.stringify(
           {
             mode: "daily-half-day-synthesis",
-            day,
+            day: context.day,
             segment: "PM (12:00-23:59 UTC)",
-            sourceDocuments: daySourceDocuments
+            sourceDocuments: context.daySourceDocuments
           },
           null,
           2
         );
-        pmSummary = await runPromptExecution({
-          prompt: pmPrompt,
-          responseDay: day,
-          submittedText,
-          sourceDocumentCount: dayDocuments.length,
-          outputFactory: (execution) =>
-            this.config.llmClient.generateText({
-              systemPrompt: pmPrompt.content,
-              userPrompt: submittedText,
-              componentId: `${pmPrompt.key}:${day}`
-            })
-        });
-      }
-
-      const dailyPrompt = promptByKey.get("daily_summary");
-      if (dailyPrompt && shouldRunDayStage(dailyPrompt.key) && amSummary && pmSummary) {
-        const submittedText = JSON.stringify(
-          {
-            mode: "daily-final-from-half-day",
-            day,
-            amSummary,
-            pmSummary,
-            sourceDocuments: daySourceDocuments
-          },
-          null,
-          2
+        halfDayTasks.push(
+          (async () => {
+            const pmSummary = await runPromptExecution({
+              prompt: pmPrompt,
+              responseDay: context.day,
+              submittedText,
+              sourceDocumentCount: context.dayDocuments.length,
+              outputFactory: () =>
+                this.config.llmClient.generateText({
+                  systemPrompt: pmPrompt.content,
+                  userPrompt: submittedText,
+                  componentId: `${pmPrompt.key}:${context.day}`
+                })
+            });
+            const daySummaries = halfDaySummariesByDay.get(context.day);
+            if (daySummaries) {
+              daySummaries.pmSummary = pmSummary;
+            }
+          })()
         );
-        dailySummary = await runPromptExecution({
-          prompt: dailyPrompt,
-          responseDay: day,
-          submittedText,
-          sourceDocumentCount: dayDocuments.length,
-          outputFactory: (execution) =>
-            this.config.llmClient.generateText({
-              systemPrompt: dailyPrompt.content,
-              userPrompt: submittedText,
-              componentId: `${dailyPrompt.key}:${day}:final`
-            })
-        });
-        if (dailySummary) {
-          await this.persistSingleDaySummaryArtifact(day, dailySummary, dayDocuments);
-        }
-      }
-
-      const notablePrompt = promptByKey.get("notable_moments");
-      if (notablePrompt && shouldRunDayStage(notablePrompt.key)) {
-        const submittedText = JSON.stringify(
-          {
-            mode: "daily-notable-moments",
-            day,
-            targetMoments: this.config.notableMoments.baselinePerDay,
-            dailySummary,
-            sourceDocuments: daySourceDocuments
-          },
-          null,
-          2
-        );
-        const notableOutput = await runPromptExecution({
-          prompt: notablePrompt,
-          responseDay: day,
-          submittedText,
-          sourceDocumentCount: dayDocuments.length,
-          outputFactory: (execution) =>
-            this.config.llmClient.generateText({
-              systemPrompt: notablePrompt.content,
-              userPrompt: submittedText,
-              componentId: `${notablePrompt.key}:${day}`,
-              requestId: `${notablePrompt.key}-${execution.id}`
-            })
-        });
-        if (notableOutput) {
-          notableDayOutputs.push({ day, output: notableOutput });
-        }
       }
     }
+    await Promise.allSettled(halfDayTasks);
+
+    const finalTasks: Array<Promise<void>> = [];
+    for (const context of dayContexts) {
+      const halfDaySummaries = halfDaySummariesByDay.get(context.day);
+      if (!shouldRunFinalStage || !dailyPrompt || !halfDaySummaries?.amSummary || !halfDaySummaries.pmSummary) {
+        continue;
+      }
+
+      const submittedText = JSON.stringify(
+        {
+          mode: "daily-final-from-half-day",
+          day: context.day,
+          amSummary: halfDaySummaries.amSummary,
+          pmSummary: halfDaySummaries.pmSummary,
+          sourceDocuments: context.daySourceDocuments
+        },
+        null,
+        2
+      );
+      finalTasks.push(
+        (async () => {
+          const dailySummary = await runPromptExecution({
+            prompt: dailyPrompt,
+            responseDay: context.day,
+            submittedText,
+            sourceDocumentCount: context.dayDocuments.length,
+            outputFactory: () =>
+              this.config.llmClient.generateText({
+                systemPrompt: dailyPrompt.content,
+                userPrompt: submittedText,
+                componentId: `${dailyPrompt.key}:${context.day}:final`
+              })
+          });
+          dailySummariesByDay.set(context.day, dailySummary);
+          if (dailySummary) {
+            await this.persistSingleDaySummaryArtifact(context.day, dailySummary, context.dayDocuments);
+          }
+        })()
+      );
+    }
+    await Promise.allSettled(finalTasks);
+
+    const notableTasks: Array<Promise<void>> = [];
+    for (const context of dayContexts) {
+      if (!shouldRunNotableStage || !notablePrompt) {
+        continue;
+      }
+      const submittedText = JSON.stringify(
+        {
+          mode: "daily-notable-moments",
+          day: context.day,
+          targetMoments: this.config.notableMoments.baselinePerDay,
+          dailySummary: dailySummariesByDay.get(context.day) ?? null,
+          sourceDocuments: context.daySourceDocuments
+        },
+        null,
+        2
+      );
+      notableTasks.push(
+        (async () => {
+          const notableOutput = await runPromptExecution({
+            prompt: notablePrompt,
+            responseDay: context.day,
+            submittedText,
+            sourceDocumentCount: context.dayDocuments.length,
+            outputFactory: (execution) =>
+              this.config.llmClient.generateText({
+                systemPrompt: notablePrompt.content,
+                userPrompt: submittedText,
+                componentId: `${notablePrompt.key}:${context.day}`,
+                requestId: `${notablePrompt.key}-${execution.id}`
+              })
+          });
+          if (notableOutput) {
+            notableDayOutputs.push({ day: context.day, output: notableOutput });
+          }
+        })()
+      );
+    }
+    await Promise.allSettled(notableTasks);
 
     const missionPrompt = promptByKey.get("mission_summary");
     if (missionPrompt && (sourceDocumentsChanged || changedPromptKeys.has(missionPrompt.key))) {

@@ -54,9 +54,9 @@ export const SignalChatPage: FunctionComponent = () => {
     <section className={styles.shell} data-component-id={componentId} data-component-uid={componentUid}>
       <header className={styles.header}>
         <div>
-          <p className={sharedStyles["timeline-kicker"]}>Mission Workspace</p>
+          <p className={styles["workspace-kicker"]}>Mission Workspace</p>
           <h2>Signal Chat</h2>
-          <p className={sharedStyles["timeline-subtitle"]}>Ask mission questions and review ranked transcript evidence side-by-side.</p>
+          <p className={styles["workspace-subtitle"]}>Ask mission questions and review ranked transcript evidence side-by-side.</p>
         </div>
       </header>
 
