@@ -4,7 +4,7 @@ import { compareTranscriptFiles, parseTranscriptFileName } from "./transcriptFil
 describe("parseTranscriptFileName", () => {
   it("parses full-day file names", () => {
     expect(parseTranscriptFileName("2026-04-09_summary.csv")).toEqual({
-      fileName: "2026-04-09_summary.csv",
+      audioFileName: "2026-04-09_summary.csv",
       day: "2026-04-09",
       kind: "full-day",
       partialIndex: null,
@@ -15,7 +15,7 @@ describe("parseTranscriptFileName", () => {
 
   it("parses partial sequence file names", () => {
     expect(parseTranscriptFileName("2026-04-09_partial_2.csv")).toEqual({
-      fileName: "2026-04-09_partial_2.csv",
+      audioFileName: "2026-04-09_partial_2.csv",
       day: "2026-04-09",
       kind: "partial-sequence",
       partialIndex: 2,
@@ -26,7 +26,7 @@ describe("parseTranscriptFileName", () => {
 
   it("parses hour-range file names", () => {
     expect(parseTranscriptFileName("2026-04-09_12-23.csv")).toEqual({
-      fileName: "2026-04-09_12-23.csv",
+      audioFileName: "2026-04-09_12-23.csv",
       day: "2026-04-09",
       kind: "hour-range",
       partialIndex: null,

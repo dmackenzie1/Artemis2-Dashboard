@@ -179,8 +179,8 @@ export class IngestionSchedulerService {
 
   private async writeIngestionEventLog(payload: IngestionEventPayload): Promise<void> {
     const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-    const fileName = `${timestamp}-ingestion-event.json`;
-    const outputPath = path.join(this.options.promptSubmissionsDir, fileName);
+    const audioFileName = `${timestamp}-ingestion-event.json`;
+    const outputPath = path.join(this.options.promptSubmissionsDir, audioFileName);
 
     try {
       await fs.mkdir(this.options.promptSubmissionsDir, { recursive: true });
@@ -368,8 +368,8 @@ export class IngestionSchedulerService {
   private startFilesystemIngestionWatchers(): void {
     for (const watchTarget of this.watchTargets) {
       try {
-        watch(watchTarget, { persistent: false }, (eventType, fileName) => {
-          const changedPath = fileName ? `${watchTarget}/${fileName.toString()}` : watchTarget;
+        watch(watchTarget, { persistent: false }, (eventType, audioFileName) => {
+          const changedPath = audioFileName ? `${watchTarget}/${audioFileName.toString()}` : watchTarget;
           this.scheduleAutoIngestion(`fs:${eventType}`, changedPath);
         });
         serverLogger.info("Enabled filesystem watcher for auto-ingestion", { watchTarget });

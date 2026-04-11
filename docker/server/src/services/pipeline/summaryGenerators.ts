@@ -1,6 +1,7 @@
 import type { EntityManager } from "@mikro-orm/postgresql";
 import { dayjs } from "../../lib/dayjs.js";
 import { SummaryArtifact } from "../../entities/SummaryArtifact.js";
+import { TranscriptUtterance } from "../../entities/TranscriptUtterance.js";
 import type { PromptDefinition } from "../../entities/PromptDefinition.js";
 import type { LlmClient } from "../llmClient.js";
 import { dailySummaryChunkCharacterLimit, dailySummaryTargetWords } from "./pipelineTypes.js";
@@ -23,7 +24,8 @@ export class HalfDaySummaryGenerator implements SummaryPromptGenerator {
   constructor(
     promptKey: "daily_summary_am" | "daily_summary_pm",
     private readonly llmClient: LlmTextGenerator,
-    private readonly transcriptContextBuilder: TranscriptContextBuilder
+    private readonly transcriptContextBuilder: TranscriptContextBuilder,
+    private readonly getEntityManager: () => EntityManager
   ) {
     this.promptKey = promptKey;
   }
@@ -31,8 +33,29 @@ export class HalfDaySummaryGenerator implements SummaryPromptGenerator {
   async generateOutput(prompt: PromptDefinition, sourceContext: SourceContextDocument[]): Promise<string> {
     const dayGroups = this.transcriptContextBuilder.buildDailyGroups(sourceContext);
     const segment = this.promptKey === "daily_summary_am" ? "AM (00:00-11:59 UTC)" : "PM (12:00-23:59 UTC)";
+    const em = this.getEntityManager();
+
     const days = await Promise.all(
       dayGroups.map(async (group) => {
+        const timeStart = this.promptKey === "daily_summary_am" ? "00:00:00" : "12:00:00";
+        const timeEnd = this.promptKey === "daily_summary_am" ? "11:59:59.999" : "23:59:59.999";
+        
+        const utterances = await em.find(
+          TranscriptUtterance,
+          {
+            day: group.day,
+            timestamp: {
+              $gte: new Date(`${group.day}T${timeStart}Z`),
+              $lte: new Date(`${group.day}T${timeEnd}Z`)
+            }
+          },
+          { orderBy: { timestamp: "asc" } }
+        );
+
+        const transcriptSegment = utterances
+          .map((u) => `[${dayjs(u.timestamp).utc().format("HH:mm:ss")}] ${u.channel}: ${u.text}`)
+          .join("\n");
+
         const summary = await this.llmClient.generateText({
           systemPrompt: prompt.content,
           userPrompt: JSON.stringify(
@@ -40,10 +63,7 @@ export class HalfDaySummaryGenerator implements SummaryPromptGenerator {
               mode: "daily-half-day-synthesis",
               segment,
               day: group.day,
-              sourceDocuments: group.documents.map((document) => ({
-                path: document.path,
-                content: document.content
-              }))
+              transcriptSegment
             },
             null,
             2
@@ -243,8 +263,8 @@ export const createSummaryPromptGenerators = (dependencies: {
     maxPerDay: number;
   };
 } ): Map<SummaryPromptGenerator["promptKey"], SummaryPromptGenerator> => {
-  const dailyAmGenerator = new HalfDaySummaryGenerator("daily_summary_am", dependencies.llmClient, dependencies.transcriptContextBuilder);
-  const dailyPmGenerator = new HalfDaySummaryGenerator("daily_summary_pm", dependencies.llmClient, dependencies.transcriptContextBuilder);
+  const dailyAmGenerator = new HalfDaySummaryGenerator("daily_summary_am", dependencies.llmClient, dependencies.transcriptContextBuilder, dependencies.getEntityManager);
+  const dailyPmGenerator = new HalfDaySummaryGenerator("daily_summary_pm", dependencies.llmClient, dependencies.transcriptContextBuilder, dependencies.getEntityManager);
   const dailyGenerator = new DailySummaryGenerator(dependencies.llmClient, dependencies.transcriptContextBuilder);
   const notableGenerator = new NotableMomentsGenerator(
     dependencies.llmClient,

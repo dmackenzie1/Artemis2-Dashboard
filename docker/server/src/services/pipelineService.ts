@@ -32,7 +32,7 @@ type PipelineConfig = {
 type PromptDashboardEntry = {
   id: number;
   key: string;
-  fileName: string;
+  audioFileName: string;
   promptUpdatedAt: string;
   lastRunAt: string | null;
   status: "running" | "success" | "failed" | "never";
@@ -133,8 +133,8 @@ export class PipelineService {
 
   private async persistPromptSubmission(promptKey: string, submittedText: string): Promise<string> {
     const timestamp = dayjs().utc().format("YYYYMMDDTHHmmssSSS");
-    const fileName = `${timestamp}-${promptKey}.json`;
-    const outputPath = path.join(this.config.promptSubmissionsDir, fileName);
+    const audioFileName = `${timestamp}-${promptKey}.json`;
+    const outputPath = path.join(this.config.promptSubmissionsDir, audioFileName);
 
     await fs.mkdir(this.config.promptSubmissionsDir, { recursive: true });
     await fs.writeFile(outputPath, submittedText, "utf8");
@@ -409,16 +409,16 @@ export class PipelineService {
     const now = dayjs().utc().toDate();
     const changedPromptKeys = new Set<string>();
 
-    for (const fileName of promptFiles) {
-      const promptText = await fs.readFile(path.join(this.config.promptsDir, fileName), "utf8");
-      const rawKey = fileName.replace(/\.txt$/i, "");
+    for (const audioFileName of promptFiles) {
+      const promptText = await fs.readFile(path.join(this.config.promptsDir, audioFileName), "utf8");
+      const rawKey = audioFileName.replace(/\.txt$/i, "");
       const key = canonicalPromptKey(rawKey);
-      const existing = await em.findOne(PromptDefinition, { fileName });
+      const existing = await em.findOne(PromptDefinition, { audioFileName });
 
       if (!existing) {
         const created = em.create(PromptDefinition, {
           key,
-          fileName,
+          audioFileName,
           content: promptText,
           updatedAt: now
         });
@@ -839,7 +839,7 @@ export class PipelineService {
       return {
         id: prompt.id,
         key: prompt.key,
-        fileName: prompt.fileName,
+        audioFileName: prompt.audioFileName,
         promptUpdatedAt: dayjs(prompt.updatedAt).utc().toISOString(),
         lastRunAt: latestExecution ? dayjs(latestExecution.startedAt).utc().toISOString() : null,
         status: latestExecution?.status ?? "never",
@@ -874,7 +874,7 @@ export class PipelineService {
     return {
       id: prompt.id,
       key: prompt.key,
-      fileName: prompt.fileName,
+      audioFileName: prompt.audioFileName,
       promptUpdatedAt: dayjs(prompt.updatedAt).utc().toISOString(),
       lastRunAt: latestExecution ? dayjs(latestExecution.startedAt).utc().toISOString() : null,
       status: latestExecution?.status ?? "never",
@@ -1083,7 +1083,7 @@ export class PipelineService {
       latestIngestAt,
       days: dayKeys,
       prompts: [
-        ...prompts.map((prompt) => rowMap.get(prompt.key)).filter((row): row is PromptMatrixRow => Boolean(row)),
+        ...prompts.filter(p => p.key !== "mission_summary").map((prompt) => rowMap.get(prompt.key)).filter((row): row is PromptMatrixRow => Boolean(row)),
         "mission_summary_3h",
         "mission_summary_6h",
         "mission_summary_12h",

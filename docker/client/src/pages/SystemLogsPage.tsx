@@ -274,7 +274,7 @@ export const SystemLogsPage: FunctionComponent = () => {
       return "No log file selected.";
     }
 
-    return `${selectedLog.entry.category} • ${selectedLog.entry.fileName}`;
+    return `${selectedLog.entry.category} • ${selectedLog.entry.audioFileName}`;
   }, [selectedLog]);
 
   return (
@@ -393,7 +393,7 @@ export const SystemLogsPage: FunctionComponent = () => {
                   }}
                 >
                   <span>{entry.category}</span>
-                  <strong>{entry.fileName}</strong>
+                  <strong>{entry.audioFileName}</strong>
                   <small>{formatTimestamp(entry.modifiedAt)} UTC</small>
                 </button>
               </li>

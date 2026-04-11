@@ -7,7 +7,7 @@ export type RankedUtterance = {
   day: string;
   channel: string;
   text: string;
-  filename: string;
+  audioFileName: string;
   source: string;
   score: number;
 };
@@ -27,7 +27,7 @@ const toRankedUtterance = (utterance: TranscriptUtterance, score: number): Ranke
   day: utterance.day,
   channel: utterance.channel,
   text: utterance.text,
-  filename: utterance.filename,
+  audioFileName: utterance.audioFileName,
   source: utterance.sourceFile,
   score: Number(score.toFixed(4))
 });

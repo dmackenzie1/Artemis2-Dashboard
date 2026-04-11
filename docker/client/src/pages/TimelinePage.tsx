@@ -209,7 +209,7 @@ const buildTimelineItems = (
       timeLabel: formatDateLabel(timestamp),
       body: `“${toReadableQuote(entry.text)}”`,
       tags: entry.reasons.slice(0, 2),
-      meta: `Ref ${entry.id} • ${formatDateLabel(timestamp)} UTC • ${entry.filename} • Score ${entry.score.toFixed(2)}`
+      meta: `Ref ${entry.id} • ${formatDateLabel(timestamp)} UTC • ${entry.audioFileName} • Score ${entry.score.toFixed(2)}`
     });
 
     utterancesPerDay.set(utcDayKey, dayCount + 1);

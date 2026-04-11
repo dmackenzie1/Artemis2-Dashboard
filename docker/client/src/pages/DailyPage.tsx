@@ -194,7 +194,7 @@ export const DailyPage: FunctionComponent = () => {
   if (dayEntries.length === 0) {
     return (
       <div className={sharedStyles.stack} data-component-id={componentId} data-component-uid={componentUid}>
-        <p className={styles["daily-empty"]}>No data yet. Run the pipeline from the Overview page, then return here.</p>
+        <p className={sharedStyles["pane-state-empty"]}>No data yet. Run the pipeline from the Overview page, then return here.</p>
       </div>
     );
   }

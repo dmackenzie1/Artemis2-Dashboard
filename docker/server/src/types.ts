@@ -9,7 +9,7 @@ export type TranscriptUtterance = {
   translated: string;
   text: string;
   tokens?: string[];
-  filename: string;
+  audioFileName: string;
   sourceFile: string;
 };
 
@@ -18,7 +18,7 @@ export type NotableUtterance = {
   timestamp: string;
   day: string;
   channel: string;
-  filename: string;
+  audioFileName: string;
   text: string;
   score: number;
   reasons: string[];

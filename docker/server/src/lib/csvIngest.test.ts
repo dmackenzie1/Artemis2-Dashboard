@@ -12,12 +12,12 @@ afterEach(async () => {
 });
 
 describe("ingestCsvDirectory", () => {
-  it("parses rows when filename/text fields include unescaped quote characters", async () => {
+  it("parses rows when audioFileName/text fields include unescaped quote characters", async () => {
     const directoryPath = await mkdtemp(path.join(tmpdir(), "csv-ingest-"));
     tempDirectories.push(directoryPath);
 
     const csvContent = [
-      "Date,Channel,Duration,Language,Translated,Text,Filename",
+      "Date,Channel,Duration,Language,Translated,Text,audioFileName",
       "2026-04-05T21:00:00Z,FLIGHT,00:30,en,Nominal,Crew reported stowage size 2'6\" in transfer bag,log-1.csv"
     ].join("\n");
 
@@ -27,6 +27,6 @@ describe("ingestCsvDirectory", () => {
 
     expect(utterances).toHaveLength(1);
     expect(utterances[0]?.text).toContain("2'6\"");
-    expect(utterances[0]?.filename).toBe("log-1.csv");
+    expect(utterances[0]?.audioFileName).toBe("log-1.csv");
   });
 });

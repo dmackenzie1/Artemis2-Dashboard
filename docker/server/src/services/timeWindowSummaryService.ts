@@ -18,7 +18,7 @@ type TimeWindowUtteranceRow = {
   timestamp: string;
   channel: string;
   text: string;
-  filename: string;
+  audioFileName: string;
   sourceFile: string;
   wordCount: string;
 };
@@ -118,7 +118,7 @@ export class TimeWindowSummaryService {
           to_char(timestamp at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "timestamp",
           channel,
           text,
-          filename,
+          audioFileName,
           source_file as "sourceFile",
           word_count::text as "wordCount"
         from transcript_utterances
@@ -168,7 +168,7 @@ export class TimeWindowSummaryService {
         timestamp: utterance.timestamp,
         channel: utterance.channel,
         text: utterance.text,
-        filename: utterance.filename,
+        audioFileName: utterance.audioFileName,
         sourceFile: utterance.sourceFile
       }))
     }));

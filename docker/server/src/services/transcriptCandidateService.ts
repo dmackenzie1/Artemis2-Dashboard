@@ -37,7 +37,7 @@ export const loadTranscriptCandidates = async (
     language: string;
     translated: boolean;
     text: string;
-    filename: string;
+    audioFileName: string;
     sourceFile: string;
     tokens: string[];
   }[]>(
@@ -50,7 +50,7 @@ export const loadTranscriptCandidates = async (
         u.language,
         u.translated,
         u.text,
-        u.filename,
+        u.audioFileName,
         u.source_file as "sourceFile",
         u.tokens
       from transcript_utterances u
@@ -84,7 +84,7 @@ export const loadTranscriptCandidates = async (
       translated: row.translated ? "yes" : "no",
       text: row.text,
       tokens: row.tokens,
-      filename: row.filename,
+      audioFileName: row.audioFileName,
       sourceFile: row.sourceFile
     };
   });

@@ -1,7 +1,7 @@
 import { dayjs } from "./dayjs.js";
 
 export type TranscriptFileDescriptor = {
-  fileName: string;
+  audioFileName: string;
   day: string;
   kind: "full-day" | "partial-sequence" | "hour-range" | "unstructured";
   partialIndex: number | null;
@@ -18,8 +18,8 @@ const normalizeHour = (value: string): number | null => {
   return parsed;
 };
 
-export const parseTranscriptFileName = (fileName: string): TranscriptFileDescriptor | null => {
-  const trimmed = fileName.trim();
+export const parseTranscriptFileName = (audioFileName: string): TranscriptFileDescriptor | null => {
+  const trimmed = audioFileName.trim();
   const normalized = trimmed.toLowerCase();
   const dayMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})/u);
   const day = dayMatch?.[1] ?? null;
@@ -29,7 +29,7 @@ export const parseTranscriptFileName = (fileName: string): TranscriptFileDescrip
 
   if (/^\d{4}-\d{2}-\d{2}_summary\.csv$/u.test(normalized)) {
     return {
-      fileName: trimmed,
+      audioFileName: trimmed,
       day,
       kind: "full-day",
       partialIndex: null,
@@ -41,7 +41,7 @@ export const parseTranscriptFileName = (fileName: string): TranscriptFileDescrip
   const partialMatch = normalized.match(/^\d{4}-\d{2}-\d{2}_partial_(\d+)\.csv$/u);
   if (partialMatch?.[1]) {
     return {
-      fileName: trimmed,
+      audioFileName: trimmed,
       day,
       kind: "partial-sequence",
       partialIndex: Number.parseInt(partialMatch[1], 10),
@@ -56,7 +56,7 @@ export const parseTranscriptFileName = (fileName: string): TranscriptFileDescrip
     const hourEnd = normalizeHour(hourRangeMatch[3]);
     if (hourStart !== null && hourEnd !== null && hourEnd >= hourStart) {
       return {
-        fileName: trimmed,
+        audioFileName: trimmed,
         day,
         kind: "hour-range",
         partialIndex: null,
@@ -67,7 +67,7 @@ export const parseTranscriptFileName = (fileName: string): TranscriptFileDescrip
   }
 
   return {
-    fileName: trimmed,
+    audioFileName: trimmed,
     day,
     kind: "unstructured",
     partialIndex: null,

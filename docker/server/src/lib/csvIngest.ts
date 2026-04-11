@@ -43,7 +43,7 @@ export const ingestCsvDirectory = async (directoryPath: string, options: IngestC
     let fileRowsSkipped = 0;
 
     for (const record of dataRows) {
-      const [dateRaw = "", channel = "", duration = "", language = "", translated = "", text = "", filename = ""] = record;
+      const [dateRaw = "", channel = "", duration = "", language = "", translated = "", text = "", audioFileName = ""] = record;
       const parsedDate = dayjs(dateRaw).utc();
 
       if (!parsedDate.isValid()) {
@@ -62,7 +62,7 @@ export const ingestCsvDirectory = async (directoryPath: string, options: IngestC
         language: language.trim(),
         translated: translated.trim(),
         text: text.trim(),
-        filename: filename.trim(),
+        audioFileName: audioFileName.trim(),
         sourceFile: file
       });
     }

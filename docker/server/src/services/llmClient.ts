@@ -251,8 +251,8 @@ export class LlmClient {
       const timestamp = new Date().toISOString().replaceAll(":", "-");
       const safeRequestId = this.sanitizeSegment(requestId);
       const safeComponentId = this.sanitizeSegment(componentId);
-      const fileName = `${timestamp}_${direction}_${safeComponentId}_${safeRequestId}.json`;
-      const filePath = path.join(directionDirectoryPath, fileName);
+      const audioFileName = `${timestamp}_${direction}_${safeComponentId}_${safeRequestId}.json`;
+      const filePath = path.join(directionDirectoryPath, audioFileName);
 
       await writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
     } catch (error) {

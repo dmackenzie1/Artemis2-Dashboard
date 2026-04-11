@@ -66,7 +66,7 @@ export const SignalChatPage: FunctionComponent = () => {
         <article className={`${sharedStyles.panel} ${styles["chat-log"]}`}>
           <h3>Chat Log</h3>
           {!chatResponse && !isThinking ? (
-            <p className={sharedStyles.subtle}>No answer yet. Submit a query to start the search flow.</p>
+            <p className={sharedStyles["pane-state-empty"]}>No answer yet. Submit a query to start the search flow.</p>
           ) : null}
           {isThinking ? <p className={sharedStyles.subtle}>Synthesizing response from ranked evidence…</p> : null}
           {chatResponse ? (
@@ -84,7 +84,7 @@ export const SignalChatPage: FunctionComponent = () => {
 
         <article className={`${sharedStyles.panel} ${styles.evidence}`}>
           <h3>Evidence</h3>
-          {!searchResponse && !isThinking ? <p className={sharedStyles.subtle}>Evidence appears here after retrieval.</p> : null}
+          {!searchResponse && !isThinking ? <p className={sharedStyles["pane-state-empty"]}>Evidence appears here after retrieval.</p> : null}
           {searchResponse ? (
             <p className={styles.strategy}>
               tokens={queryTokenLabel} • results={searchResponse.resultCount}
@@ -99,7 +99,7 @@ export const SignalChatPage: FunctionComponent = () => {
                 </header>
                 <div className={sharedStyles["formatted-copy"]}>{renderStructuredText(entry.text, sharedStyles["formatted-list"])}</div>
                 <small>
-                  day={entry.day} • score={entry.score.toFixed(4)} • file={entry.filename} • source={entry.source}
+                  day={entry.day} • score={entry.score.toFixed(4)} • file={entry.audioFileName} • source={entry.source}
                 </small>
               </li>
             ))}

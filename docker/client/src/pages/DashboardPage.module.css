@@ -14,6 +14,7 @@
 .dashboard-stats-pane,
 .dashboard-bottom-row {
   min-height: 0;
+  height: 100%;
 }
 
 .dashboard-text-pane {

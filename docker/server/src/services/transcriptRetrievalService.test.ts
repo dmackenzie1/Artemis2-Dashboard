@@ -12,7 +12,7 @@ const buildUtterance = (id: string, text: string, channel = "FLIGHT"): Transcrip
   language: "en",
   translated: "no",
   text,
-  filename: `file-${id}.csv`,
+  audioFileName: `file-${id}.csv`,
   sourceFile: `file-${id}.csv`
 });
 
@@ -30,7 +30,7 @@ describe("retrieveRankedUtterances", () => {
 
     expect(result.queryTokens).toContain("cabin");
     expect(result.ranked).toHaveLength(2);
-    expect(result.ranked[0]?.filename).toBe("file-2.csv");
+    expect(result.ranked[0]?.audioFileName).toBe("file-2.csv");
     expect(result.ranked[0]?.score).toBeGreaterThan(result.ranked[1]?.score ?? 0);
   });
 

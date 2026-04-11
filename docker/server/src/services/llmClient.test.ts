@@ -154,12 +154,12 @@ describe("LlmClient.generateText", () => {
       expect(files).toContain("query-set");
       expect(files).toContain("query-receive");
       expect(debugPayloadFiles.length).toBe(2);
-      expect(querySetFiles.some((fileName) => fileName.includes("outgoing_mission_chat_request_1"))).toBe(true);
-      expect(queryReceiveFiles.some((fileName) => fileName.includes("incoming_mission_chat_request_1"))).toBe(true);
+      expect(querySetFiles.some((audioFileName) => audioFileName.includes("outgoing_mission_chat_request_1"))).toBe(true);
+      expect(queryReceiveFiles.some((audioFileName) => audioFileName.includes("incoming_mission_chat_request_1"))).toBe(true);
 
       const outgoingPath = path.join(
         querySetDir,
-        querySetFiles.find((fileName) => fileName.includes("outgoing")) ?? ""
+        querySetFiles.find((audioFileName) => audioFileName.includes("outgoing")) ?? ""
       );
       const outgoingPayload = JSON.parse(await readFile(outgoingPath, "utf8")) as { systemPrompt: string; userPrompt: string };
       expect(outgoingPayload.systemPrompt).toBe("Debug system prompt");

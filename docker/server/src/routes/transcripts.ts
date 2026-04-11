@@ -57,7 +57,7 @@ export const createTranscriptRouter = (getEntityManager: EntityManagerProvider):
           formatted,
           language: row.language,
           translated: row.translated,
-          filename: row.filename,
+          audioFileName: row.audioFileName,
           sourceFile: row.sourceFile
         };
       });

@@ -105,9 +105,12 @@ export const NotableMomentsPage: FunctionComponent = () => {
       ) : null}
 
       {days.length === 0 ? (
-        <section className={sharedStyles.panel}>
-          <p>No notable moments yet. Run ingestion/pipeline and refresh this page.</p>
-        </section>
+        <article className={`${sharedStyles.panel} ${styles["notable-moments-day-panel"]}`}>
+          <div className={styles["notable-moment-day-divider"]}>
+            <h2>Waiting for Data</h2>
+          </div>
+          <p className={sharedStyles["pane-state-empty"]}>No notable moments yet. Run ingestion/pipeline and refresh this page.</p>
+        </article>
       ) : (
         days.map((dayEntry) => (
           <article

@@ -15,7 +15,7 @@ const buildUtterance = (id: string, day: string, channel: string, text: string):
   language: "en",
   translated: text,
   text,
-  filename: `file-${id}.csv`,
+  audioFileName: `file-${id}.csv`,
   sourceFile: `file-${id}.csv`
 });
 

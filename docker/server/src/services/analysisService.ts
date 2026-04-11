@@ -101,7 +101,7 @@ export class AnalysisService {
       day: string;
       channel: string;
       text: string;
-      filename: string;
+      audioFileName: string;
       source: string;
       score: number;
     }>;
@@ -601,7 +601,7 @@ export class AnalysisService {
         timestamp: entry.timestamp,
         day: entry.day,
         channel: entry.channel,
-        filename: entry.filename,
+        audioFileName: entry.audioFileName,
         text: entry.text,
         score,
         reasons: reasons.length > 0 ? reasons : ["high aggregate significance score"]
@@ -667,7 +667,7 @@ export class AnalysisService {
       day: string;
       channel: string;
       text: string;
-      filename: string;
+      audioFileName: string;
       source: string;
       score: number;
     }>;
@@ -710,7 +710,7 @@ export class AnalysisService {
       day: entry.day,
       channel: entry.channel,
       text: entry.text,
-      filename: entry.filename,
+      audioFileName: entry.audioFileName,
       source: entry.sourceFile,
       score: 0
     }));

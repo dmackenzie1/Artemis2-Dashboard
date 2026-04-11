@@ -24,7 +24,7 @@ export type PipelineDashboardData = {
   prompts: Array<{
     id: number;
     key: string;
-    fileName: string;
+    audioFileName: string;
     promptUpdatedAt: string;
     lastRunAt: string | null;
     status: "running" | "success" | "failed" | "never";
@@ -131,7 +131,7 @@ export type NotableUtteranceEntry = {
   timestamp: string;
   day: string;
   channel: string;
-  filename: string;
+  audioFileName: string;
   text: string;
   score: number;
   reasons: string[];
@@ -169,7 +169,7 @@ export type RankedEvidence = {
   day: string;
   timestamp: string;
   channel: string;
-  filename: string;
+  audioFileName: string;
   source: string;
   score: number;
 };
@@ -198,7 +198,7 @@ export type ChatMode = "rag_chat" | "llm_chat";
 export type SystemLogEntry = {
   id: string;
   category: "prompt-submission" | "prompt-outgoing" | "prompt-incoming";
-  fileName: string;
+  audioFileName: string;
   relativePath: string;
   sizeBytes: number;
   modifiedAt: string;

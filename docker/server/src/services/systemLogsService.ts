@@ -7,7 +7,7 @@ const MAX_SYSTEM_LOG_FILES = 500;
 export type SystemLogEntry = {
   id: string;
   category: "prompt-submission" | "prompt-outgoing" | "prompt-incoming";
-  fileName: string;
+  audioFileName: string;
   relativePath: string;
   absolutePath: string;
   sizeBytes: number;
@@ -78,7 +78,7 @@ export class SystemLogsService {
             return {
               id: encodeSystemLogId(category, relativePath),
               category,
-              fileName: entry.name,
+              audioFileName: entry.name,
               relativePath,
               absolutePath,
               sizeBytes: stat.size,
@@ -136,7 +136,7 @@ export class SystemLogsService {
         entry: {
           id,
           category: parsed.category,
-          fileName: path.basename(absolutePath),
+          audioFileName: path.basename(absolutePath),
           relativePath: parsed.relativePath,
           sizeBytes: stat.size,
           modifiedAt: dayjs(stat.mtime).utc().toISOString()

@@ -13,7 +13,9 @@
 }
 
 .stats-groups {
-  display: grid;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   gap: 0.48rem;
   min-height: 0;
   overflow-y: auto;

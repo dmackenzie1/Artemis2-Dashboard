@@ -20,12 +20,12 @@ describe("ingestTranscriptCsvDirectory", () => {
     tempDirectories.push(directoryPath);
 
     const malformedCsvContent = [
-      "Date,Channel,Duration,Language,Translated,Text,Filename",
+      "Date,Channel,Duration,Language,Translated,Text,audioFileName",
       "2026-04-05T21:01:00Z,FLIGHT,00:30,en,No,\"broken quote line,log-2.csv"
     ].join("\n");
 
     const validCsvContent = [
-      "Date,Channel,Duration,Language,Translated,Text,Filename",
+      "Date,Channel,Duration,Language,Translated,Text,audioFileName",
       "2026-04-05T21:00:00Z,FLIGHT,00:30,en,No,Crew reported stowage size 2'6\" in transfer bag,log-1.csv"
     ].join("\n");
 
@@ -64,12 +64,12 @@ describe("ingestTranscriptCsvDirectory", () => {
     expect(em.nativeDelete).toHaveBeenCalledWith(TranscriptUtterance, { sourceFile: "2026-04-05_summary.csv" });
   });
 
-  it("logs mismatched filename date and overlapping partial hour files", async () => {
+  it("logs mismatched audioFileName date and overlapping partial hour files", async () => {
     const directoryPath = await mkdtemp(path.join(tmpdir(), "transcript-ingest-"));
     tempDirectories.push(directoryPath);
 
     const content = [
-      "Date,Channel,Duration,Language,Translated,Text,Filename",
+      "Date,Channel,Duration,Language,Translated,Text,audioFileName",
       "2026-04-08T01:00:00Z,FLIGHT,00:30,en,No,Day mismatch row,log-1.csv"
     ].join("\n");
 

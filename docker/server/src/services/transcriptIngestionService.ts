@@ -146,7 +146,7 @@ const ingestFile = async (filePath: string, em: EntityManager, checksum: string)
       language: row.Language ?? "",
       translated: row.Translated ?? "",
       text: row.Text ?? "",
-      filename: row.Filename ?? "",
+      audioFileName: row.Filename ?? "",
       sourceFile
     });
 
@@ -252,28 +252,28 @@ const ingestFile = async (filePath: string, em: EntityManager, checksum: string)
 };
 
 const logOverlapWarnings = (fileNames: string[]): void => {
-  const groupedByDay = fileNames.reduce<Map<string, string[]>>((grouped, fileName) => {
-    const parsed = parseTranscriptFileName(fileName);
+  const groupedByDay = fileNames.reduce<Map<string, string[]>>((grouped, audioFileName) => {
+    const parsed = parseTranscriptFileName(audioFileName);
     if (!parsed) {
       return grouped;
     }
 
     const existing = grouped.get(parsed.day) ?? [];
-    existing.push(fileName);
+    existing.push(audioFileName);
     grouped.set(parsed.day, existing);
     return grouped;
   }, new Map<string, string[]>());
 
   for (const [day, dayFileNames] of groupedByDay.entries()) {
     const parsed = dayFileNames
-      .map((fileName) => parseTranscriptFileName(fileName))
+      .map((audioFileName) => parseTranscriptFileName(audioFileName))
       .filter((descriptor): descriptor is NonNullable<typeof descriptor> => Boolean(descriptor));
 
     const fullDayFiles = parsed.filter((descriptor) => descriptor.kind === "full-day");
     if (fullDayFiles.length > 1) {
       serverLogger.warn("Duplicate full-day transcript files detected for a single day", {
         day,
-        files: fullDayFiles.map((descriptor) => descriptor.fileName)
+        files: fullDayFiles.map((descriptor) => descriptor.audioFileName)
       });
     }
 
@@ -287,8 +287,8 @@ const logOverlapWarnings = (fileNames: string[]): void => {
       if ((current.hourStart ?? 0) <= (previous.hourEnd ?? -1)) {
         serverLogger.warn("Overlapping hour-range transcript files detected", {
           day,
-          previousFile: previous.fileName,
-          currentFile: current.fileName,
+          previousFile: previous.audioFileName,
+          currentFile: current.audioFileName,
           previousRange: `${previous.hourStart}-${previous.hourEnd}`,
           currentRange: `${current.hourStart}-${current.hourEnd}`
         });
@@ -303,7 +303,7 @@ export const ingestTranscriptCsvDirectory = async (
   options: IngestTranscriptCsvDirectoryOptions = {}
 ): Promise<TranscriptIngestionSummary> => {
   const files = (await fs.readdir(transcriptCsvDir))
-    .filter((fileName) => fileName.toLowerCase().endsWith(".csv"))
+    .filter((audioFileName) => audioFileName.toLowerCase().endsWith(".csv"))
     .sort(compareTranscriptFiles);
 
   logOverlapWarnings(files);
@@ -330,23 +330,23 @@ export const ingestTranscriptCsvDirectory = async (
     });
   }
 
-  for (const fileName of files) {
-    const filePath = path.join(transcriptCsvDir, fileName);
+  for (const audioFileName of files) {
+    const filePath = path.join(transcriptCsvDir, audioFileName);
     const checksum = await checksumFile(filePath);
-    const existingManifest = manifestBySourceFile.get(fileName);
+    const existingManifest = manifestBySourceFile.get(audioFileName);
     if (existingManifest?.checksum === checksum) {
       filesSkippedUnchanged += 1;
       continue;
     }
 
-    const parsedSourceFile = parseTranscriptFileName(fileName);
+    const parsedSourceFile = parseTranscriptFileName(audioFileName);
     const day = parsedSourceFile?.day ?? "unspecified-day";
     options.onFileLoadStarted?.({
-      sourceFile: fileName,
+      sourceFile: audioFileName,
       day,
       parsedSourceFile
     });
-    const deletedRows = await em.nativeDelete(TranscriptUtterance, { sourceFile: fileName });
+    const deletedRows = await em.nativeDelete(TranscriptUtterance, { sourceFile: audioFileName });
     deleted += deletedRows;
 
     const result = await ingestFile(filePath, em, checksum);
@@ -356,7 +356,7 @@ export const ingestTranscriptCsvDirectory = async (
     changedDayKeys.add(result.day);
 
     const nextManifest = existingManifest ?? em.create(IngestionSourceFile, {
-      sourceFile: fileName,
+      sourceFile: audioFileName,
       checksum: result.checksum,
       day,
       rowCount: result.inserted,
@@ -380,7 +380,7 @@ export const ingestTranscriptCsvDirectory = async (
     });
 
     serverLogger.info("Inserted records from transcript file", {
-      fileName,
+      audioFileName,
       deletedRows,
       insertedRecords: result.inserted,
       skippedRecords: result.skipped,

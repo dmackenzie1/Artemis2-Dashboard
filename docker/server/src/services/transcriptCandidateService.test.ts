@@ -25,7 +25,7 @@ describe("loadTranscriptCandidates", () => {
         language: "en",
         translated: false,
         text: "Sample transcript line",
-        filename: "transcript.csv",
+        audioFileName: "transcript.csv",
         sourceFile: "source_files/transcript.csv",
         tokens: ["sample", "transcript", "line"]
       }
@@ -62,7 +62,7 @@ describe("loadTranscriptCandidates", () => {
         translated: "no",
         text: "Sample transcript line",
         tokens: ["sample", "transcript", "line"],
-        filename: "transcript.csv",
+        audioFileName: "transcript.csv",
         sourceFile: "source_files/transcript.csv"
       }
     ]);
