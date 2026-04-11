@@ -5,7 +5,12 @@ import { normalizeTokenWithAsrCorrections } from "./asrCorrections.js";
 const tokenizer = winkTokenizer();
 const MIN_TOKEN_LENGTH = 3;
 
-const normalizeText = (text: string): string => text.normalize("NFKC").toLowerCase();
+const normalizeText = (text: string): string =>
+  text
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\btalkie\s*bot\b/gi, "talkybot")
+    .replace(/\btalkiebot\b/gi, "talkybot");
 
 const normalizeTokenStream = (tokens: string[]): string[] => {
   const normalized: string[] = [];

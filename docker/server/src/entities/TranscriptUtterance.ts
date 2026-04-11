@@ -56,6 +56,7 @@ export class TranscriptUtterance {
 export const TranscriptUtteranceSchema = new EntitySchema<TranscriptUtterance>({
   class: TranscriptUtterance,
   tableName: "transcript_utterances",
+  indexes: [{ properties: "tokens", type: "gin" }],
   properties: {
     id: { type: "number", primary: true, autoincrement: true },
     timestamp: { type: "datetime", index: true },

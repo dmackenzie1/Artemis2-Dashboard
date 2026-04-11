@@ -44,8 +44,8 @@ describe("loadTranscriptCandidates", () => {
     const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("u.tokens && array[?]::text[]");
     expect(sql).toContain("token = any(array[?]::text[])");
-    expect(params[0]).toEqual(expect.arrayContaining(["give", "references", "talkie", "bot", "emss"]));
-    expect(params[1]).toEqual(expect.arrayContaining(["give", "references", "talkie", "bot", "emss"]));
+    expect(params[0]).toEqual(expect.arrayContaining(["give", "references", "talkybot", "emss"]));
+    expect(params[1]).toEqual(expect.arrayContaining(["give", "references", "talkybot", "emss"]));
     expect(params[2]).toBe("FD");
     expect(params[3]).toBe("FD");
     expect(params[4]).toBe(250);

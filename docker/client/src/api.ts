@@ -164,22 +164,11 @@ export type TimeWindowSummaryData = {
   }>;
 };
 
-export type HealthData = {
-  ok: boolean;
-  llm: {
-    connected: boolean;
-    model: string | null;
-    baseUrl: string | null;
-    checkedAt: string;
-    error: string | null;
-  };
-};
-
 export type RankedEvidence = {
-  timestamp: string;
-  day: string;
-  channel: string;
   text: string;
+  day: string;
+  timestamp: string;
+  channel: string;
   filename: string;
   source: string;
   score: number;
@@ -327,16 +316,6 @@ export const fetchPipelineSummariesCatalog = async (): Promise<PipelineSummaries
   return (await response.json()) as PipelineSummariesCatalogData;
 };
 
-export const triggerPipelineRun = async (): Promise<TriggerPipelineRunResponse> => {
-  const response = await fetch(`${base}/pipeline/run`, { method: "POST" });
-  if (!response.ok) {
-    clientLogger.error("Pipeline run request failed", { status: response.status });
-    throw new Error("Unable to trigger pipeline run");
-  }
-
-  return (await response.json()) as TriggerPipelineRunResponse;
-};
-
 export const triggerIngest = async (): Promise<TriggerIngestResponse> => {
   const response = await fetch(`${base}/ingest`, { method: "POST", cache: "no-store" });
   if (!response.ok) {
@@ -437,15 +416,6 @@ export const fetchNotableUtterances = async (limit = 10, days = 7): Promise<Nota
   }
 
   return (await response.json()) as NotableUtterancesResponse;
-};
-
-export const fetchHealth = async (): Promise<HealthData> => {
-  const response = await fetch(`${base}/health`);
-  if (!response.ok) {
-    throw new Error("Unable to load health status");
-  }
-
-  return (await response.json()) as HealthData;
 };
 
 export const fetchNotableMoments = async (): Promise<NotableMomentsData | null> => {

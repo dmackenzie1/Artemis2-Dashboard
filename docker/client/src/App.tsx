@@ -7,7 +7,6 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { DailyPage } from "./pages/DailyPage";
 import styles from "./App.module.css";
 import { TimelinePage } from "./pages/TimelinePage";
-import { TopicPage } from "./pages/TopicPage";
 import { NotableMomentsPage } from "./pages/NotableMomentsPage";
 import { SystemLogsPage } from "./pages/SystemLogsPage";
 import { SignalChatPage } from "./pages/SignalChatPage";
@@ -166,7 +165,6 @@ export const App: FC = () => {
           <Route path="/search" element={<Navigate to="/chat" replace />} />
           <Route path="/system-logs" element={<SystemLogsPage />} />
           <Route path="/about" element={<AboutPage />} />
-          <Route path="/topics/:title" element={<TopicPage />} />
         </Routes>
       </main>
     </div>

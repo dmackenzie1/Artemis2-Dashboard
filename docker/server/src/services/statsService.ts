@@ -55,6 +55,7 @@ export class StatsService {
   private readonly summaryCache = new ExpiringCache<MissionStatsSummary>(statsFreshCacheTtlMs, statsStaleCacheTtlMs);
   private readonly dailyCache = new ExpiringCache<MissionStatsByDayEntry[]>(statsFreshCacheTtlMs, statsStaleCacheTtlMs);
   private readonly hourlyCache = new ExpiringCache<MissionHourlyChannelEntry[]>(statsFreshCacheTtlMs, statsStaleCacheTtlMs);
+  private readonly channelCache = new ExpiringCache<MissionChannelTotalsEntry[]>(statsFreshCacheTtlMs, statsStaleCacheTtlMs);
   private readonly refreshInFlight = new Map<string, Promise<void>>();
 
   constructor(private readonly getEntityManager: EntityManagerProvider) {}
@@ -177,25 +178,27 @@ export class StatsService {
   }
 
   async getChannelTotals(): Promise<MissionChannelTotalsEntry[]> {
-    const rows = await this.getEntityManager().getConnection().execute<
-      { channel: string; utterances: string; words: string }[]
-    >(
-      `
-        select
-          coalesce(nullif(trim(channel), ''), 'UNSPECIFIED') as "channel",
-          count(*)::text as "utterances",
-          coalesce(sum(word_count), 0)::text as "words"
-        from transcript_utterances
-        group by 1
-        order by count(*) desc, 1 asc
-      `
-    );
+    return this.resolveWithStaleWhileRevalidate("channel-totals", this.channelCache, async () => {
+      const rows = await this.getEntityManager().getConnection().execute<
+        { channel: string; utterances: string; words: string }[]
+      >(
+        `
+          select
+            coalesce(nullif(trim(channel), ''), 'UNSPECIFIED') as "channel",
+            count(*)::text as "utterances",
+            coalesce(sum(word_count), 0)::text as "words"
+          from transcript_utterances
+          group by 1
+          order by count(*) desc, 1 asc
+        `
+      );
 
-    return rows.map((row) => ({
-      channel: row.channel,
-      utterances: Number(row.utterances),
-      words: Number(row.words)
-    }));
+      return rows.map((row) => ({
+        channel: row.channel,
+        utterances: Number(row.utterances),
+        words: Number(row.words)
+      }));
+    });
   }
 
   inspectHourlyRequest(days = 7): HourlyStatsRequestDiagnostics {
@@ -214,17 +217,20 @@ export class StatsService {
     this.summaryCache.clear();
     this.dailyCache.clear();
     this.hourlyCache.clear();
+    this.channelCache.clear();
   }
 
   inspectCaches(): {
     summary: ReturnType<ExpiringCache<MissionStatsSummary>["inspect"]>;
     daily: ReturnType<ExpiringCache<MissionStatsByDayEntry[]>["inspect"]>;
     hourly: ReturnType<ExpiringCache<MissionHourlyChannelEntry[]>["inspect"]>;
+    channel: ReturnType<ExpiringCache<MissionChannelTotalsEntry[]>["inspect"]>;
   } {
     return {
       summary: this.summaryCache.inspect(),
       daily: this.dailyCache.inspect(),
-      hourly: this.hourlyCache.inspect()
+      hourly: this.hourlyCache.inspect(),
+      channel: this.channelCache.inspect()
     };
   }
 

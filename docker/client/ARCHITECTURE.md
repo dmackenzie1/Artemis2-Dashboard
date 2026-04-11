@@ -30,17 +30,11 @@ This document is the implementation map for `docker/client/src`.
 | `pages/TimelinePage.tsx` | Long-form timeline view with mission chronology presentation logic. |
 | `pages/NotableMomentsPage.tsx` | Notable moments route parsing daily JSON payload from pipeline output. |
 | `pages/SystemLogsPage.tsx` | Operator system-log browser for prompt artifacts/debug files. |
-| `pages/TopicPage.tsx` | Topic detail route for `/topics/:title` drill-down content. |
 | `pages/dashboard/types.ts` | Dashboard-page-specific view-model typing. |
-| `pages/dashboard/dashboardViewModel.ts` | Pure transformation layer from API payloads to dashboard view model. |
-| `pages/dashboard/dashboardViewModel.test.ts` | Unit tests for dashboard view-model shaping logic. |
 | `pages/dashboard/useDashboardController.ts` | Legacy controller from older centralized dashboard orchestration; retained for historical reference/tests and no longer used by `DashboardPage`. |
 | `components/dashboard/types.ts` | Shared dashboard component prop/data contracts. |
 | `components/dashboard/promptDisplay.ts` | Prompt status/value helper utilities for pane rendering. |
-| `components/dashboard/MissionOverviewPanel.tsx` | Legacy standalone mission summary panel UI (kept for reference; mission summary is now selected via the unified workspace panel). |
-| `components/dashboard/DailySummaryPanel.tsx` | Legacy daily summary panel UI. |
 | `components/dashboard/StatsPanel.tsx` | Mission metrics table + daily volume chart panel UI. |
-| `components/dashboard/MissionChatPanel.tsx` | Query Console chat interaction panel UI. |
 | `components/dashboard/UtterancesTimelinePanel.tsx` | Mission hourly histogram/timeline panel UI. |
 | `components/dashboard/primitives/DashboardPanel.tsx` | Shared panel chrome/frame wrapper. |
 | `components/dashboard/primitives/StatusBadge.tsx` | Small status chip used in topbar and panels. |

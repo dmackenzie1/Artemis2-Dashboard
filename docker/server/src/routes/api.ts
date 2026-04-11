@@ -18,10 +18,6 @@ export const createApiRouter = (
   const router = Router();
   const MAX_NOTABLE_UTTERANCES_LIMIT = 50;
 
-  router.get("/health", (_req, res) => {
-    res.json({ ok: true, llm: getLlmConnectivityStatus() });
-  });
-
   router.post("/ingest", async (_req, res, next) => {
     try {
       serverLogger.info("Ingest endpoint invoked");
@@ -189,23 +185,6 @@ export const createApiRouter = (
       next(error);
     }
   });
-
-  router.get("/topics/:topicTitle", (req, res) => {
-    const topicTitle = decodeURIComponent(req.params.topicTitle).toLowerCase();
-    const cache = analysisService.getCache();
-
-    const details = cache?.days
-      .flatMap((day) => day.topics.map((topic) => ({ ...topic, day })))
-      .find((topic) => topic.title.toLowerCase() === topicTitle);
-
-    if (!details) {
-      res.status(404).json({ message: "Topic not found" });
-      return;
-    }
-
-    res.json(details);
-  });
-
 
   router.get("/notable-utterances", (req, res, next) => {
     try {
