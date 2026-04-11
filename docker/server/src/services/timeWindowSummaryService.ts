@@ -6,10 +6,13 @@ import type { LlmClient } from "./llmClient.js";
 import { getPrompt } from "../lib/prompts.js";
 import { serverLogger } from "../utils/logging/serverLogger.js";
 import { ExpiringCache } from "./expiringCache.js";
+import { PromptDefinition } from "../entities/PromptDefinition.js";
+import { PromptExecution } from "../entities/PromptExecution.js";
 
 type EntityManagerProvider = () => EntityManager;
 const rollingWindowFreshCacheTtlMs = 40 * 60 * 1000;
 const rollingWindowStaleCacheTtlMs = 80 * 60 * 1000;
+const globalPromptDayMarker = "*";
 
 type TimeWindowUtteranceRow = {
   timestamp: string;
@@ -171,25 +174,65 @@ export class TimeWindowSummaryService {
     }));
 
     const systemPrompt = await getPrompt(this.promptsDir, "time_window_summary.txt");
-    const llmRaw = await this.llmClient.generateText({
-      systemPrompt,
-      userPrompt: JSON.stringify(
-        {
-          window: {
-            hours: safeHours,
-            start: windowStart.toISOString(),
-            end: windowEnd.toISOString()
-          },
-          stats: totals,
-          promptGuidance:
-            "Focus on what is new, currently changing, and operationally relevant in this exact rolling window. Prioritize recency and avoid retrospective mission-history narration.",
-          hours: context
+    const userPrompt = JSON.stringify(
+      {
+        window: {
+          hours: safeHours,
+          start: windowStart.toISOString(),
+          end: windowEnd.toISOString()
         },
-        null,
-        2
-      ),
-      componentId: `analysis/time-window/${safeHours}-hour`
-    });
+        stats: totals,
+        promptGuidance:
+          "Focus on what is new, currently changing, and operationally relevant in this exact rolling window. Prioritize recency and avoid retrospective mission-history narration.",
+        hours: context
+      },
+      null,
+      2
+    );
+
+    const em = this.getEntityManager();
+    const promptDefinition = await em.findOne(PromptDefinition, { key: "time_window_summary" });
+    const startedAt = dayjs().utc().toDate();
+    const execution = promptDefinition
+      ? em.create(PromptExecution, {
+          prompt: promptDefinition,
+          responseDay: globalPromptDayMarker,
+          startedAt,
+          sentAt: startedAt,
+          receivedAt: null,
+          status: "running",
+          submittedText: userPrompt,
+          output: "",
+          errorMessage: null
+        })
+      : null;
+    if (execution) {
+      em.persist(execution);
+      await em.flush();
+    }
+
+    let llmRaw: string;
+    try {
+      llmRaw = await this.llmClient.generateText({
+        systemPrompt,
+        userPrompt,
+        componentId: `analysis/time-window/${safeHours}-hour`
+      });
+      if (execution) {
+        execution.status = "success";
+        execution.output = llmRaw;
+        execution.receivedAt = dayjs().utc().toDate();
+        await em.flush();
+      }
+    } catch (error) {
+      if (execution) {
+        execution.status = "failed";
+        execution.errorMessage = error instanceof Error ? error.message : "Unknown error";
+        execution.receivedAt = dayjs().utc().toDate();
+        await em.flush();
+      }
+      throw error;
+    }
 
     const parsed = parseLlmJsonWithSchema(llmRaw, llmOutputSchema, "object");
     if (!parsed.ok) {
