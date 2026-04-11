@@ -5,9 +5,20 @@
   flex-direction: column;
 }
 
+.stats-panel :global(.panel-body) {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .stats-groups {
   display: grid;
   gap: 0.48rem;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.16rem;
 }
 
 .stats-group {
