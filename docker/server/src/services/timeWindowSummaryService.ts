@@ -118,7 +118,7 @@ export class TimeWindowSummaryService {
           to_char(timestamp at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "timestamp",
           channel,
           text,
-          audioFileName,
+          audio_file_name as "audioFileName",
           source_file as "sourceFile",
           word_count::text as "wordCount"
         from transcript_utterances

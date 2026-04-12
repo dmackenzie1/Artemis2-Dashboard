@@ -50,7 +50,7 @@ export const loadTranscriptCandidates = async (
         u.language,
         u.translated,
         u.text,
-        u.audioFileName,
+        u.audio_file_name as "audioFileName",
         u.source_file as "sourceFile",
         u.tokens
       from transcript_utterances u
