@@ -62,12 +62,12 @@ const parseDailySummaryHtml = (html: string): ParsedDailySummary => {
       currentBodyParts = [];
       seenFirstHeading = true;
     } else if (!seenFirstHeading) {
-      const text = el.textContent?.trim() ?? "";
+      const text = el.innerHTML?.trim() ?? "";
       if (text.length > 0) {
         topParagraphs.push(text);
       }
     } else if (currentHeading !== null) {
-      const text = el.textContent?.trim() ?? "";
+      const text = el.innerHTML?.trim() ?? "";
       if (text.length > 0) {
         currentBodyParts.push(text);
       }
@@ -230,9 +230,7 @@ export const DailyPage: FunctionComponent = () => {
 
             {/* Top narrative — opening mission overview paragraphs */}
             {parsed.topNarrative ? (
-              <div className={`${sharedStyles["formatted-copy"]} ${styles["daily-top-narrative"]}`}>
-                <p>{parsed.topNarrative}</p>
-              </div>
+              <div className={`${sharedStyles["formatted-copy"]} ${styles["daily-top-narrative"]}`} dangerouslySetInnerHTML={{ __html: parsed.topNarrative }} />
             ) : null}
 
             {/* Hour-by-hour milestone sections extracted from pipeline HTML */}
@@ -243,7 +241,7 @@ export const DailyPage: FunctionComponent = () => {
                   {parsed.sections.map((section) => (
                     <p className={sharedStyles.subtle} key={`${entry.day}-${section.heading}`}>
                       <span className={styles["hourly-highlight-hour"]}>{section.heading}</span>{" "}
-                      {section.body ? section.body : "No additional details recorded for this hour window."}
+                      {section.body ? <span dangerouslySetInnerHTML={{ __html: section.body }} /> : "No additional details recorded for this hour window."}
                     </p>
                   ))}
                 </div>
@@ -252,7 +250,7 @@ export const DailyPage: FunctionComponent = () => {
               // Fallback: render the full summary as structured text when no
               // <h3> sections were found (plain-text or markdown LLM output).
               <div className={sharedStyles["formatted-copy"]}>
-                <p className={sharedStyles.subtle}>{entry.summary.slice(0, 800)}</p>
+                <div className={sharedStyles.subtle} dangerouslySetInnerHTML={{ __html: entry.summary.slice(0, 800) }} />
               </div>
             )}
 
@@ -264,8 +262,8 @@ export const DailyPage: FunctionComponent = () => {
                   {dayNotableMoments.map((moment) => (
                     <article className={styles["daily-notable-card"]} key={`${entry.day}-${moment.rank}-${moment.title}`}>
                       <p className={styles["daily-notable-rank"]}>#{moment.rank}</p>
-                      <h4>{moment.title}</h4>
-                      <blockquote>{moment.quote}</blockquote>
+                      <h4 dangerouslySetInnerHTML={{ __html: moment.title }} />
+                      <blockquote dangerouslySetInnerHTML={{ __html: moment.quote }} />
                       <p className={sharedStyles.subtle}>
                         {moment.timestamp ?? "timestamp n/a"} • {moment.channel ?? "channel n/a"}
                       </p>

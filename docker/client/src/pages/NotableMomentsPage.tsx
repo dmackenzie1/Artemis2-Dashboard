@@ -128,9 +128,9 @@ export const NotableMomentsPage: FunctionComponent = () => {
                   key={`${dayEntry.day}-${moment.rank}-${moment.title}`}
                 >
                   <p className={styles["notable-moment-rank"]}>#{moment.rank}</p>
-                  <h3>{moment.title}</h3>
-                  <blockquote className={styles["notable-moment-quote"]}>{moment.quote}</blockquote>
-                  {showReasoning && moment.reason.trim().length > 0 ? <p>{moment.reason}</p> : null}
+                  <h3 dangerouslySetInnerHTML={{ __html: moment.title }} />
+                  <blockquote className={styles["notable-moment-quote"]} dangerouslySetInnerHTML={{ __html: moment.quote }} />
+                  {showReasoning && moment.reason.trim().length > 0 ? <p dangerouslySetInnerHTML={{ __html: moment.reason }} /> : null}
                   <p className={styles["notable-moment-meta"]}>
                     {moment.timestamp ?? "timestamp n/a"} • {moment.channel ?? "channel n/a"}
                   </p>

@@ -81,36 +81,47 @@ const toUtcDayKey = (timestamp: number): string =>
     day: "2-digit"
   }).format(timestamp);
 
+const stripHtml = (html: string): string => {
+  if (typeof window === "undefined") {
+    return html.replace(/<\/?[^>]+(>|$)/g, "");
+  }
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return doc.body.textContent || "";
+};
+
 const toSummaryBody = (summary: string): string => {
   const compact = summary.replace(/\s+/g, " ").trim();
-  if (compact.length <= 360) {
+  const plainText = stripHtml(compact);
+  if (plainText.length <= 360) {
     return compact;
   }
 
-  return `${compact.slice(0, 357)}...`;
+  return `${plainText.slice(0, 357)}...`;
 };
 
 const toReadableQuote = (quote: string): string => {
   const compact = quote.replace(/\s+/g, " ").trim();
-  if (compact.length <= 240) {
+  const plainText = stripHtml(compact);
+  if (plainText.length <= 240) {
     return compact;
   }
 
-  return `${compact.slice(0, 237)}...`;
+  return `${plainText.slice(0, 237)}...`;
 };
 
 const toSummaryHighlights = (summary: string): string[] => {
   const normalized = summary.replace(/\s+/g, " ").trim();
-  const sentenceChunks = normalized
+  const plainText = stripHtml(normalized);
+  const sentenceChunks = plainText
     .split(/(?<=[.!?])\s+/)
     .map((sentence) => sentence.trim())
     .filter((sentence) => sentence.length >= 48);
 
   if (sentenceChunks.length === 0) {
-    if (normalized.length === 0) {
+    if (plainText.length === 0) {
       return [];
     }
-    return [toSummaryBody(normalized)];
+    return [toSummaryBody(plainText)];
   }
 
   return sentenceChunks.slice(0, MAX_SUMMARY_HIGHLIGHTS_PER_DAY);
